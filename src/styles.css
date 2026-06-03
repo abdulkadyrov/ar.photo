@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f5f7fa;
+  --card: #ffffff;
+  --primary: #2563eb;
+  --ink: #111827;
+  --muted: #64748b;
+  --line: #e5e7eb;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b1220;
+    --card: #111827;
+    --ink: #f9fafb;
+    --muted: #94a3b8;
+    --line: #243044;
+    color-scheme: dark;
+  }
+  input,
+  .bg-white {
+    background-color: #111827;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.btn {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border-radius: 16px;
+  padding: 0.72rem 1rem;
+  font-size: 0.94rem;
+  font-weight: 700;
+  transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-ghost {
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--card) 92%, var(--primary));
+  color: var(--ink);
+}
+
+.btn-quiet {
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--background) 74%, var(--card));
+  color: var(--ink);
+}
