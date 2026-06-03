@@ -2,6 +2,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "re
 import { QRCodeCanvas } from "qrcode.react";
 import {
   ArrowLeft,
+  AlertTriangle,
   Camera,
   Download,
   Expand,
@@ -24,7 +25,7 @@ import type { ARClass, ARProject, ARStudent, LivePhoto, Media, StoreSnapshot } f
 import { clearAll, deleteProjectCascade, getMediaBlob, importSnapshot, loadData, saveClass, saveLivePhoto, saveMedia, saveProject, saveStudent } from "./lib/db";
 import { createId, nowIso } from "./lib/id";
 import { exportClassZip, exportProjectZip, getClassStats, parseImportZip } from "./lib/zip";
-import { go, href, parseRoute, viewerUrl } from "./lib/routes";
+import { go, parseRoute, viewerUrl } from "./lib/routes";
 
 const emptySnapshot: StoreSnapshot = {
   projects: [],
@@ -54,6 +55,7 @@ export function App() {
 
   if (loading) return <Shell><StatusPanel title="Подготовка AR..." text="Загружаем локальное хранилище." /></Shell>;
   if (route.name === "project") return <ProjectPage snapshot={snapshot} projectId={route.id} refresh={refresh} />;
+  if (route.name === "viewer" && route.id === "test") return <TestViewerPage />;
   if (route.name === "viewer") return <ViewerPage snapshot={snapshot} livePhotoId={route.id} />;
   if (route.name === "dashboard") return <Dashboard snapshot={snapshot} refresh={refresh} />;
   return <Home snapshot={snapshot} refresh={refresh} />;
@@ -73,8 +75,9 @@ function Home({ snapshot, refresh }: { snapshot: StoreSnapshot; refresh: () => P
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">School AR Photo</p>
             <h1 className="max-w-3xl text-5xl font-semibold leading-tight md:text-7xl">Оживающие выпускные фотографии</h1>
             <p className="max-w-2xl text-lg leading-8 text-muted">Создавайте школьные AR-альбомы без backend: фото, видео, QR, ZIP-экспорт и локальная работа прямо в браузере.</p>
-            <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3">
               <Button onClick={() => go("/dashboard")} icon={<FolderPlus size={19} />}>Открыть проекты</Button>
+              <Button variant="ghost" onClick={() => go("/viewer/test")} icon={<Camera size={18} />}>Test Viewer</Button>
               <Button variant="ghost" onClick={() => seedDemo(refresh)} icon={<Play size={18} />}>Создать демо</Button>
             </div>
           </div>
@@ -371,6 +374,96 @@ function ViewerPage({ snapshot, livePhotoId }: { snapshot: StoreSnapshot; livePh
   );
 }
 
+function TestViewerPage() {
+  const base = import.meta.env.BASE_URL;
+  const imageSrc = `${base}test-assets/test.jpg`;
+  const videoSrc = `${base}test-assets/test.mp4`;
+  const targetSrc = `${base}test-assets/test.mind`;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const fallbackCameraRef = useRef<HTMLVideoElement>(null);
+  const fallbackVideoRef = useRef<HTMLVideoElement>(null);
+  const [status, setStatus] = useState("Проверяем test assets...");
+  const [mode, setMode] = useState<"loading" | "mindar" | "fallback" | "missing">("loading");
+  const [muted, setMuted] = useState(true);
+
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+
+    async function boot() {
+      const [hasImage, hasVideo, hasTarget] = await Promise.all([assetExists(imageSrc), assetExists(videoSrc), assetExists(targetSrc)]);
+      if (!hasImage || !hasVideo) {
+        setMode("missing");
+        setStatus("Нужны public/test-assets/test.jpg и public/test-assets/test.mp4");
+        return;
+      }
+      if (!hasTarget) {
+        setMode("fallback");
+        setStatus("test.mind не найден: показываем camera preview и test.mp4 без image tracking");
+        cleanup = await startFallbackCamera(fallbackCameraRef.current);
+        return;
+      }
+
+      setMode("mindar");
+      setStatus("Подготовка MindAR...");
+      try {
+        cleanup = await startMindAr({
+          container: containerRef.current,
+          targetSrc,
+          videoSrc,
+          muted,
+          onStatus: setStatus,
+        });
+      } catch (error) {
+        setMode("fallback");
+        setStatus(error instanceof Error ? error.message : "MindAR не запустился, включен fallback viewer");
+        cleanup = await startFallbackCamera(fallbackCameraRef.current);
+      }
+    }
+
+    boot();
+    return () => cleanup?.();
+  }, [imageSrc, muted, targetSrc, videoSrc]);
+
+  const replay = () => {
+    const video = fallbackVideoRef.current;
+    if (!video) return;
+    video.currentTime = 0;
+    video.play();
+  };
+
+  return (
+    <Shell flush>
+      <div className="relative min-h-screen overflow-hidden bg-black text-white">
+        <div ref={containerRef} className={mode === "mindar" ? "absolute inset-0" : "hidden"} />
+        {mode !== "mindar" && (
+          <>
+            <video ref={fallbackCameraRef} className="absolute inset-0 h-full w-full object-cover opacity-70" playsInline muted />
+            <div className="absolute left-1/2 top-1/2 aspect-[3/4] w-[76vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[18px] border border-white/50 bg-black shadow-[0_30px_90px_rgba(0,0,0,0.45)]">
+              <video ref={fallbackVideoRef} className="h-full w-full object-cover" src={videoSrc} muted={muted} autoPlay loop playsInline />
+            </div>
+          </>
+        )}
+        <div className="absolute inset-x-4 top-5 rounded-[20px] bg-black/55 p-4 text-white backdrop-blur">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            {mode === "fallback" || mode === "missing" ? <AlertTriangle size={17} /> : <Camera size={17} />}
+            <span>{mode === "mindar" ? "Наведите камеру на test.jpg" : "Test Viewer"}</span>
+          </div>
+          <div className="mt-1 text-xs leading-5 text-white/75">{status}</div>
+          <div className="mt-3 flex items-center gap-3 text-xs text-white/75">
+            <img src={imageSrc} className="h-14 w-11 rounded-lg object-cover" alt="test target" />
+            <span>Файлы: test.jpg, test.mp4{mode !== "mindar" ? ", нужен test.mind для tracking" : ""}</span>
+          </div>
+        </div>
+        <div className="absolute inset-x-4 bottom-5 grid grid-cols-3 gap-2">
+          <ControlButton onClick={() => setMuted((value) => !value)} icon={muted ? <VolumeX /> : <Volume2 />} label="Звук" />
+          <ControlButton onClick={() => document.documentElement.requestFullscreen?.()} icon={<Maximize2 />} label="Fullscreen" />
+          <ControlButton onClick={replay} icon={<RotateCcw />} label="Повтор" />
+        </div>
+      </div>
+    </Shell>
+  );
+}
+
 function Topbar({ snapshot, refresh }: { snapshot: StoreSnapshot; refresh: () => Promise<void> }) {
   return (
     <header className="flex items-center justify-between gap-4">
@@ -446,6 +539,119 @@ function ControlButton({ icon, label, onClick }: { icon: React.ReactNode; label:
 
 function NotFound() {
   return <div className="grid min-h-screen place-items-center px-5"><StatusPanel title="Не найдено" text="Проверьте ссылку или вернитесь в dashboard." /></div>;
+}
+
+async function assetExists(url: string) {
+  try {
+    const response = await fetch(url, { method: "HEAD", cache: "no-store" });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function startFallbackCamera(camera: HTMLVideoElement | null) {
+  if (!camera) return undefined;
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+  camera.srcObject = stream;
+  await camera.play();
+  return () => stream.getTracks().forEach((track) => track.stop());
+}
+
+async function startMindAr({
+  container,
+  targetSrc,
+  videoSrc,
+  muted,
+  onStatus,
+}: {
+  container: HTMLDivElement | null;
+  targetSrc: string;
+  videoSrc: string;
+  muted: boolean;
+  onStatus: (status: string) => void;
+}) {
+  if (!container) throw new Error("MindAR container не готов");
+  await loadScript("https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.min.js");
+  await loadScript("https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js");
+
+  const runtime = window as unknown as {
+    THREE?: {
+      VideoTexture: new (video: HTMLVideoElement) => unknown;
+      PlaneGeometry: new (width: number, height: number) => unknown;
+      MeshBasicMaterial: new (options: { map: unknown; transparent: boolean }) => unknown;
+      Mesh: new (geometry: unknown, material: unknown) => { scale: { set: (x: number, y: number, z: number) => void } };
+    };
+    MINDAR?: {
+      IMAGE?: {
+        MindARThree: new (options: { container: HTMLDivElement; imageTargetSrc: string }) => {
+          renderer: { setAnimationLoop: (callback: (() => void) | null) => void; render: (scene: unknown, camera: unknown) => void };
+          scene: unknown;
+          camera: unknown;
+          addAnchor: (index: number) => { group: { add: (mesh: unknown) => void }; onTargetFound?: () => void; onTargetLost?: () => void };
+          start: () => Promise<void>;
+          stop: () => void;
+        };
+      };
+    };
+  };
+
+  const THREE = runtime.THREE;
+  const MindARThree = runtime.MINDAR?.IMAGE?.MindARThree;
+  if (!THREE || !MindARThree) throw new Error("MindAR runtime не загрузился");
+
+  const video = document.createElement("video");
+  video.src = videoSrc;
+  video.loop = true;
+  video.muted = muted;
+  video.playsInline = true;
+  video.crossOrigin = "anonymous";
+  await video.play().catch(() => undefined);
+
+  const mindarThree = new MindARThree({ container, imageTargetSrc: targetSrc });
+  const { renderer, scene, camera } = mindarThree;
+  const texture = new THREE.VideoTexture(video);
+  const geometry = new THREE.PlaneGeometry(1, 1.35);
+  const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+  const plane = new THREE.Mesh(geometry, material);
+  plane.scale.set(1, 1, 1);
+
+  const anchor = mindarThree.addAnchor(0);
+  anchor.group.add(plane);
+  anchor.onTargetFound = () => {
+    onStatus("Фото найдено: test.mp4 воспроизводится поверх test.jpg");
+    video.play();
+  };
+  anchor.onTargetLost = () => {
+    onStatus("Фото потеряно: наведите камеру на test.jpg");
+    video.pause();
+  };
+
+  await mindarThree.start();
+  onStatus("Наведите камеру на распечатанное или открытое test.jpg");
+  renderer.setAnimationLoop(() => renderer.render(scene, camera));
+
+  return () => {
+    renderer.setAnimationLoop(null);
+    mindarThree.stop();
+    video.pause();
+  };
+}
+
+function loadScript(src: string) {
+  return new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
+    if (existing) {
+      resolve();
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`Не удалось загрузить ${src}`));
+    document.head.append(script);
+  });
 }
 
 async function seedDemo(refresh: () => Promise<void>) {
