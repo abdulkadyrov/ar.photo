@@ -408,6 +408,7 @@ function TestViewerPage() {
       try {
         cleanup = await startMindAr({
           container: containerRef.current,
+          baseUrl: base,
           targetSrc,
           videoSrc,
           muted,
@@ -560,20 +561,22 @@ async function startFallbackCamera(camera: HTMLVideoElement | null) {
 
 async function startMindAr({
   container,
+  baseUrl,
   targetSrc,
   videoSrc,
   muted,
   onStatus,
 }: {
   container: HTMLDivElement | null;
+  baseUrl: string;
   targetSrc: string;
   videoSrc: string;
   muted: boolean;
   onStatus: (status: string) => void;
 }) {
   if (!container) throw new Error("MindAR container не готов");
-  await loadScript("https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.min.js");
-  await loadScript("https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js");
+  await loadScript(`${baseUrl}vendor/three.min.js`);
+  await loadScript(`${baseUrl}vendor/mindar-image-three.prod.js`);
 
   const runtime = window as unknown as {
     THREE?: {
