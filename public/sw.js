@@ -1,5 +1,6 @@
 const CACHE_NAME = "school-ar-photo-v1";
-const APP_SHELL = ["/", "/manifest.webmanifest", "/icon.svg"];
+const BASE_URL = "/ar.photo/";
+const APP_SHELL = [BASE_URL, `${BASE_URL}manifest.webmanifest`, `${BASE_URL}icon.svg`];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -22,7 +23,7 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() => {
-          if (event.request.mode === "navigate") return caches.match("/");
+          if (event.request.mode === "navigate") return caches.match(BASE_URL);
           throw new Error("Offline and not cached");
         });
     }),
