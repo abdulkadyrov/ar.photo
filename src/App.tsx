@@ -618,8 +618,15 @@ async function startMindAr({
   video.crossOrigin = "anonymous";
   video.load();
 
-  const mindarThree = new MindARThree({ container, imageTargetSrc: targetSrc });
+  const mindarThree = new MindARThree({
+    container,
+    imageTargetSrc: targetSrc,
+    uiLoading: "no",
+    uiScanning: "no",
+    uiError: "no",
+  });
   const { renderer, scene, camera } = mindarThree;
+  renderer.setClearColor(0x000000, 0);
   const texture = new THREE.VideoTexture(video);
   const geometry = new THREE.PlaneGeometry(1, 1.35);
   const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
@@ -638,6 +645,7 @@ async function startMindAr({
   };
 
   await mindarThree.start();
+  keepMindArCameraVisible(mindarThree);
   onStatus("Наведите камеру на распечатанное или открытое test.jpg");
   renderer.setAnimationLoop(() => renderer.render(scene, camera));
 
@@ -646,6 +654,22 @@ async function startMindAr({
     mindarThree.stop();
     video.pause();
   };
+}
+
+function keepMindArCameraVisible(mindarThree: {
+  video?: HTMLVideoElement;
+  renderer: { domElement?: HTMLCanvasElement; setClearColor?: (color: number, alpha?: number) => void };
+  cssRenderer?: { domElement?: HTMLElement };
+}) {
+  mindarThree.video?.style.setProperty("z-index", "0");
+  mindarThree.video?.style.setProperty("opacity", "1");
+  mindarThree.video?.style.setProperty("background", "transparent");
+  mindarThree.renderer.setClearColor?.(0x000000, 0);
+  mindarThree.renderer.domElement?.style.setProperty("z-index", "1");
+  mindarThree.renderer.domElement?.style.setProperty("background", "transparent");
+  mindarThree.cssRenderer?.domElement?.style.setProperty("z-index", "2");
+  mindarThree.cssRenderer?.domElement?.style.setProperty("background", "transparent");
+  mindarThree.cssRenderer?.domElement?.style.setProperty("pointer-events", "none");
 }
 
 async function seedDemo(refresh: () => Promise<void>) {
