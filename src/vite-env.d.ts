@@ -58,6 +58,7 @@ declare module "three" {
 
   export class Mesh {
     constructor(geometry: unknown, material: unknown);
+    position: { set: (x: number, y: number, z: number) => void };
     scale: { set: (x: number, y: number, z: number) => void };
   }
 }

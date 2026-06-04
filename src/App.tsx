@@ -610,6 +610,7 @@ async function startMindAr({
     import("three"),
   ]);
   const targetAspect = await loadImageAspect(targetSrc);
+  const calibration = getArCalibration();
 
   const video = document.createElement("video");
   video.src = videoSrc;
@@ -632,9 +633,10 @@ async function startMindAr({
   const { renderer, scene, camera } = mindarThree;
   renderer.setClearColor(0x000000, 0);
   const texture = new THREE.VideoTexture(video);
-  const geometry = new THREE.PlaneGeometry(1, targetAspect);
+  const geometry = new THREE.PlaneGeometry(calibration.scale, targetAspect * calibration.scale);
   const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
   const plane = new THREE.Mesh(geometry, material);
+  plane.position.set(calibration.dx, calibration.dy, 0.01);
   plane.scale.set(1, 1, 1);
 
   const anchor = mindarThree.addAnchor(0);
@@ -667,6 +669,21 @@ function loadImageAspect(src: string) {
     image.onerror = () => resolve(1);
     image.src = src;
   });
+}
+
+function getArCalibration() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    dx: parseNumberParam(params.get("dx"), -0.18),
+    dy: parseNumberParam(params.get("dy"), 0),
+    scale: parseNumberParam(params.get("scale"), 1.04),
+  };
+}
+
+function parseNumberParam(value: string | null, fallback: number) {
+  if (value === null) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function keepMindArCameraVisible(mindarThree: {
