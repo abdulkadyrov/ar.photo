@@ -609,6 +609,7 @@ async function startMindAr({
     import("mind-ar/dist/mindar-image-three.prod.js"),
     import("three"),
   ]);
+  const targetAspect = await loadImageAspect(targetSrc);
 
   const video = document.createElement("video");
   video.src = videoSrc;
@@ -624,11 +625,14 @@ async function startMindAr({
     uiLoading: "no",
     uiScanning: "no",
     uiError: "no",
+    maxTrack: 1,
+    warmupTolerance: 5,
+    missTolerance: 8,
   });
   const { renderer, scene, camera } = mindarThree;
   renderer.setClearColor(0x000000, 0);
   const texture = new THREE.VideoTexture(video);
-  const geometry = new THREE.PlaneGeometry(1, 1.35);
+  const geometry = new THREE.PlaneGeometry(1, targetAspect);
   const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
   const plane = new THREE.Mesh(geometry, material);
   plane.scale.set(1, 1, 1);
@@ -654,6 +658,15 @@ async function startMindAr({
     mindarThree.stop();
     video.pause();
   };
+}
+
+function loadImageAspect(src: string) {
+  return new Promise<number>((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image.naturalHeight / image.naturalWidth || 1);
+    image.onerror = () => resolve(1);
+    image.src = src;
+  });
 }
 
 function keepMindArCameraVisible(mindarThree: {

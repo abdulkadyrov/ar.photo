@@ -13,7 +13,16 @@ declare module "qrcode" {
 
 declare module "mind-ar/dist/mindar-image-three.prod.js" {
   export class MindARThree {
-    constructor(options: { container: HTMLElement; imageTargetSrc: string; uiLoading?: "yes" | "no"; uiScanning?: "yes" | "no"; uiError?: "yes" | "no" });
+    constructor(options: {
+      container: HTMLElement;
+      imageTargetSrc: string;
+      uiLoading?: "yes" | "no";
+      uiScanning?: "yes" | "no";
+      uiError?: "yes" | "no";
+      maxTrack?: number;
+      warmupTolerance?: number;
+      missTolerance?: number;
+    });
     video?: HTMLVideoElement;
     renderer: {
       domElement?: HTMLCanvasElement;
