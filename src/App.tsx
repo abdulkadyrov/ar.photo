@@ -1,5 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
+import type * as ThreeModule from "three";
 import {
   ArrowLeft,
   AlertTriangle,
@@ -322,7 +323,7 @@ function ViewerPage({ snapshot, livePhotoId }: { snapshot: StoreSnapshot; livePh
   const [videoUrl, setVideoUrl] = useState("");
   const [cameraReady, setCameraReady] = useState(false);
   const [videoVisible, setVideoVisible] = useState(false);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const cameraRef = useRef<HTMLVideoElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -404,7 +405,7 @@ function TestViewerPage() {
   const fallbackVideoRef = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState("Проверяем test assets...");
   const [mode, setMode] = useState<"loading" | "mindar" | "fallback" | "missing">("loading");
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const [fallbackVideoVisible, setFallbackVideoVisible] = useState(false);
 
   useEffect(() => {
@@ -430,9 +431,11 @@ function TestViewerPage() {
       try {
         cleanup = await startMindAr({
           container: containerRef.current,
+          imageSrc,
           targetSrc,
           videoSrc,
           muted,
+          onMutedFallback: () => setMuted(true),
           onStatus: setStatus,
         });
       } catch (error) {
@@ -593,15 +596,19 @@ async function startFallbackCamera(camera: HTMLVideoElement | null) {
 
 async function startMindAr({
   container,
+  imageSrc,
   targetSrc,
   videoSrc,
   muted,
+  onMutedFallback,
   onStatus,
 }: {
   container: HTMLDivElement | null;
+  imageSrc: string;
   targetSrc: string;
   videoSrc: string;
   muted: boolean;
+  onMutedFallback?: () => void;
   onStatus: (status: string) => void;
 }) {
   if (!container) throw new Error("MindAR container не готов");
@@ -609,13 +616,15 @@ async function startMindAr({
     import("mind-ar/dist/mindar-image-three.prod.js"),
     import("three"),
   ]);
-  const targetAspect = await loadImageAspect(targetSrc);
+  const Three = THREE as typeof ThreeModule;
+  const targetAspect = await loadImageAspect(imageSrc);
   const calibration = getArCalibration();
 
   const video = document.createElement("video");
   video.src = videoSrc;
   video.loop = true;
   video.muted = muted;
+  video.volume = 1;
   video.playsInline = true;
   video.crossOrigin = "anonymous";
   video.load();
@@ -632,18 +641,32 @@ async function startMindAr({
   });
   const { renderer, scene, camera } = mindarThree;
   renderer.setClearColor(0x000000, 0);
-  const texture = new THREE.VideoTexture(video);
-  const geometry = new THREE.PlaneGeometry(calibration.scale, targetAspect * calibration.scale);
-  const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
-  const plane = new THREE.Mesh(geometry, material);
+  const texture = new Three.VideoTexture(video);
+  const geometry = new Three.PlaneGeometry(calibration.scale, targetAspect * calibration.scale);
+  const material = new Three.MeshBasicMaterial({ map: texture, transparent: true });
+  const plane = new Three.Mesh(geometry, material);
   plane.position.set(calibration.dx, calibration.dy, 0.01);
   plane.scale.set(1, 1, 1);
 
   const anchor = mindarThree.addAnchor(0);
   anchor.group.add(plane);
+  if (calibration.center) {
+    const ThreeDebug = Three as any;
+    const centerDot = new Three.Mesh(
+      new Three.PlaneGeometry(0.05 * calibration.scale, 0.05 * calibration.scale),
+      new ThreeDebug.MeshBasicMaterial({ color: 0xff2d55, depthTest: false })
+    );
+    centerDot.position.set(0, 0, 0.03);
+    anchor.group.add(centerDot);
+  }
   anchor.onTargetFound = () => {
     onStatus("Фото найдено: test.mp4 воспроизводится поверх test.jpg");
-    video.play();
+    video.play().catch(() => {
+      video.muted = true;
+      onMutedFallback?.();
+      onStatus("Фото найдено: Safari заблокировал автозвук, нажмите Звук");
+      video.play().catch(() => undefined);
+    });
   };
   anchor.onTargetLost = () => {
     onStatus("Фото потеряно: наведите камеру на test.jpg");
@@ -674,9 +697,10 @@ function loadImageAspect(src: string) {
 function getArCalibration() {
   const params = new URLSearchParams(window.location.search);
   return {
-    dx: parseNumberParam(params.get("dx"), -0.18),
+    dx: parseNumberParam(params.get("dx"), 0),
     dy: parseNumberParam(params.get("dy"), 0),
-    scale: parseNumberParam(params.get("scale"), 1.04),
+    scale: parseNumberParam(params.get("scale"), 1),
+    center: params.get("center") === "1",
   };
 }
 
