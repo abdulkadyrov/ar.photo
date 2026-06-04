@@ -430,7 +430,6 @@ function TestViewerPage() {
       try {
         cleanup = await startMindAr({
           container: containerRef.current,
-          baseUrl: base,
           targetSrc,
           videoSrc,
           muted,
@@ -594,47 +593,22 @@ async function startFallbackCamera(camera: HTMLVideoElement | null) {
 
 async function startMindAr({
   container,
-  baseUrl,
   targetSrc,
   videoSrc,
   muted,
   onStatus,
 }: {
   container: HTMLDivElement | null;
-  baseUrl: string;
   targetSrc: string;
   videoSrc: string;
   muted: boolean;
   onStatus: (status: string) => void;
 }) {
   if (!container) throw new Error("MindAR container не готов");
-  await loadScript(`${baseUrl}vendor/three.min.js`);
-  await loadScript(`${baseUrl}vendor/mindar-image-three.prod.js`, "module");
-
-  const runtime = window as unknown as {
-    THREE?: {
-      VideoTexture: new (video: HTMLVideoElement) => unknown;
-      PlaneGeometry: new (width: number, height: number) => unknown;
-      MeshBasicMaterial: new (options: { map: unknown; transparent: boolean }) => unknown;
-      Mesh: new (geometry: unknown, material: unknown) => { scale: { set: (x: number, y: number, z: number) => void } };
-    };
-    MINDAR?: {
-      IMAGE?: {
-        MindARThree: new (options: { container: HTMLDivElement; imageTargetSrc: string }) => {
-          renderer: { setAnimationLoop: (callback: (() => void) | null) => void; render: (scene: unknown, camera: unknown) => void };
-          scene: unknown;
-          camera: unknown;
-          addAnchor: (index: number) => { group: { add: (mesh: unknown) => void }; onTargetFound?: () => void; onTargetLost?: () => void };
-          start: () => Promise<void>;
-          stop: () => void;
-        };
-      };
-    };
-  };
-
-  const THREE = runtime.THREE;
-  const MindARThree = runtime.MINDAR?.IMAGE?.MindARThree;
-  if (!THREE || !MindARThree) throw new Error("MindAR runtime не загрузился");
+  const [{ MindARThree }, THREE] = await Promise.all([
+    import("mind-ar/dist/mindar-image-three.prod.js"),
+    import("three"),
+  ]);
 
   const video = document.createElement("video");
   video.src = videoSrc;
@@ -672,23 +646,6 @@ async function startMindAr({
     mindarThree.stop();
     video.pause();
   };
-}
-
-function loadScript(src: string, type: "classic" | "module" = "classic") {
-  return new Promise<void>((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
-    if (existing) {
-      resolve();
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = src;
-    if (type === "module") script.type = "module";
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`Не удалось загрузить ${src}`));
-    document.head.append(script);
-  });
 }
 
 async function seedDemo(refresh: () => Promise<void>) {
