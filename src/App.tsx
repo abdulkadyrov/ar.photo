@@ -405,11 +405,13 @@ function TestViewerPage() {
   const [status, setStatus] = useState("Проверяем test assets...");
   const [mode, setMode] = useState<"loading" | "mindar" | "fallback" | "missing">("loading");
   const [muted, setMuted] = useState(true);
+  const [fallbackVideoVisible, setFallbackVideoVisible] = useState(false);
 
   useEffect(() => {
     let cleanup: (() => void) | undefined;
 
     async function boot() {
+      setFallbackVideoVisible(false);
       const [hasImage, hasVideo, hasTarget] = await Promise.all([assetExists(imageSrc), assetExists(videoSrc), assetExists(targetSrc)]);
       if (!hasImage || !hasVideo) {
         setMode("missing");
@@ -445,11 +447,17 @@ function TestViewerPage() {
     return () => cleanup?.();
   }, [imageSrc, muted, targetSrc, videoSrc]);
 
-  const replay = () => {
+  const toggleFallbackVideo = async () => {
     const video = fallbackVideoRef.current;
     if (!video) return;
+    if (fallbackVideoVisible) {
+      video.pause();
+      setFallbackVideoVisible(false);
+      return;
+    }
+    setFallbackVideoVisible(true);
     video.currentTime = 0;
-    video.play();
+    await video.play().catch(() => undefined);
   };
 
   return (
@@ -459,8 +467,13 @@ function TestViewerPage() {
         {mode !== "mindar" && (
           <>
             <video ref={fallbackCameraRef} className="absolute inset-0 h-full w-full object-cover opacity-70" playsInline muted />
-            <div className="absolute left-1/2 top-1/2 aspect-[3/4] w-[76vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[18px] border border-white/50 bg-black shadow-[0_30px_90px_rgba(0,0,0,0.45)]">
-              <video ref={fallbackVideoRef} className="h-full w-full object-cover" src={videoSrc} muted={muted} autoPlay loop playsInline />
+            <div className="pointer-events-none absolute left-1/2 top-1/2 aspect-[3/4] w-[76vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-[18px] border-2 border-dashed border-white/60 bg-white/5">
+              <div className="grid h-full place-items-center p-6 text-center text-sm font-semibold text-white/75">
+                Наведите test.jpg в рамку
+              </div>
+            </div>
+            <div className={`absolute left-1/2 top-1/2 aspect-[3/4] w-[76vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[18px] border border-white/50 bg-black shadow-[0_30px_90px_rgba(0,0,0,0.45)] transition-opacity ${fallbackVideoVisible ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+              <video ref={fallbackVideoRef} className="h-full w-full object-cover" src={videoSrc} muted={muted} loop playsInline preload="metadata" />
             </div>
           </>
         )}
@@ -478,7 +491,7 @@ function TestViewerPage() {
         <div className="absolute inset-x-4 bottom-5 grid grid-cols-3 gap-2">
           <ControlButton onClick={() => setMuted((value) => !value)} icon={muted ? <VolumeX /> : <Volume2 />} label="Звук" />
           <ControlButton onClick={() => document.documentElement.requestFullscreen?.()} icon={<Maximize2 />} label="Fullscreen" />
-          <ControlButton onClick={replay} icon={<RotateCcw />} label="Повтор" />
+          <ControlButton onClick={toggleFallbackVideo} icon={fallbackVideoVisible ? <RotateCcw /> : <Play />} label={fallbackVideoVisible ? "Скрыть" : "Видео"} />
         </div>
       </div>
     </Shell>
@@ -596,7 +609,7 @@ async function startMindAr({
 }) {
   if (!container) throw new Error("MindAR container не готов");
   await loadScript(`${baseUrl}vendor/three.min.js`);
-  await loadScript(`${baseUrl}vendor/mindar-image-three.prod.js`);
+  await loadScript(`${baseUrl}vendor/mindar-image-three.prod.js`, "module");
 
   const runtime = window as unknown as {
     THREE?: {
@@ -629,7 +642,7 @@ async function startMindAr({
   video.muted = muted;
   video.playsInline = true;
   video.crossOrigin = "anonymous";
-  await video.play().catch(() => undefined);
+  video.load();
 
   const mindarThree = new MindARThree({ container, imageTargetSrc: targetSrc });
   const { renderer, scene, camera } = mindarThree;
@@ -661,7 +674,7 @@ async function startMindAr({
   };
 }
 
-function loadScript(src: string) {
+function loadScript(src: string, type: "classic" | "module" = "classic") {
   return new Promise<void>((resolve, reject) => {
     const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
     if (existing) {
@@ -670,6 +683,7 @@ function loadScript(src: string) {
     }
     const script = document.createElement("script");
     script.src = src;
+    if (type === "module") script.type = "module";
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error(`Не удалось загрузить ${src}`));
