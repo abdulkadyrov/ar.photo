@@ -321,6 +321,7 @@ function ViewerPage({ snapshot, livePhotoId }: { snapshot: StoreSnapshot; livePh
   const videoMeta = livePhoto ? snapshot.media.find((item) => item.id === livePhoto.videoId) : undefined;
   const [videoUrl, setVideoUrl] = useState("");
   const [cameraReady, setCameraReady] = useState(false);
+  const [videoVisible, setVideoVisible] = useState(false);
   const [muted, setMuted] = useState(true);
   const cameraRef = useRef<HTMLVideoElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -346,28 +347,47 @@ function ViewerPage({ snapshot, livePhotoId }: { snapshot: StoreSnapshot; livePh
     boot().catch(() => setCameraReady(false));
     return () => {
       stream?.getTracks().forEach((track) => track.stop());
+      videoRef.current?.pause();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [videoMeta]);
 
   if (!livePhoto) return <Shell flush><NotFound /></Shell>;
 
+  const toggleVideo = async () => {
+    const video = videoRef.current;
+    if (!video || !videoUrl) return;
+    if (videoVisible) {
+      video.pause();
+      setVideoVisible(false);
+      return;
+    }
+    setVideoVisible(true);
+    video.currentTime = 0;
+    await video.play().catch(() => undefined);
+  };
+
   return (
     <Shell flush>
       <div className="relative min-h-screen overflow-hidden bg-black">
         <video ref={cameraRef} className="absolute inset-0 h-full w-full object-cover" playsInline muted />
         <div className="absolute inset-0 bg-black/20" />
-        <div className="absolute left-1/2 top-1/2 aspect-[3/4] w-[76vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[18px] border border-white/50 bg-black/20 shadow-[0_30px_90px_rgba(0,0,0,0.45)]">
-          {videoUrl ? <video ref={videoRef} className="h-full w-full object-cover" src={videoUrl} muted={muted} autoPlay loop playsInline /> : <div className="grid h-full place-items-center text-white">Подготовка AR...</div>}
+        <div className="pointer-events-none absolute left-1/2 top-1/2 aspect-[3/4] w-[76vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-[18px] border-2 border-dashed border-white/70 bg-white/5 shadow-[0_30px_90px_rgba(0,0,0,0.28)]">
+          <div className="grid h-full place-items-center p-6 text-center text-sm font-semibold text-white/80">
+            Наведите фотографию в рамку
+          </div>
+        </div>
+        <div className={`absolute left-1/2 top-1/2 aspect-[3/4] w-[76vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[18px] border border-white/50 bg-black shadow-[0_30px_90px_rgba(0,0,0,0.45)] transition-opacity ${videoVisible ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+          {videoUrl ? <video ref={videoRef} className="h-full w-full object-cover" src={videoUrl} muted={muted} loop playsInline preload="metadata" /> : <div className="grid h-full place-items-center text-white">Подготовка видео...</div>}
         </div>
         <div className="absolute inset-x-4 top-5 rounded-[20px] bg-black/45 p-4 text-white backdrop-blur">
           <div className="text-sm font-semibold">{cameraReady ? "Наведите камеру на фотографию" : "Подготовка AR..."}</div>
-          <div className="mt-1 text-xs text-white/70">{videoUrl ? "Видео воспроизводится" : "Загружаем видео"}</div>
+          <div className="mt-1 text-xs text-white/70">{videoVisible ? "Видео включено вручную" : videoUrl ? "Камера готова, видео не закрывает обзор" : "Загружаем видео"}</div>
         </div>
         <div className="absolute inset-x-4 bottom-5 grid grid-cols-3 gap-2">
           <ControlButton onClick={() => setMuted((value) => !value)} icon={muted ? <VolumeX /> : <Volume2 />} label="Звук" />
           <ControlButton onClick={() => document.documentElement.requestFullscreen?.()} icon={<Maximize2 />} label="Fullscreen" />
-          <ControlButton onClick={() => { videoRef.current?.play(); videoRef.current!.currentTime = 0; }} icon={<RotateCcw />} label="Повтор" />
+          <ControlButton onClick={toggleVideo} icon={videoVisible ? <RotateCcw /> : <Play />} label={videoVisible ? "Скрыть" : "Видео"} />
         </div>
       </div>
     </Shell>
