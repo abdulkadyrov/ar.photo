@@ -3,6 +3,9 @@ import { QRCodeCanvas } from "qrcode.react";
 import type * as ThreeModule from "three";
 import {
   ArrowLeft,
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
   AlertTriangle,
   Camera,
   Download,
@@ -12,6 +15,7 @@ import {
   ImageUp,
   Import,
   Maximize2,
+  Minus,
   Play,
   Plus,
   QrCode,
@@ -27,6 +31,14 @@ import { clearAll, deleteProjectCascade, getMediaBlob, importSnapshot, loadData,
 import { createId, nowIso } from "./lib/id";
 import { exportClassZip, exportProjectZip, getClassStats, parseImportZip } from "./lib/zip";
 import { go, parseRoute, viewerUrl } from "./lib/routes";
+
+const AR_CALIBRATION_KEY = "ar-photo-calibration-v1";
+const DEFAULT_AR_CALIBRATION = {
+  dx: -0.18,
+  dy: 0,
+  scale: 1.04,
+  center: false,
+};
 
 const emptySnapshot: StoreSnapshot = {
   projects: [],
@@ -407,6 +419,7 @@ function TestViewerPage() {
   const [mode, setMode] = useState<"loading" | "mindar" | "fallback" | "missing">("loading");
   const [muted, setMuted] = useState(false);
   const [fallbackVideoVisible, setFallbackVideoVisible] = useState(false);
+  const [calibration, setCalibration] = useState(() => getArCalibration());
 
   useEffect(() => {
     let cleanup: (() => void) | undefined;
@@ -495,8 +508,63 @@ function TestViewerPage() {
           <ControlButton onClick={() => document.documentElement.requestFullscreen?.()} icon={<Maximize2 />} label="Fullscreen" />
           <ControlButton onClick={toggleFallbackVideo} icon={fallbackVideoVisible ? <RotateCcw /> : <Play />} label={fallbackVideoVisible ? "Скрыть" : "Видео"} />
         </div>
+        {mode === "mindar" && (
+          <CalibrationPad
+            calibration={calibration}
+            onChange={(next) => {
+              setCalibration(next);
+              saveArCalibration(next);
+              window.dispatchEvent(new CustomEvent("ar-photo-calibration", { detail: next }));
+            }}
+            onReset={() => {
+              setCalibration(DEFAULT_AR_CALIBRATION);
+              saveArCalibration(DEFAULT_AR_CALIBRATION);
+              window.dispatchEvent(new CustomEvent("ar-photo-calibration", { detail: DEFAULT_AR_CALIBRATION }));
+            }}
+          />
+        )}
       </div>
     </Shell>
+  );
+}
+
+function CalibrationPad({
+  calibration,
+  onChange,
+  onReset,
+}: {
+  calibration: ReturnType<typeof getArCalibration>;
+  onChange: (calibration: ReturnType<typeof getArCalibration>) => void;
+  onReset: () => void;
+}) {
+  const moveStep = 0.03;
+  const scaleStep = 0.02;
+  const change = (patch: Partial<ReturnType<typeof getArCalibration>>) => onChange({ ...calibration, ...patch });
+
+  return (
+    <div className="absolute bottom-24 right-4 grid w-[168px] gap-2 rounded-[18px] bg-black/55 p-2 text-white backdrop-blur">
+      <div className="grid grid-cols-3 gap-2">
+        <CalibrationButton icon={<Minus size={17} />} label="Scale down" onClick={() => change({ scale: Math.max(0.5, calibration.scale - scaleStep) })} />
+        <CalibrationButton icon={<ArrowUp size={17} />} label="Up" onClick={() => change({ dy: calibration.dy + moveStep })} />
+        <CalibrationButton icon={<Plus size={17} />} label="Scale up" onClick={() => change({ scale: calibration.scale + scaleStep })} />
+        <CalibrationButton icon={<ArrowLeft size={17} />} label="Left" onClick={() => change({ dx: calibration.dx - moveStep })} />
+        <CalibrationButton icon={<RotateCcw size={17} />} label="Reset" onClick={onReset} />
+        <CalibrationButton icon={<ArrowRight size={17} />} label="Right" onClick={() => change({ dx: calibration.dx + moveStep })} />
+        <div />
+        <CalibrationButton icon={<ArrowDown size={17} />} label="Down" onClick={() => change({ dy: calibration.dy - moveStep })} />
+        <div className="grid place-items-center rounded-xl bg-white/10 px-1 text-[10px] font-semibold tabular-nums">
+          {calibration.dx.toFixed(2)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CalibrationButton({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button className="grid h-10 w-10 place-items-center rounded-xl bg-white/90 text-slate-950" title={label} aria-label={label} onClick={onClick}>
+      {icon}
+    </button>
   );
 }
 
@@ -642,11 +710,16 @@ async function startMindAr({
   const { renderer, scene, camera } = mindarThree;
   renderer.setClearColor(0x000000, 0);
   const texture = new Three.VideoTexture(video);
-  const geometry = new Three.PlaneGeometry(calibration.scale, targetAspect * calibration.scale);
+  const geometry = new Three.PlaneGeometry(1, targetAspect);
   const material = new Three.MeshBasicMaterial({ map: texture, transparent: true });
   const plane = new Three.Mesh(geometry, material);
-  plane.position.set(calibration.dx, calibration.dy, 0.01);
-  plane.scale.set(1, 1, 1);
+  const applyCalibration = (next: ReturnType<typeof getArCalibration>) => {
+    plane.position.set(next.dx, next.dy, 0.01);
+    plane.scale.set(next.scale, next.scale, 1);
+  };
+  applyCalibration(calibration);
+  const onCalibration = (event: Event) => applyCalibration((event as CustomEvent<ReturnType<typeof getArCalibration>>).detail);
+  window.addEventListener("ar-photo-calibration", onCalibration);
 
   const anchor = mindarThree.addAnchor(0);
   anchor.group.add(plane);
@@ -679,6 +752,7 @@ async function startMindAr({
   renderer.setAnimationLoop(() => renderer.render(scene, camera));
 
   return () => {
+    window.removeEventListener("ar-photo-calibration", onCalibration);
     renderer.setAnimationLoop(null);
     mindarThree.stop();
     video.pause();
@@ -696,11 +770,12 @@ function loadImageAspect(src: string) {
 
 function getArCalibration() {
   const params = new URLSearchParams(window.location.search);
+  const stored = loadSavedArCalibration();
   return {
-    dx: parseNumberParam(params.get("dx"), -0.18),
-    dy: parseNumberParam(params.get("dy"), 0),
-    scale: parseNumberParam(params.get("scale"), 1.04),
-    center: params.get("center") === "1",
+    dx: parseNumberParam(params.get("dx"), stored.dx),
+    dy: parseNumberParam(params.get("dy"), stored.dy),
+    scale: parseNumberParam(params.get("scale"), stored.scale),
+    center: params.has("center") ? params.get("center") === "1" : stored.center,
   };
 }
 
@@ -708,6 +783,26 @@ function parseNumberParam(value: string | null, fallback: number) {
   if (value === null) return fallback;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function loadSavedArCalibration() {
+  try {
+    const saved = localStorage.getItem(AR_CALIBRATION_KEY);
+    if (!saved) return DEFAULT_AR_CALIBRATION;
+    const parsed = JSON.parse(saved) as Partial<typeof DEFAULT_AR_CALIBRATION>;
+    return {
+      dx: typeof parsed.dx === "number" ? parsed.dx : DEFAULT_AR_CALIBRATION.dx,
+      dy: typeof parsed.dy === "number" ? parsed.dy : DEFAULT_AR_CALIBRATION.dy,
+      scale: typeof parsed.scale === "number" ? parsed.scale : DEFAULT_AR_CALIBRATION.scale,
+      center: typeof parsed.center === "boolean" ? parsed.center : DEFAULT_AR_CALIBRATION.center,
+    };
+  } catch {
+    return DEFAULT_AR_CALIBRATION;
+  }
+}
+
+function saveArCalibration(calibration: typeof DEFAULT_AR_CALIBRATION) {
+  localStorage.setItem(AR_CALIBRATION_KEY, JSON.stringify(calibration));
 }
 
 function keepMindArCameraVisible(mindarThree: {
