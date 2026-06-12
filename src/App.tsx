@@ -697,9 +697,9 @@ function loadImageAspect(src: string) {
 function getArCalibration() {
   const params = new URLSearchParams(window.location.search);
   return {
-    dx: parseNumberParam(params.get("dx"), 0),
+    dx: parseNumberParam(params.get("dx"), -0.18),
     dy: parseNumberParam(params.get("dy"), 0),
-    scale: parseNumberParam(params.get("scale"), 1),
+    scale: parseNumberParam(params.get("scale"), 1.04),
     center: params.get("center") === "1",
   };
 }
