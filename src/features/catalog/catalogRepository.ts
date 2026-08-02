@@ -1,0 +1,312 @@
+import type {
+  Group,
+  GroupInput,
+  PaginatedProjects,
+  Project,
+  ProjectInput,
+  ProjectListParams,
+  Workspace,
+} from "../../entities/catalog/model";
+import { groupFormSchema, projectFormSchema, projectListParamsSchema } from "../../entities/catalog/catalogSchemas";
+import { getSupabaseBrowserClient } from "../../shared/api/supabase";
+import type { Database } from "../../shared/api/database.types";
+
+type SupabaseBrowserClient = NonNullable<ReturnType<typeof getSupabaseBrowserClient>>;
+
+export type CatalogErrorCode =
+  | "workspace_unavailable"
+  | "forbidden"
+  | "subscription_inactive"
+  | "limit_reached"
+  | "not_found"
+  | "conflict"
+  | "unexpected";
+
+export class CatalogError extends Error {
+  constructor(
+    readonly code: CatalogErrorCode,
+    message: string,
+    readonly cause?: unknown,
+  ) {
+    super(message);
+    this.name = "CatalogError";
+  }
+}
+
+export interface CatalogRepository {
+  getWorkspace(userId: string): Promise<Workspace>;
+  listProjects(accountId: string, params: ProjectListParams): Promise<PaginatedProjects>;
+  getProject(accountId: string, projectId: string): Promise<Project>;
+  createProject(accountId: string, input: ProjectInput, requestId: string): Promise<Project>;
+  updateProject(accountId: string, projectId: string, input: ProjectInput): Promise<Project>;
+  archiveProject(accountId: string, projectId: string): Promise<Project>;
+  restoreProject(accountId: string, projectId: string): Promise<Project>;
+  softDeleteProject(accountId: string, projectId: string): Promise<Project>;
+  restoreDeletedProject(accountId: string, projectId: string): Promise<Project>;
+  listGroups(accountId: string, projectId: string, includeDeleted?: boolean): Promise<Group[]>;
+  createGroup(accountId: string, projectId: string, input: GroupInput, requestId: string): Promise<Group>;
+  updateGroup(accountId: string, groupId: string, input: GroupInput): Promise<Group>;
+  archiveGroup(accountId: string, groupId: string): Promise<Group>;
+  restoreGroup(accountId: string, groupId: string): Promise<Group>;
+  softDeleteGroup(accountId: string, groupId: string): Promise<Group>;
+  restoreDeletedGroup(accountId: string, groupId: string): Promise<Group>;
+}
+
+export class SupabaseCatalogRepository implements CatalogRepository {
+  constructor(private readonly client: SupabaseBrowserClient) {}
+
+  async getWorkspace(userId: string): Promise<Workspace> {
+    const { data: profile, error: profileError } = await this.client
+      .from("profiles")
+      .select("account_id,is_active")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (profileError) throw mapCatalogError(profileError);
+    if (!profile?.is_active || !profile.account_id) {
+      throw new CatalogError("workspace_unavailable", "Аккаунт пользователя не активирован");
+    }
+
+    const accountId = profile.account_id;
+    const [accountResult, membershipResult, subscriptionResult] = await Promise.all([
+      this.client.from("accounts").select("id,name,status").eq("id", accountId).maybeSingle(),
+      this.client
+        .from("account_members")
+        .select("role,is_active")
+        .eq("account_id", accountId)
+        .eq("user_id", userId)
+        .maybeSingle(),
+      this.client.from("subscriptions").select("status,expires_at").eq("account_id", accountId).maybeSingle(),
+    ]);
+
+    if (accountResult.error) throw mapCatalogError(accountResult.error);
+    if (membershipResult.error) throw mapCatalogError(membershipResult.error);
+    if (subscriptionResult.error) throw mapCatalogError(subscriptionResult.error);
+    if (!accountResult.data || !membershipResult.data?.is_active || !subscriptionResult.data) {
+      throw new CatalogError("workspace_unavailable", "Рабочее пространство недоступно");
+    }
+
+    const subscriptionStatus = subscriptionResult.data.status;
+    const canWriteByRole = ["owner", "manager", "editor"].includes(membershipResult.data.role);
+    const canWriteBySubscription = ["trial", "active", "grace_period"].includes(subscriptionStatus);
+
+    return {
+      accountId,
+      accountName: accountResult.data.name,
+      accountStatus: accountResult.data.status,
+      memberRole: membershipResult.data.role,
+      canWrite: accountResult.data.status === "active" && canWriteByRole && canWriteBySubscription,
+      subscriptionStatus,
+      subscriptionExpiresAt: subscriptionResult.data.expires_at,
+    };
+  }
+
+  async listProjects(accountId: string, rawParams: ProjectListParams): Promise<PaginatedProjects> {
+    const params = projectListParamsSchema.parse(rawParams);
+    const from = (params.page - 1) * params.pageSize;
+    const to = from + params.pageSize - 1;
+    const sort = projectSort[params.sort];
+
+    let query = this.client
+      .from("projects")
+      .select("*", { count: "exact" })
+      .eq("account_id", accountId)
+      .order(sort.column, { ascending: sort.ascending })
+      .range(from, to);
+
+    query = params.filter === "deleted" ? query.not("deleted_at", "is", null) : query.is("deleted_at", null);
+    if (params.filter !== "all" && params.filter !== "deleted") query = query.eq("status", params.filter);
+    if (params.search) query = query.ilike("name", `%${params.search}%`);
+
+    const { data, error, count } = await query;
+    if (error) throw mapCatalogError(error);
+
+    const projects = data ?? [];
+    const ids = projects.map((project) => project.id);
+    const [groups, items] = ids.length
+      ? await Promise.all([
+          this.client.from("groups").select("project_id").in("project_id", ids).is("deleted_at", null),
+          this.client.from("ar_items").select("project_id").in("project_id", ids).is("deleted_at", null),
+        ])
+      : [
+          { data: [], error: null },
+          { data: [], error: null },
+        ];
+
+    if (groups.error) throw mapCatalogError(groups.error);
+    if (items.error) throw mapCatalogError(items.error);
+
+    return {
+      items: projects.map((project) => ({
+        ...project,
+        groupCount: groups.data?.filter((group) => group.project_id === project.id).length ?? 0,
+        arItemCount: items.data?.filter((item) => item.project_id === project.id).length ?? 0,
+      })),
+      page: params.page,
+      pageSize: params.pageSize,
+      total: count ?? 0,
+    };
+  }
+
+  async getProject(accountId: string, projectId: string) {
+    const { data, error } = await this.client
+      .from("projects")
+      .select("*")
+      .eq("account_id", accountId)
+      .eq("id", projectId)
+      .maybeSingle();
+    if (error) throw mapCatalogError(error);
+    if (!data) throw new CatalogError("not_found", "Проект не найден");
+    return data;
+  }
+
+  async createProject(accountId: string, rawInput: ProjectInput, requestId: string) {
+    const input = projectFormSchema.parse(rawInput);
+    const { data, error } = await this.client.rpc("create_project", {
+      target_account_id: accountId,
+      project_name: input.name,
+      project_description: input.description,
+      project_category: input.category,
+      request_id: requestId,
+    });
+    if (error) throw mapCatalogError(error);
+    return data;
+  }
+
+  updateProject(accountId: string, projectId: string, rawInput: ProjectInput) {
+    const input = projectFormSchema.parse(rawInput);
+    return this.updateProjectFields(accountId, projectId, input);
+  }
+
+  archiveProject(accountId: string, projectId: string) {
+    return this.updateProjectFields(accountId, projectId, {
+      status: "archived",
+      archived_at: new Date().toISOString(),
+    });
+  }
+
+  restoreProject(accountId: string, projectId: string) {
+    return this.updateProjectFields(accountId, projectId, { status: "active", archived_at: null });
+  }
+
+  softDeleteProject(accountId: string, projectId: string) {
+    return this.updateProjectFields(accountId, projectId, { deleted_at: new Date().toISOString() });
+  }
+
+  restoreDeletedProject(accountId: string, projectId: string) {
+    return this.updateProjectFields(accountId, projectId, { deleted_at: null });
+  }
+
+  async listGroups(accountId: string, projectId: string, includeDeleted = false) {
+    let query = this.client
+      .from("groups")
+      .select("*")
+      .eq("account_id", accountId)
+      .eq("project_id", projectId)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+    if (!includeDeleted) query = query.is("deleted_at", null);
+    const { data, error } = await query;
+    if (error) throw mapCatalogError(error);
+    return data;
+  }
+
+  async createGroup(accountId: string, projectId: string, rawInput: GroupInput, requestId: string) {
+    const input = groupFormSchema.parse(rawInput);
+    const { data, error } = await this.client.rpc("create_group", {
+      target_account_id: accountId,
+      target_project_id: projectId,
+      group_name: input.name,
+      group_description: input.description,
+      request_id: requestId,
+    });
+    if (error) throw mapCatalogError(error);
+    return data;
+  }
+
+  updateGroup(accountId: string, groupId: string, rawInput: GroupInput) {
+    const input = groupFormSchema.parse(rawInput);
+    return this.updateGroupFields(accountId, groupId, input);
+  }
+
+  archiveGroup(accountId: string, groupId: string) {
+    return this.updateGroupFields(accountId, groupId, { archived_at: new Date().toISOString() });
+  }
+
+  restoreGroup(accountId: string, groupId: string) {
+    return this.updateGroupFields(accountId, groupId, { archived_at: null });
+  }
+
+  softDeleteGroup(accountId: string, groupId: string) {
+    return this.updateGroupFields(accountId, groupId, { deleted_at: new Date().toISOString() });
+  }
+
+  restoreDeletedGroup(accountId: string, groupId: string) {
+    return this.updateGroupFields(accountId, groupId, { deleted_at: null });
+  }
+
+  private async updateProjectFields(
+    accountId: string,
+    projectId: string,
+    values: Database["public"]["Tables"]["projects"]["Update"],
+  ) {
+    const { data, error } = await this.client
+      .from("projects")
+      .update(values)
+      .eq("account_id", accountId)
+      .eq("id", projectId)
+      .select("*")
+      .maybeSingle();
+    if (error) throw mapCatalogError(error);
+    if (!data) throw new CatalogError("not_found", "Проект не найден или недоступен");
+    return data;
+  }
+
+  private async updateGroupFields(
+    accountId: string,
+    groupId: string,
+    values: Database["public"]["Tables"]["groups"]["Update"],
+  ) {
+    const { data, error } = await this.client
+      .from("groups")
+      .update(values)
+      .eq("account_id", accountId)
+      .eq("id", groupId)
+      .select("*")
+      .maybeSingle();
+    if (error) throw mapCatalogError(error);
+    if (!data) throw new CatalogError("not_found", "Группа не найдена или недоступна");
+    return data;
+  }
+}
+
+const projectSort = {
+  updated_desc: { column: "updated_at", ascending: false },
+  updated_asc: { column: "updated_at", ascending: true },
+  name_asc: { column: "name", ascending: true },
+  name_desc: { column: "name", ascending: false },
+} as const;
+
+function mapCatalogError(error: { code?: string; message?: string }) {
+  const message = error.message ?? "Не удалось выполнить операцию";
+  if (error.code === "42501") return new CatalogError("forbidden", message, error);
+  if (error.code === "23514" && /limit/i.test(message)) return new CatalogError("limit_reached", message, error);
+  if (error.code === "23505") return new CatalogError("conflict", message, error);
+  if (error.code === "PGRST116") return new CatalogError("not_found", message, error);
+  return new CatalogError("unexpected", message, error);
+}
+
+let repository: CatalogRepository | undefined;
+
+export function getCatalogRepository(): CatalogRepository {
+  if (repository) return repository;
+  const client = getSupabaseBrowserClient();
+  repository = client ? new SupabaseCatalogRepository(client) : createDemoCatalogRepository();
+  return repository;
+}
+
+export function setCatalogRepositoryForTests(nextRepository?: CatalogRepository) {
+  repository = nextRepository;
+}
+
+import { createDemoCatalogRepository } from "./demoCatalogRepository";
