@@ -1,4 +1,5 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
 import type * as ThreeModule from "three";
 import {
@@ -26,22 +27,22 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import type { ARClass, ARProject, ARStudent, Media, StoreSnapshot } from "./types";
+import type { ARClass, ARProject, ARStudent, Media, StoreSnapshot } from "../../types";
 import {
   clearAll,
   deleteProjectCascade,
   getMediaBlob,
   importSnapshot,
-  loadData,
   saveClass,
   saveLivePhoto,
   saveMedia,
   saveProject,
   saveStudent,
-} from "./lib/db";
-import { createId, nowIso } from "./lib/id";
-import { exportClassZip, exportProjectZip, getClassStats, parseImportZip } from "./lib/zip";
-import { go, parseRoute, viewerUrl } from "./lib/routes";
+} from "../../lib/db";
+import { createId, nowIso } from "../../lib/id";
+import { exportClassZip, exportProjectZip, getClassStats, parseImportZip } from "../../lib/zip";
+import { go, viewerUrl } from "../../lib/routes";
+import { usePrototypeSnapshot } from "./usePrototypeSnapshot";
 
 const AR_CALIBRATION_KEY = "ar-photo-calibration-v1";
 const DEFAULT_AR_CALIBRATION = {
@@ -51,43 +52,42 @@ const DEFAULT_AR_CALIBRATION = {
   center: false,
 };
 
-const emptySnapshot: StoreSnapshot = {
-  projects: [],
-  classes: [],
-  students: [],
-  livePhotos: [],
-  media: [],
-  mediaBlobs: [],
-};
+export function PrototypeHomeRoute() {
+  const store = usePrototypeSnapshot();
+  if (store.loading) return <PrototypeLoading />;
+  return <Home snapshot={store.snapshot} refresh={store.refresh} />;
+}
 
-export function App() {
-  const [route, setRoute] = useState(() => parseRoute(location.pathname));
-  const [snapshot, setSnapshot] = useState<StoreSnapshot>(emptySnapshot);
-  const [loading, setLoading] = useState(true);
+export function PrototypeDashboardRoute() {
+  const store = usePrototypeSnapshot();
+  if (store.loading) return <PrototypeLoading />;
+  return <Dashboard snapshot={store.snapshot} refresh={store.refresh} />;
+}
 
-  const refresh = async () => {
-    setSnapshot(await loadData());
-    setLoading(false);
-  };
+export function PrototypeProjectRoute() {
+  const { projectId = "" } = useParams<{ projectId: string }>();
+  const store = usePrototypeSnapshot();
+  if (store.loading) return <PrototypeLoading />;
+  return <ProjectPage snapshot={store.snapshot} projectId={projectId} refresh={store.refresh} />;
+}
 
-  useEffect(() => {
-    refresh();
-    const onRoute = () => setRoute(parseRoute(location.pathname));
-    window.addEventListener("popstate", onRoute);
-    return () => window.removeEventListener("popstate", onRoute);
-  }, []);
+export function PrototypeViewerRoute() {
+  const { livePhotoId = "" } = useParams<{ livePhotoId: string }>();
+  const store = usePrototypeSnapshot();
+  if (store.loading) return <PrototypeLoading />;
+  return <ViewerPage snapshot={store.snapshot} livePhotoId={livePhotoId} />;
+}
 
-  if (loading)
-    return (
-      <Shell>
-        <StatusPanel title="Подготовка AR..." text="Загружаем локальное хранилище." />
-      </Shell>
-    );
-  if (route.name === "project") return <ProjectPage snapshot={snapshot} projectId={route.id} refresh={refresh} />;
-  if (route.name === "viewer" && route.id === "test") return <TestViewerPage />;
-  if (route.name === "viewer") return <ViewerPage snapshot={snapshot} livePhotoId={route.id} />;
-  if (route.name === "dashboard") return <Dashboard snapshot={snapshot} refresh={refresh} />;
-  return <Home snapshot={snapshot} refresh={refresh} />;
+export function PrototypeTestViewerRoute() {
+  return <TestViewerPage />;
+}
+
+function PrototypeLoading() {
+  return (
+    <Shell>
+      <StatusPanel title="Подготовка AR..." text="Загружаем локальное хранилище." />
+    </Shell>
+  );
 }
 
 function Shell({ children, flush = false }: { children: React.ReactNode; flush?: boolean }) {
