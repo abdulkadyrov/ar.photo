@@ -40,6 +40,8 @@ Picker accepts не являются защитой. Нет magic-byte inspectio
 
 Мера: в этапе 1 провести controlled update/override audit, отделить offline compiler dependencies от browser runtime, закрепить Node 22, повторить build/AR regression и добиться приемлемого audit baseline. Не выполнять слепой `npm audit fix`.
 
+Статус этапа 1: critical `tar`, vulnerable `form-data` и direct `postcss` устранены pin/override. `npm audit` всё ещё сообщает один high advisory через `react-router-dom@7.18.2`; он затрагивает RSC action execution, тогда как AR Photo использует только client-side Vite routing и не включает React Server Components/Data RSC mode. Это временное documented exception: версия закреплена, dependency bot должен поднять PR сразу после выхода исправленного стабильного релиза.
+
 ### P1 — должны быть закрыты до MVP
 
 #### SEC-006: необратимое удаление без подтверждения
@@ -212,4 +214,3 @@ VITE_PUBLIC_APP_URL
 - admin API tokens.
 
 `.env`, `.env.local` и platform exports добавляются в `.gitignore`; `.env.example` содержит только имена и безопасные placeholders.
-

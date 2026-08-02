@@ -1,0 +1,9 @@
+dist
+coverage
+node_modules
+playwright-report
+public/vendor
+test-results
+package-lock.json
+public/test-assets
+test-assets

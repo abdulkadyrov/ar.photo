@@ -14,19 +14,19 @@
 
 ## 3. Текущий стек
 
-| Область | Сейчас | Оценка |
-| --- | --- | --- |
-| UI | React 19, TypeScript, Vite 6, Tailwind CSS 3, Lucide | Совместим с целевой архитектурой |
-| Навигация | Самописный parser поверх History API | Заменить на React Router |
-| Состояние | Локальный `useState`, весь snapshot загружается целиком | Недостаточно для SaaS |
-| Данные | IndexedDB, 6 object stores | Сохранить только как optional offline/cache слой |
-| Backend | Отсутствует | Нужен Supabase |
-| Auth | Отсутствует | Нужен Supabase Auth |
-| AR | MindAR + Three.js, один тестовый target | Полезный spike, не production workflow |
-| QR | `qrcode.react` и `qrcode`, PNG и ZIP | Реальная генерация, URL пока непереносим |
-| PWA | Manifest и самописный service worker | Минимальная оболочка, требует пересмотра |
-| Tests/lint | Скриптов нет | Блокер для этапа 1 |
-| Deploy | GitHub Pages, base `/ar.photo/` | Подходит прототипу, не SaaS/backend |
+| Область    | Сейчас                                                  | Оценка                                           |
+| ---------- | ------------------------------------------------------- | ------------------------------------------------ |
+| UI         | React 19, TypeScript, Vite 6, Tailwind CSS 3, Lucide    | Совместим с целевой архитектурой                 |
+| Навигация  | Самописный parser поверх History API                    | Заменить на React Router                         |
+| Состояние  | Локальный `useState`, весь snapshot загружается целиком | Недостаточно для SaaS                            |
+| Данные     | IndexedDB, 6 object stores                              | Сохранить только как optional offline/cache слой |
+| Backend    | Отсутствует                                             | Нужен Supabase                                   |
+| Auth       | Отсутствует                                             | Нужен Supabase Auth                              |
+| AR         | MindAR + Three.js, один тестовый target                 | Полезный spike, не production workflow           |
+| QR         | `qrcode.react` и `qrcode`, PNG и ZIP                    | Реальная генерация, URL пока непереносим         |
+| PWA        | Manifest и самописный service worker                    | Минимальная оболочка, требует пересмотра         |
+| Tests/lint | Скриптов нет                                            | Блокер для этапа 1                               |
+| Deploy     | GitHub Pages, base `/ar.photo/`                         | Подходит прототипу, не SaaS/backend              |
 
 ## 4. Что найдено в репозитории
 
@@ -72,19 +72,19 @@
 
 ## 5. Результаты baseline-проверок
 
-| Проверка | Результат |
-| --- | --- |
-| `git status` до изменений | Чистый `main`, совпадает с `origin/main` |
-| `npm ci` на локальном Node 26.5.1 | Ошибка сборки `canvas@2.11.2`; нет binary для Node 26 и локальных native libs |
-| `npm ci --ignore-scripts` | Успешно, используется только для аудита frontend build |
-| `tsc -b --pretty false` | Успешно |
-| `npm run build` | Успешно |
-| Bundle | MindAR ~2.10 MB и Three.js ~667 KB до gzip; Vite предупреждает о больших chunks |
-| lint | Скрипт и конфигурация отсутствуют |
-| unit tests | Скрипт и тесты отсутствуют |
-| `npm audit` | 1 critical и 4 high; direct `postcss`, остальные главным образом через `mind-ar`/`canvas` |
-| Browser smoke-test | Проект → группа → участник → фото → видео → QR → reload прошёл, console errors не обнаружены |
-| Реальный camera/image tracking | Не выполнялся в автоматическом аудите; требуется ручной device test и разрешение камеры |
+| Проверка                          | Результат                                                                                    |
+| --------------------------------- | -------------------------------------------------------------------------------------------- |
+| `git status` до изменений         | Чистый `main`, совпадает с `origin/main`                                                     |
+| `npm ci` на локальном Node 26.5.1 | Ошибка сборки `canvas@2.11.2`; нет binary для Node 26 и локальных native libs                |
+| `npm ci --ignore-scripts`         | Успешно, используется только для аудита frontend build                                       |
+| `tsc -b --pretty false`           | Успешно                                                                                      |
+| `npm run build`                   | Успешно                                                                                      |
+| Bundle                            | MindAR ~2.10 MB и Three.js ~667 KB до gzip; Vite предупреждает о больших chunks              |
+| lint                              | Скрипт и конфигурация отсутствуют                                                            |
+| unit tests                        | Скрипт и тесты отсутствуют                                                                   |
+| `npm audit`                       | 1 critical и 4 high; direct `postcss`, остальные главным образом через `mind-ar`/`canvas`    |
+| Browser smoke-test                | Проект → группа → участник → фото → видео → QR → reload прошёл, console errors не обнаружены |
+| Реальный camera/image tracking    | Не выполнялся в автоматическом аудите; требуется ручной device test и разрешение камеры      |
 
 CI использует Node 22, а локально проект не закрепляет версию Node. В этапе 1 необходимо добавить `.nvmrc` или `.node-version` и поле `engines`, затем добиться обычного `npm ci` без `--ignore-scripts`.
 
@@ -186,4 +186,3 @@ CI использует Node 22, а локально проект не закр�
 - документация и `.env.example` актуальны;
 - перечислены изменённые файлы и шаги ручной проверки;
 - push не выполняется без прямого указания.
-

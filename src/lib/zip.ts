@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import type { AppData, ARClass, ARStudent, LivePhoto, Media, MediaBlob, StoreSnapshot } from "../types";
+import type { AppData, ARClass, MediaBlob, StoreSnapshot } from "../types";
 import { slugify } from "./id";
 
 function downloadBlob(blob: Blob, fileName: string) {

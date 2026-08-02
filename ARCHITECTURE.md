@@ -280,4 +280,3 @@ PWA caching должен иметь allowlist: hashed application assets и яв
 - [Storage access control](https://supabase.com/docs/guides/storage/security/access-control)
 - [Password-based Auth](https://supabase.com/docs/guides/auth/passwords)
 - [Supabase changelog](https://supabase.com/changelog)
-

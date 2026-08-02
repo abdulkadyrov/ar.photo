@@ -37,47 +37,47 @@
 
 ### `accounts`
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid PK | server-generated |
-| `name` | text | 1–120 chars |
-| `slug` | text unique | internal human-readable slug, не public AR slug |
-| `owner_user_id` | uuid FK → `auth.users.id` | bootstrap owner |
-| `logo_path` | text nullable | private Storage path |
-| `status` | account_status | default `active` |
-| `timezone` | text | default `Europe/Moscow` only if product decision confirms |
-| `created_at`, `updated_at` | timestamptz | server timestamps |
+| Column                     | Type                      | Notes                                                     |
+| -------------------------- | ------------------------- | --------------------------------------------------------- |
+| `id`                       | uuid PK                   | server-generated                                          |
+| `name`                     | text                      | 1–120 chars                                               |
+| `slug`                     | text unique               | internal human-readable slug, не public AR slug           |
+| `owner_user_id`            | uuid FK → `auth.users.id` | bootstrap owner                                           |
+| `logo_path`                | text nullable             | private Storage path                                      |
+| `status`                   | account_status            | default `active`                                          |
+| `timezone`                 | text                      | default `Europe/Moscow` only if product decision confirms |
+| `created_at`, `updated_at` | timestamptz               | server timestamps                                         |
 
 Indexes: unique normalized `slug`, `owner_user_id`, `status`.
 
 ### `profiles`
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid PK/FK → `auth.users.id` | identity |
-| `full_name` | text | not used in Storage names |
-| `email_display` | text | display copy, Auth remains source of truth |
-| `avatar_path` | text nullable | private |
-| `account_id` | uuid nullable FK | active/default account for MVP, not authorization source |
-| `role` | profile_role | superadmin flag is server-controlled |
-| `is_active` | boolean | default true |
-| `last_login_at` | timestamptz nullable | server maintained |
-| `created_at`, `updated_at` | timestamptz | server timestamps |
+| Column                     | Type                         | Notes                                                    |
+| -------------------------- | ---------------------------- | -------------------------------------------------------- |
+| `id`                       | uuid PK/FK → `auth.users.id` | identity                                                 |
+| `full_name`                | text                         | not used in Storage names                                |
+| `email_display`            | text                         | display copy, Auth remains source of truth               |
+| `avatar_path`              | text nullable                | private                                                  |
+| `account_id`               | uuid nullable FK             | active/default account for MVP, not authorization source |
+| `role`                     | profile_role                 | superadmin flag is server-controlled                     |
+| `is_active`                | boolean                      | default true                                             |
+| `last_login_at`            | timestamptz nullable         | server maintained                                        |
+| `created_at`, `updated_at` | timestamptz                  | server timestamps                                        |
 
 Authorization never trusts `user_metadata`; membership tables and server-controlled app metadata are authoritative.
 
 ### `account_members`
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid PK |  |
-| `account_id` | uuid FK | tenant |
-| `user_id` | uuid FK → `auth.users.id` | member |
-| `role` | member_role | coarse role |
-| `permissions` | jsonb | validated permission map |
-| `is_active` | boolean | immediate access switch |
-| `invited_at`, `accepted_at` | timestamptz nullable | lifecycle |
-| `created_at`, `updated_at` | timestamptz |  |
+| Column                      | Type                      | Notes                    |
+| --------------------------- | ------------------------- | ------------------------ |
+| `id`                        | uuid PK                   |                          |
+| `account_id`                | uuid FK                   | tenant                   |
+| `user_id`                   | uuid FK → `auth.users.id` | member                   |
+| `role`                      | member_role               | coarse role              |
+| `permissions`               | jsonb                     | validated permission map |
+| `is_active`                 | boolean                   | immediate access switch  |
+| `invited_at`, `accepted_at` | timestamptz nullable      | lifecycle                |
+| `created_at`, `updated_at`  | timestamptz               |                          |
 
 Constraints: unique `(account_id, user_id)`. Index `(user_id, account_id)` and partial active-member index.
 
@@ -189,17 +189,17 @@ Create project/group/AR item, add member, upload finalize и publish выпол�
 
 ## 7. RLS matrix
 
-| Table | anon | authenticated member | owner/manager | superadmin |
-| --- | --- | --- | --- | --- |
-| profiles | нет | свой профиль/разрешённые team fields | team read/manage via server flow | protected server flow |
-| accounts | нет | свой active account read | update allowed fields | protected server flow |
-| account_members | нет | own membership read | team read/manage by permission | protected server flow |
-| plans/subscriptions | нет | current effective read | current/history read | protected server flow |
-| projects/groups/items | нет | account-scoped by permission | account-scoped CRUD | protected server flow |
-| processing_jobs | нет | account-scoped read | retry via server flow | protected server flow |
-| qr_codes | нет | account-scoped read | regenerate via server flow | protected server flow |
-| analytics | нет | permission-scoped aggregate read | account-scoped read | protected server flow |
-| audit_logs | нет | обычно нет | filtered account read | protected server flow |
+| Table                 | anon | authenticated member                 | owner/manager                    | superadmin            |
+| --------------------- | ---- | ------------------------------------ | -------------------------------- | --------------------- |
+| profiles              | нет  | свой профиль/разрешённые team fields | team read/manage via server flow | protected server flow |
+| accounts              | нет  | свой active account read             | update allowed fields            | protected server flow |
+| account_members       | нет  | own membership read                  | team read/manage by permission   | protected server flow |
+| plans/subscriptions   | нет  | current effective read               | current/history read             | protected server flow |
+| projects/groups/items | нет  | account-scoped by permission         | account-scoped CRUD              | protected server flow |
+| processing_jobs       | нет  | account-scoped read                  | retry via server flow            | protected server flow |
+| qr_codes              | нет  | account-scoped read                  | regenerate via server flow       | protected server flow |
+| analytics             | нет  | permission-scoped aggregate read     | account-scoped read              | protected server flow |
+| audit_logs            | нет  | обычно нет                           | filtered account read            | protected server flow |
 
 Для UPDATE создаются SELECT policy, `USING` и `WITH CHECK`. Policies используют `TO authenticated` плюс membership predicate. Indexes покрывают columns, используемые RLS.
 
@@ -242,4 +242,3 @@ generated/qr/{itemId}/{version}.svg
 - проверить чистое развёртывание с нуля.
 
 Особое правило 2026 года: exposed Data API grants задаются явно; RLS и GRANT проверяются как две отдельные границы.
-

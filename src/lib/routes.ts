@@ -1,8 +1,5 @@
 export type Route =
-  | { name: "home" }
-  | { name: "dashboard" }
-  | { name: "project"; id: string }
-  | { name: "viewer"; id: string };
+  { name: "home" } | { name: "dashboard" } | { name: "project"; id: string } | { name: "viewer"; id: string };
 
 export function parseRoute(pathname: string): Route {
   const parts = normalizePath(pathname).split("/").filter(Boolean);

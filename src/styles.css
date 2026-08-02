@@ -9,7 +9,13 @@
   --ink: #111827;
   --muted: #64748b;
   --line: #e5e7eb;
-  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  font-family:
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Display",
+    "Segoe UI",
+    sans-serif;
   color-scheme: light;
 }
 
@@ -57,7 +63,10 @@ button:disabled {
   padding: 0.72rem 1rem;
   font-size: 0.94rem;
   font-weight: 700;
-  transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease;
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
 }
 
 .btn:hover:not(:disabled) {

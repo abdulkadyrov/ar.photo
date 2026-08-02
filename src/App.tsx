@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import type * as ThreeModule from "three";
 import {
@@ -26,8 +26,19 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import type { ARClass, ARProject, ARStudent, LivePhoto, Media, StoreSnapshot } from "./types";
-import { clearAll, deleteProjectCascade, getMediaBlob, importSnapshot, loadData, saveClass, saveLivePhoto, saveMedia, saveProject, saveStudent } from "./lib/db";
+import type { ARClass, ARProject, ARStudent, Media, StoreSnapshot } from "./types";
+import {
+  clearAll,
+  deleteProjectCascade,
+  getMediaBlob,
+  importSnapshot,
+  loadData,
+  saveClass,
+  saveLivePhoto,
+  saveMedia,
+  saveProject,
+  saveStudent,
+} from "./lib/db";
 import { createId, nowIso } from "./lib/id";
 import { exportClassZip, exportProjectZip, getClassStats, parseImportZip } from "./lib/zip";
 import { go, parseRoute, viewerUrl } from "./lib/routes";
@@ -66,7 +77,12 @@ export function App() {
     return () => window.removeEventListener("popstate", onRoute);
   }, []);
 
-  if (loading) return <Shell><StatusPanel title="Подготовка AR..." text="Загружаем локальное хранилище." /></Shell>;
+  if (loading)
+    return (
+      <Shell>
+        <StatusPanel title="Подготовка AR..." text="Загружаем локальное хранилище." />
+      </Shell>
+    );
   if (route.name === "project") return <ProjectPage snapshot={snapshot} projectId={route.id} refresh={refresh} />;
   if (route.name === "viewer" && route.id === "test") return <TestViewerPage />;
   if (route.name === "viewer") return <ViewerPage snapshot={snapshot} livePhotoId={route.id} />;
@@ -75,7 +91,9 @@ export function App() {
 }
 
 function Shell({ children, flush = false }: { children: React.ReactNode; flush?: boolean }) {
-  return <main className={flush ? "min-h-screen bg-ink text-white" : "min-h-screen bg-background text-ink"}>{children}</main>;
+  return (
+    <main className={flush ? "min-h-screen bg-ink text-white" : "min-h-screen bg-background text-ink"}>{children}</main>
+  );
 }
 
 function Home({ snapshot, refresh }: { snapshot: StoreSnapshot; refresh: () => Promise<void> }) {
@@ -86,12 +104,23 @@ function Home({ snapshot, refresh }: { snapshot: StoreSnapshot; refresh: () => P
         <section className="grid flex-1 items-center gap-8 py-10 lg:grid-cols-[1fr_0.9fr]">
           <div className="space-y-7">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">School AR Photo</p>
-            <h1 className="max-w-3xl text-5xl font-semibold leading-tight md:text-7xl">Оживающие выпускные фотографии</h1>
-            <p className="max-w-2xl text-lg leading-8 text-muted">Создавайте школьные AR-альбомы без backend: фото, видео, QR, ZIP-экспорт и локальная работа прямо в браузере.</p>
-          <div className="flex flex-wrap gap-3">
-              <Button onClick={() => go("/dashboard")} icon={<FolderPlus size={19} />}>Открыть проекты</Button>
-              <Button variant="ghost" onClick={() => go("/viewer/test")} icon={<Camera size={18} />}>Test Viewer</Button>
-              <Button variant="ghost" onClick={() => seedDemo(refresh)} icon={<Play size={18} />}>Создать демо</Button>
+            <h1 className="max-w-3xl text-5xl font-semibold leading-tight md:text-7xl">
+              Оживающие выпускные фотографии
+            </h1>
+            <p className="max-w-2xl text-lg leading-8 text-muted">
+              Создавайте школьные AR-альбомы без backend: фото, видео, QR, ZIP-экспорт и локальная работа прямо в
+              браузере.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={() => go("/dashboard")} icon={<FolderPlus size={19} />}>
+                Открыть проекты
+              </Button>
+              <Button variant="ghost" onClick={() => go("/viewer/test")} icon={<Camera size={18} />}>
+                Test Viewer
+              </Button>
+              <Button variant="ghost" onClick={() => seedDemo(refresh)} icon={<Play size={18} />}>
+                Создать демо
+              </Button>
             </div>
           </div>
           <div className="relative overflow-hidden rounded-[32px] bg-card p-5 shadow-soft">
@@ -150,17 +179,40 @@ function Dashboard({ snapshot, refresh }: { snapshot: StoreSnapshot; refresh: ()
             <h2 className="text-2xl font-semibold">AR Photo</h2>
             <form className="mt-5 space-y-3" onSubmit={createProject}>
               <Input value={projectName} onChange={setProjectName} placeholder="Гимназия 12" />
-              <Button icon={<Plus size={18} />} full>Новый проект</Button>
+              <Button icon={<Plus size={18} />} full>
+                Новый проект
+              </Button>
             </form>
             <div className="mt-4 flex gap-2">
               <input ref={importRef} type="file" accept=".zip" className="hidden" onChange={importZip} />
-              <Button type="button" variant="ghost" onClick={() => importRef.current?.click()} icon={<Import size={18} />}>ZIP Import</Button>
-              <Button type="button" variant="ghost" onClick={async () => { await clearAll(); await refresh(); }} icon={<Trash2 size={18} />}>Очистить</Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => importRef.current?.click()}
+                icon={<Import size={18} />}
+              >
+                ZIP Import
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={async () => {
+                  await clearAll();
+                  await refresh();
+                }}
+                icon={<Trash2 size={18} />}
+              >
+                Очистить
+              </Button>
             </div>
           </Panel>
           <div className="grid gap-4">
-            {snapshot.projects.map((project) => <ProjectCard key={project.id} project={project} snapshot={snapshot} refresh={refresh} />)}
-            {!snapshot.projects.length && <StatusPanel title="Нет проектов" text="Создайте первый школьный AR-альбом." />}
+            {snapshot.projects.map((project) => (
+              <ProjectCard key={project.id} project={project} snapshot={snapshot} refresh={refresh} />
+            ))}
+            {!snapshot.projects.length && (
+              <StatusPanel title="Нет проектов" text="Создайте первый школьный AR-альбом." />
+            )}
           </div>
         </section>
       </div>
@@ -168,7 +220,15 @@ function Dashboard({ snapshot, refresh }: { snapshot: StoreSnapshot; refresh: ()
   );
 }
 
-function ProjectPage({ snapshot, projectId, refresh }: { snapshot: StoreSnapshot; projectId: string; refresh: () => Promise<void> }) {
+function ProjectPage({
+  snapshot,
+  projectId,
+  refresh,
+}: {
+  snapshot: StoreSnapshot;
+  projectId: string;
+  refresh: () => Promise<void>;
+}) {
   const project = snapshot.projects.find((item) => item.id === projectId);
   const [className, setClassName] = useState("");
   const [studentName, setStudentName] = useState("");
@@ -182,7 +242,12 @@ function ProjectPage({ snapshot, projectId, refresh }: { snapshot: StoreSnapshot
     if (!selectedClassId && classes[0]) setSelectedClassId(classes[0].id);
   }, [classes, selectedClassId]);
 
-  if (!project) return <Shell><NotFound /></Shell>;
+  if (!project)
+    return (
+      <Shell>
+        <NotFound />
+      </Shell>
+    );
 
   const createClass = async (event: FormEvent) => {
     event.preventDefault();
@@ -198,7 +263,12 @@ function ProjectPage({ snapshot, projectId, refresh }: { snapshot: StoreSnapshot
     event.preventDefault();
     if (!activeClass || !studentName.trim()) return;
     const [lastName = "", ...rest] = studentName.trim().split(/\s+/);
-    await saveStudent({ id: createId("student"), classId: activeClass.id, firstName: rest.join(" ") || "Ученик", lastName });
+    await saveStudent({
+      id: createId("student"),
+      classId: activeClass.id,
+      firstName: rest.join(" ") || "Ученик",
+      lastName,
+    });
     setStudentName("");
     await refresh();
   };
@@ -207,27 +277,48 @@ function ProjectPage({ snapshot, projectId, refresh }: { snapshot: StoreSnapshot
     <Shell>
       <div className="mx-auto max-w-7xl px-5 py-6">
         <Topbar snapshot={snapshot} refresh={refresh} />
-        <button className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-muted" onClick={() => go("/dashboard")}><ArrowLeft size={16} /> Проекты</button>
+        <button
+          className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-muted"
+          onClick={() => go("/dashboard")}
+        >
+          <ArrowLeft size={16} /> Проекты
+        </button>
         <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-4xl font-semibold">{project.name}</h1>
-            <p className="mt-2 text-muted">{classes.length} класса, {snapshot.livePhotos.length} live photo</p>
+            <p className="mt-2 text-muted">
+              {classes.length} класса, {snapshot.livePhotos.length} live photo
+            </p>
           </div>
-          <Button variant="ghost" onClick={() => exportProjectZip(snapshot, project.id)} icon={<FileArchive size={18} />}>Экспорт проекта</Button>
+          <Button
+            variant="ghost"
+            onClick={() => exportProjectZip(snapshot, project.id)}
+            icon={<FileArchive size={18} />}
+          >
+            Экспорт проекта
+          </Button>
         </div>
         <section className="mt-6 grid gap-5 lg:grid-cols-[320px_1fr]">
           <Panel>
             <form className="space-y-3" onSubmit={createClass}>
               <Input value={className} onChange={setClassName} placeholder="4А" />
-              <Button icon={<Plus size={18} />} full>Создать класс</Button>
+              <Button icon={<Plus size={18} />} full>
+                Создать класс
+              </Button>
             </form>
             <div className="mt-5 grid gap-2">
               {classes.map((item) => {
                 const stats = getClassStats(snapshot, item);
                 return (
-                  <button key={item.id} className={`rounded-2xl border p-4 text-left transition ${activeClass?.id === item.id ? "border-primary bg-blue-50" : "border-line bg-white"}`} onClick={() => setSelectedClassId(item.id)}>
+                  <button
+                    key={item.id}
+                    className={`rounded-2xl border p-4 text-left transition ${activeClass?.id === item.id ? "border-primary bg-blue-50" : "border-line bg-white"}`}
+                    onClick={() => setSelectedClassId(item.id)}
+                  >
                     <div className="font-semibold">{item.name}</div>
-                    <div className="mt-1 text-sm text-muted">{stats.students} учеников, {stats.livePhotos} live photo</div>
+                    <div className="mt-1 text-sm text-muted">
+                      {stats.students} учеников, {stats.livePhotos} live photo
+                    </div>
                   </button>
                 );
               })}
@@ -238,7 +329,13 @@ function ProjectPage({ snapshot, projectId, refresh }: { snapshot: StoreSnapshot
               <Panel>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <h2 className="text-2xl font-semibold">{activeClass.name}</h2>
-                  <Button variant="ghost" onClick={() => exportClassZip(snapshot, activeClass)} icon={<Download size={18} />}>4A_live_photos.zip</Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => exportClassZip(snapshot, activeClass)}
+                    icon={<Download size={18} />}
+                  >
+                    4A_live_photos.zip
+                  </Button>
                 </div>
                 <form className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={createStudent}>
                   <Input value={studentName} onChange={setStudentName} placeholder="Иванов Максим" />
@@ -247,8 +344,12 @@ function ProjectPage({ snapshot, projectId, refresh }: { snapshot: StoreSnapshot
               </Panel>
             )}
             <div className="grid gap-4 xl:grid-cols-2">
-              {students.map((student) => <StudentCard key={student.id} student={student} snapshot={snapshot} refresh={refresh} />)}
-              {activeClass && !students.length && <StatusPanel title="Класс пустой" text="Добавьте ученика и загрузите фото с видео." />}
+              {students.map((student) => (
+                <StudentCard key={student.id} student={student} snapshot={snapshot} refresh={refresh} />
+              ))}
+              {activeClass && !students.length && (
+                <StatusPanel title="Класс пустой" text="Добавьте ученика и загрузите фото с видео." />
+              )}
             </div>
           </div>
         </section>
@@ -257,7 +358,15 @@ function ProjectPage({ snapshot, projectId, refresh }: { snapshot: StoreSnapshot
   );
 }
 
-function StudentCard({ student, snapshot, refresh }: { student: ARStudent; snapshot: StoreSnapshot; refresh: () => Promise<void> }) {
+function StudentCard({
+  student,
+  snapshot,
+  refresh,
+}: {
+  student: ARStudent;
+  snapshot: StoreSnapshot;
+  refresh: () => Promise<void>;
+}) {
   const qrRef = useRef<HTMLCanvasElement>(null);
   const livePhoto = snapshot.livePhotos.find((item) => item.studentId === student.id);
   const image = livePhoto ? snapshot.media.find((item) => item.id === livePhoto.imageId) : undefined;
@@ -304,7 +413,9 @@ function StudentCard({ student, snapshot, refresh }: { student: ARStudent; snaps
     <Panel>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h3 className="text-xl font-semibold">{student.lastName} {student.firstName}</h3>
+          <h3 className="text-xl font-semibold">
+            {student.lastName} {student.firstName}
+          </h3>
           <div className="mt-3 flex flex-wrap gap-2 text-sm font-medium">
             <Badge ok={Boolean(image || draftImage)} label="Фото" />
             <Badge ok={Boolean(video || draftVideo)} label="Видео" />
@@ -314,15 +425,33 @@ function StudentCard({ student, snapshot, refresh }: { student: ARStudent; snaps
         {livePhoto && <QRCodeCanvas ref={qrRef} value={livePhoto.qrCode} size={84} bgColor="transparent" />}
       </div>
       <div className="mt-5 grid gap-2 sm:grid-cols-2">
-        <FileButton accept="image/*" icon={<ImageUp size={18} />} onPick={(file) => upload("image", file)}>Загрузить фото</FileButton>
-        <FileButton accept="video/*" icon={<Upload size={18} />} onPick={(file) => upload("video", file)}>Загрузить видео</FileButton>
-        <Button type="button" variant="ghost" onClick={generate} icon={<QrCode size={18} />}>Сгенерировать QR</Button>
-        <Button type="button" variant="ghost" disabled={!livePhoto} onClick={() => livePhoto && go(`/viewer/${livePhoto.id}`)} icon={<Camera size={18} />}>Открыть Viewer</Button>
+        <FileButton accept="image/*" icon={<ImageUp size={18} />} onPick={(file) => upload("image", file)}>
+          Загрузить фото
+        </FileButton>
+        <FileButton accept="video/*" icon={<Upload size={18} />} onPick={(file) => upload("video", file)}>
+          Загрузить видео
+        </FileButton>
+        <Button type="button" variant="ghost" onClick={generate} icon={<QrCode size={18} />}>
+          Сгенерировать QR
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={!livePhoto}
+          onClick={() => livePhoto && go(`/viewer/${livePhoto.id}`)}
+          icon={<Camera size={18} />}
+        >
+          Открыть Viewer
+        </Button>
       </div>
       {livePhoto && (
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Button type="button" variant="quiet" onClick={downloadQr} icon={<Download size={17} />}>PNG QR</Button>
-          <span className="min-w-0 flex-1 truncate rounded-xl bg-slate-100 px-3 py-2 text-xs text-muted">{livePhoto.qrCode}</span>
+          <Button type="button" variant="quiet" onClick={downloadQr} icon={<Download size={17} />}>
+            PNG QR
+          </Button>
+          <span className="min-w-0 flex-1 truncate rounded-xl bg-slate-100 px-3 py-2 text-xs text-muted">
+            {livePhoto.qrCode}
+          </span>
         </div>
       )}
     </Panel>
@@ -365,7 +494,12 @@ function ViewerPage({ snapshot, livePhotoId }: { snapshot: StoreSnapshot; livePh
     };
   }, [videoMeta]);
 
-  if (!livePhoto) return <Shell flush><NotFound /></Shell>;
+  if (!livePhoto)
+    return (
+      <Shell flush>
+        <NotFound />
+      </Shell>
+    );
 
   const toggleVideo = async () => {
     const video = videoRef.current;
@@ -390,17 +524,51 @@ function ViewerPage({ snapshot, livePhotoId }: { snapshot: StoreSnapshot; livePh
             Наведите фотографию в рамку
           </div>
         </div>
-        <div className={`absolute left-1/2 top-1/2 aspect-[3/4] w-[76vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[18px] border border-white/50 bg-black shadow-[0_30px_90px_rgba(0,0,0,0.45)] transition-opacity ${videoVisible ? "opacity-100" : "pointer-events-none opacity-0"}`}>
-          {videoUrl ? <video ref={videoRef} className="h-full w-full object-cover" src={videoUrl} muted={muted} loop playsInline preload="metadata" /> : <div className="grid h-full place-items-center text-white">Подготовка видео...</div>}
+        <div
+          className={`absolute left-1/2 top-1/2 aspect-[3/4] w-[76vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[18px] border border-white/50 bg-black shadow-[0_30px_90px_rgba(0,0,0,0.45)] transition-opacity ${videoVisible ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        >
+          {videoUrl ? (
+            <video
+              ref={videoRef}
+              className="h-full w-full object-cover"
+              src={videoUrl}
+              muted={muted}
+              loop
+              playsInline
+              preload="metadata"
+            />
+          ) : (
+            <div className="grid h-full place-items-center text-white">Подготовка видео...</div>
+          )}
         </div>
         <div className="absolute inset-x-4 top-5 rounded-[20px] bg-black/45 p-4 text-white backdrop-blur">
-          <div className="text-sm font-semibold">{cameraReady ? "Наведите камеру на фотографию" : "Подготовка AR..."}</div>
-          <div className="mt-1 text-xs text-white/70">{videoVisible ? "Видео включено вручную" : videoUrl ? "Камера готова, видео не закрывает обзор" : "Загружаем видео"}</div>
+          <div className="text-sm font-semibold">
+            {cameraReady ? "Наведите камеру на фотографию" : "Подготовка AR..."}
+          </div>
+          <div className="mt-1 text-xs text-white/70">
+            {videoVisible
+              ? "Видео включено вручную"
+              : videoUrl
+                ? "Камера готова, видео не закрывает обзор"
+                : "Загружаем видео"}
+          </div>
         </div>
         <div className="absolute inset-x-4 bottom-5 grid grid-cols-3 gap-2">
-          <ControlButton onClick={() => setMuted((value) => !value)} icon={muted ? <VolumeX /> : <Volume2 />} label="Звук" />
-          <ControlButton onClick={() => document.documentElement.requestFullscreen?.()} icon={<Maximize2 />} label="Fullscreen" />
-          <ControlButton onClick={toggleVideo} icon={videoVisible ? <RotateCcw /> : <Play />} label={videoVisible ? "Скрыть" : "Видео"} />
+          <ControlButton
+            onClick={() => setMuted((value) => !value)}
+            icon={muted ? <VolumeX /> : <Volume2 />}
+            label="Звук"
+          />
+          <ControlButton
+            onClick={() => document.documentElement.requestFullscreen?.()}
+            icon={<Maximize2 />}
+            label="Fullscreen"
+          />
+          <ControlButton
+            onClick={toggleVideo}
+            icon={videoVisible ? <RotateCcw /> : <Play />}
+            label={videoVisible ? "Скрыть" : "Видео"}
+          />
         </div>
       </div>
     </Shell>
@@ -426,7 +594,11 @@ function TestViewerPage() {
 
     async function boot() {
       setFallbackVideoVisible(false);
-      const [hasImage, hasVideo, hasTarget] = await Promise.all([assetExists(imageSrc), assetExists(videoSrc), assetExists(targetSrc)]);
+      const [hasImage, hasVideo, hasTarget] = await Promise.all([
+        assetExists(imageSrc),
+        assetExists(videoSrc),
+        assetExists(targetSrc),
+      ]);
       if (!hasImage || !hasVideo) {
         setMode("missing");
         setStatus("Нужны public/test-assets/test.jpg и public/test-assets/test.mp4");
@@ -481,14 +653,29 @@ function TestViewerPage() {
         <div ref={containerRef} className={mode === "mindar" ? "absolute inset-0" : "hidden"} />
         {mode !== "mindar" && (
           <>
-            <video ref={fallbackCameraRef} className="absolute inset-0 h-full w-full object-cover opacity-70" playsInline muted />
+            <video
+              ref={fallbackCameraRef}
+              className="absolute inset-0 h-full w-full object-cover opacity-70"
+              playsInline
+              muted
+            />
             <div className="pointer-events-none absolute left-1/2 top-1/2 aspect-[3/4] w-[76vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-[18px] border-2 border-dashed border-white/60 bg-white/5">
               <div className="grid h-full place-items-center p-6 text-center text-sm font-semibold text-white/75">
                 Наведите test.jpg в рамку
               </div>
             </div>
-            <div className={`absolute left-1/2 top-1/2 aspect-[3/4] w-[76vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[18px] border border-white/50 bg-black shadow-[0_30px_90px_rgba(0,0,0,0.45)] transition-opacity ${fallbackVideoVisible ? "opacity-100" : "pointer-events-none opacity-0"}`}>
-              <video ref={fallbackVideoRef} className="h-full w-full object-cover" src={videoSrc} muted={muted} loop playsInline preload="metadata" />
+            <div
+              className={`absolute left-1/2 top-1/2 aspect-[3/4] w-[76vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[18px] border border-white/50 bg-black shadow-[0_30px_90px_rgba(0,0,0,0.45)] transition-opacity ${fallbackVideoVisible ? "opacity-100" : "pointer-events-none opacity-0"}`}
+            >
+              <video
+                ref={fallbackVideoRef}
+                className="h-full w-full object-cover"
+                src={videoSrc}
+                muted={muted}
+                loop
+                playsInline
+                preload="metadata"
+              />
             </div>
           </>
         )}
@@ -504,9 +691,21 @@ function TestViewerPage() {
           </div>
         </div>
         <div className="absolute inset-x-4 bottom-5 grid grid-cols-3 gap-2">
-          <ControlButton onClick={() => setMuted((value) => !value)} icon={muted ? <VolumeX /> : <Volume2 />} label="Звук" />
-          <ControlButton onClick={() => document.documentElement.requestFullscreen?.()} icon={<Maximize2 />} label="Fullscreen" />
-          <ControlButton onClick={toggleFallbackVideo} icon={fallbackVideoVisible ? <RotateCcw /> : <Play />} label={fallbackVideoVisible ? "Скрыть" : "Видео"} />
+          <ControlButton
+            onClick={() => setMuted((value) => !value)}
+            icon={muted ? <VolumeX /> : <Volume2 />}
+            label="Звук"
+          />
+          <ControlButton
+            onClick={() => document.documentElement.requestFullscreen?.()}
+            icon={<Maximize2 />}
+            label="Fullscreen"
+          />
+          <ControlButton
+            onClick={toggleFallbackVideo}
+            icon={fallbackVideoVisible ? <RotateCcw /> : <Play />}
+            label={fallbackVideoVisible ? "Скрыть" : "Видео"}
+          />
         </div>
         {mode === "mindar" && (
           <CalibrationPad
@@ -544,14 +743,38 @@ function CalibrationPad({
   return (
     <div className="absolute bottom-24 right-4 grid w-[168px] gap-2 rounded-[18px] bg-black/55 p-2 text-white backdrop-blur">
       <div className="grid grid-cols-3 gap-2">
-        <CalibrationButton icon={<Minus size={17} />} label="Scale down" onClick={() => change({ scale: Math.max(0.5, calibration.scale - scaleStep) })} />
-        <CalibrationButton icon={<ArrowUp size={17} />} label="Up" onClick={() => change({ dy: calibration.dy + moveStep })} />
-        <CalibrationButton icon={<Plus size={17} />} label="Scale up" onClick={() => change({ scale: calibration.scale + scaleStep })} />
-        <CalibrationButton icon={<ArrowLeft size={17} />} label="Left" onClick={() => change({ dx: calibration.dx - moveStep })} />
+        <CalibrationButton
+          icon={<Minus size={17} />}
+          label="Scale down"
+          onClick={() => change({ scale: Math.max(0.5, calibration.scale - scaleStep) })}
+        />
+        <CalibrationButton
+          icon={<ArrowUp size={17} />}
+          label="Up"
+          onClick={() => change({ dy: calibration.dy + moveStep })}
+        />
+        <CalibrationButton
+          icon={<Plus size={17} />}
+          label="Scale up"
+          onClick={() => change({ scale: calibration.scale + scaleStep })}
+        />
+        <CalibrationButton
+          icon={<ArrowLeft size={17} />}
+          label="Left"
+          onClick={() => change({ dx: calibration.dx - moveStep })}
+        />
         <CalibrationButton icon={<RotateCcw size={17} />} label="Reset" onClick={onReset} />
-        <CalibrationButton icon={<ArrowRight size={17} />} label="Right" onClick={() => change({ dx: calibration.dx + moveStep })} />
+        <CalibrationButton
+          icon={<ArrowRight size={17} />}
+          label="Right"
+          onClick={() => change({ dx: calibration.dx + moveStep })}
+        />
         <div />
-        <CalibrationButton icon={<ArrowDown size={17} />} label="Down" onClick={() => change({ dy: calibration.dy - moveStep })} />
+        <CalibrationButton
+          icon={<ArrowDown size={17} />}
+          label="Down"
+          onClick={() => change({ dy: calibration.dy - moveStep })}
+        />
         <div className="grid place-items-center rounded-xl bg-white/10 px-1 text-[10px] font-semibold tabular-nums">
           {calibration.dx.toFixed(2)}
         </div>
@@ -562,7 +785,12 @@ function CalibrationPad({
 
 function CalibrationButton({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
   return (
-    <button className="grid h-10 w-10 place-items-center rounded-xl bg-white/90 text-slate-950" title={label} aria-label={label} onClick={onClick}>
+    <button
+      className="grid h-10 w-10 place-items-center rounded-xl bg-white/90 text-slate-950"
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+    >
       {icon}
     </button>
   );
@@ -572,18 +800,30 @@ function Topbar({ snapshot, refresh }: { snapshot: StoreSnapshot; refresh: () =>
   return (
     <header className="flex items-center justify-between gap-4">
       <button className="flex items-center gap-3" onClick={() => go("/")}>
-        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-white"><Expand size={20} /></span>
+        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-white">
+          <Expand size={20} />
+        </span>
         <span className="text-lg font-semibold">AR Photo</span>
       </button>
       <div className="flex items-center gap-2">
         <span className="hidden text-sm text-muted sm:inline">{snapshot.projects.length} проектов</span>
-        <Button type="button" variant="quiet" onClick={() => seedDemo(refresh)} icon={<Plus size={17} />}>Демо</Button>
+        <Button type="button" variant="quiet" onClick={() => seedDemo(refresh)} icon={<Plus size={17} />}>
+          Демо
+        </Button>
       </div>
     </header>
   );
 }
 
-function ProjectCard({ project, snapshot, refresh }: { project: ARProject; snapshot: StoreSnapshot; refresh: () => Promise<void> }) {
+function ProjectCard({
+  project,
+  snapshot,
+  refresh,
+}: {
+  project: ARProject;
+  snapshot: StoreSnapshot;
+  refresh: () => Promise<void>;
+}) {
   const classes = snapshot.classes.filter((item) => item.projectId === project.id);
   const classIds = classes.map((item) => item.id);
   const students = snapshot.students.filter((item) => classIds.includes(item.classId));
@@ -593,26 +833,74 @@ function ProjectCard({ project, snapshot, refresh }: { project: ARProject; snaps
       <div className="flex flex-wrap items-center justify-between gap-4">
         <button className="text-left" onClick={() => go(`/project/${project.id}`)}>
           <h3 className="text-2xl font-semibold">{project.name}</h3>
-          <p className="mt-2 text-muted">{classes.length} класса, {livePhotos.length} live photo</p>
+          <p className="mt-2 text-muted">
+            {classes.length} класса, {livePhotos.length} live photo
+          </p>
         </button>
         <div className="flex gap-2">
-          <Button variant="ghost" onClick={() => go(`/project/${project.id}`)} icon={<ArrowLeft className="rotate-180" size={18} />}>Открыть</Button>
-          <Button variant="quiet" onClick={async () => { await deleteProjectCascade(project.id); await refresh(); }} icon={<Trash2 size={17} />}>Удалить</Button>
+          <Button
+            variant="ghost"
+            onClick={() => go(`/project/${project.id}`)}
+            icon={<ArrowLeft className="rotate-180" size={18} />}
+          >
+            Открыть
+          </Button>
+          <Button
+            variant="quiet"
+            onClick={async () => {
+              await deleteProjectCascade(project.id);
+              await refresh();
+            }}
+            icon={<Trash2 size={17} />}
+          >
+            Удалить
+          </Button>
         </div>
       </div>
     </Panel>
   );
 }
 
-function Button({ children, icon, variant = "primary", full = false, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { icon?: React.ReactNode; variant?: "primary" | "ghost" | "quiet"; full?: boolean }) {
-  return <button {...props} className={`btn btn-${variant} ${full ? "w-full" : ""} ${props.className ?? ""}`}>{icon}{children}</button>;
+function Button({
+  children,
+  icon,
+  variant = "primary",
+  full = false,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  icon?: React.ReactNode;
+  variant?: "primary" | "ghost" | "quiet";
+  full?: boolean;
+}) {
+  return (
+    <button {...props} className={`btn btn-${variant} ${full ? "w-full" : ""} ${props.className ?? ""}`}>
+      {icon}
+      {children}
+    </button>
+  );
 }
 
-function FileButton({ children, accept, icon, onPick }: { children: React.ReactNode; accept: string; icon: React.ReactNode; onPick: (file?: File) => void }) {
+function FileButton({
+  children,
+  accept,
+  icon,
+  onPick,
+}: {
+  children: React.ReactNode;
+  accept: string;
+  icon: React.ReactNode;
+  onPick: (file?: File) => void;
+}) {
   return (
     <label className="btn btn-ghost cursor-pointer">
-      {icon}{children}
-      <input type="file" accept={accept} className="hidden" onChange={(event) => onPick(event.currentTarget.files?.[0])} />
+      {icon}
+      {children}
+      <input
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(event) => onPick(event.currentTarget.files?.[0])}
+      />
     </label>
   );
 }
@@ -621,12 +909,33 @@ function Panel({ children }: { children: React.ReactNode }) {
   return <div className="rounded-card border border-line bg-card p-4 shadow-soft">{children}</div>;
 }
 
-function Input({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) {
-  return <input className="h-12 w-full rounded-2xl border border-line bg-white px-4 text-base outline-none transition focus:border-primary" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />;
+function Input({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <input
+      className="h-12 w-full rounded-2xl border border-line bg-white px-4 text-base outline-none transition focus:border-primary"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={placeholder}
+    />
+  );
 }
 
 function Badge({ ok, label }: { ok: boolean; label: string }) {
-  return <span className={`rounded-full px-3 py-1 ${ok ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{label}: {ok ? "✓" : "○"}</span>;
+  return (
+    <span
+      className={`rounded-full px-3 py-1 ${ok ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
+    >
+      {label}: {ok ? "✓" : "○"}
+    </span>
+  );
 }
 
 function MiniStep({ label }: { label: string }) {
@@ -634,15 +943,32 @@ function MiniStep({ label }: { label: string }) {
 }
 
 function StatusPanel({ title, text }: { title: string; text: string }) {
-  return <Panel><h2 className="text-xl font-semibold">{title}</h2><p className="mt-2 text-muted">{text}</p></Panel>;
+  return (
+    <Panel>
+      <h2 className="text-xl font-semibold">{title}</h2>
+      <p className="mt-2 text-muted">{text}</p>
+    </Panel>
+  );
 }
 
 function ControlButton({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
-  return <button className="flex h-14 items-center justify-center gap-2 rounded-[18px] bg-white/90 text-sm font-semibold text-slate-950 backdrop-blur" onClick={onClick}>{icon}<span>{label}</span></button>;
+  return (
+    <button
+      className="flex h-14 items-center justify-center gap-2 rounded-[18px] bg-white/90 text-sm font-semibold text-slate-950 backdrop-blur"
+      onClick={onClick}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
 }
 
 function NotFound() {
-  return <div className="grid min-h-screen place-items-center px-5"><StatusPanel title="Не найдено" text="Проверьте ссылку или вернитесь в dashboard." /></div>;
+  return (
+    <div className="grid min-h-screen place-items-center px-5">
+      <StatusPanel title="Не найдено" text="Проверьте ссылку или вернитесь в dashboard." />
+    </div>
+  );
 }
 
 async function assetExists(url: string) {
@@ -718,7 +1044,8 @@ async function startMindAr({
     plane.scale.set(next.scale, next.scale, 1);
   };
   applyCalibration(calibration);
-  const onCalibration = (event: Event) => applyCalibration((event as CustomEvent<ReturnType<typeof getArCalibration>>).detail);
+  const onCalibration = (event: Event) =>
+    applyCalibration((event as CustomEvent<ReturnType<typeof getArCalibration>>).detail);
   window.addEventListener("ar-photo-calibration", onCalibration);
 
   const anchor = mindarThree.addAnchor(0);
@@ -727,7 +1054,7 @@ async function startMindAr({
     const ThreeDebug = Three as any;
     const centerDot = new Three.Mesh(
       new Three.PlaneGeometry(0.05 * calibration.scale, 0.05 * calibration.scale),
-      new ThreeDebug.MeshBasicMaterial({ color: 0xff2d55, depthTest: false })
+      new ThreeDebug.MeshBasicMaterial({ color: 0xff2d55, depthTest: false }),
     );
     centerDot.position.set(0, 0, 0.03);
     anchor.group.add(centerDot);
