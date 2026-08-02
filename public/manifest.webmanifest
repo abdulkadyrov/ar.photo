@@ -1,11 +1,11 @@
 {
-  "name": "School AR Photo",
+  "name": "AR Photo",
   "short_name": "AR Photo",
   "description": "Offline-first система оживающих школьных фотографий.",
   "start_url": "/ar.photo/",
   "display": "standalone",
-  "background_color": "#F5F7FA",
-  "theme_color": "#2563EB",
+  "background_color": "#070B11",
+  "theme_color": "#6C5CFF",
   "icons": [
     {
       "src": "icon.svg",

@@ -6,6 +6,7 @@ export default {
       colors: {
         background: "var(--background)",
         card: "var(--card)",
+        surface: "var(--surface)",
         primary: "var(--primary)",
         ink: "var(--ink)",
         muted: "var(--muted)",
@@ -15,7 +16,7 @@ export default {
         card: "20px",
       },
       boxShadow: {
-        soft: "0 18px 60px rgba(15, 23, 42, 0.08)",
+        soft: "0 18px 60px rgba(0, 0, 0, 0.28)",
       },
     },
   },

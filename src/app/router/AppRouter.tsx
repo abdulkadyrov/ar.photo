@@ -1,5 +1,7 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { AppShell } from "../layout/AppShell";
+import { Panel } from "../../shared/ui";
 import { getRouterBasename } from "./routerBase";
 
 const PrototypeHomeRoute = lazy(() =>
@@ -25,6 +27,10 @@ export function AppRouter() {
         <Routes>
           <Route path="/" element={<PrototypeHomeRoute />} />
           <Route path="/dashboard" element={<PrototypeDashboardRoute />} />
+          <Route path="/projects" element={<PrototypeDashboardRoute />} />
+          <Route path="/groups" element={<FoundationPlaceholder title="Группы" />} />
+          <Route path="/qr-codes" element={<FoundationPlaceholder title="QR-коды" />} />
+          <Route path="/settings" element={<FoundationPlaceholder title="Настройки" />} />
           <Route path="/project/:projectId" element={<PrototypeProjectRoute />} />
           <Route path="/viewer/test" element={<PrototypeTestViewerRoute />} />
           <Route path="/viewer/:livePhotoId" element={<PrototypeViewerRoute />} />
@@ -32,6 +38,23 @@ export function AppRouter() {
         </Routes>
       </Suspense>
     </BrowserRouter>
+  );
+}
+
+function FoundationPlaceholder({ title }: { title: string }) {
+  return (
+    <AppShell
+      eyebrow="Этап 1"
+      title={title}
+      description="Раздел подключён к новой навигации и будет наполнен рабочими сценариями на соответствующем продуктовом этапе."
+    >
+      <Panel className="mt-7">
+        <p className="text-sm leading-6 text-muted">
+          Каркас маршрута, адаптивная навигация и состояния интерфейса уже готовы. Здесь нет фиктивных действий —
+          доступные операции появятся вместе с защищённым backend.
+        </p>
+      </Panel>
+    </AppShell>
   );
 }
 

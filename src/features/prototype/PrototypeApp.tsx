@@ -10,8 +10,9 @@ import {
   AlertTriangle,
   Camera,
   Download,
-  Expand,
+  Eye,
   FileArchive,
+  FolderKanban,
   FolderPlus,
   ImageUp,
   Import,
@@ -21,8 +22,11 @@ import {
   Plus,
   QrCode,
   RotateCcw,
+  ScanLine,
+  Sparkles,
   Trash2,
   Upload,
+  Users,
   UserPlus,
   Volume2,
   VolumeX,
@@ -42,6 +46,8 @@ import {
 import { createId, nowIso } from "../../lib/id";
 import { exportClassZip, exportProjectZip, getClassStats, parseImportZip } from "../../lib/zip";
 import { go, viewerUrl } from "../../lib/routes";
+import { AppShell } from "../../app/layout/AppShell";
+import { Button, FileButton, Input, MetricCard, Panel, StatusBadge, StatusPanel } from "../../shared/ui";
 import { usePrototypeSnapshot } from "./usePrototypeSnapshot";
 
 const AR_CALIBRATION_KEY = "ar-photo-calibration-v1";
@@ -100,7 +106,22 @@ function Home({ snapshot, refresh }: { snapshot: StoreSnapshot; refresh: () => P
   return (
     <Shell>
       <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-5 py-6">
-        <Topbar snapshot={snapshot} refresh={refresh} />
+        <header className="flex items-center justify-between gap-4">
+          <button className="brand-mark" onClick={() => go("/")}>
+            <span className="brand-symbol">
+              <Sparkles size={20} />
+            </span>
+            <span>
+              <strong>AR</strong> Photo
+            </span>
+          </button>
+          <div className="flex items-center gap-2">
+            <span className="hidden text-sm text-muted sm:inline">{snapshot.projects.length} проектов</span>
+            <Button type="button" variant="quiet" onClick={() => seedDemo(refresh)} icon={<Plus size={17} />}>
+              Демо
+            </Button>
+          </div>
+        </header>
         <section className="grid flex-1 items-center gap-8 py-10 lg:grid-cols-[1fr_0.9fr]">
           <div className="space-y-7">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">School AR Photo</p>
@@ -108,8 +129,8 @@ function Home({ snapshot, refresh }: { snapshot: StoreSnapshot; refresh: () => P
               Оживающие выпускные фотографии
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-muted">
-              Создавайте школьные AR-альбомы без backend: фото, видео, QR, ZIP-экспорт и локальная работа прямо в
-              браузере.
+              Создавайте школьные AR-альбомы: фото, видео, уникальные QR-коды и дополненная реальность в одном
+              защищённом пространстве.
             </p>
             <div className="flex flex-wrap gap-3">
               <Button onClick={() => go("/dashboard")} icon={<FolderPlus size={19} />}>
@@ -171,52 +192,69 @@ function Dashboard({ snapshot, refresh }: { snapshot: StoreSnapshot; refresh: ()
   };
 
   return (
-    <Shell>
-      <div className="mx-auto max-w-6xl px-5 py-6">
-        <Topbar snapshot={snapshot} refresh={refresh} />
-        <section className="mt-8 grid gap-5 md:grid-cols-[0.8fr_1.2fr]">
-          <Panel>
-            <h2 className="text-2xl font-semibold">AR Photo</h2>
-            <form className="mt-5 space-y-3" onSubmit={createProject}>
-              <Input value={projectName} onChange={setProjectName} placeholder="Гимназия 12" />
-              <Button icon={<Plus size={18} />} full>
-                Новый проект
-              </Button>
-            </form>
-            <div className="mt-4 flex gap-2">
-              <input ref={importRef} type="file" accept=".zip" className="hidden" onChange={importZip} />
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => importRef.current?.click()}
-                icon={<Import size={18} />}
-              >
-                ZIP Import
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={async () => {
-                  await clearAll();
-                  await refresh();
-                }}
-                icon={<Trash2 size={18} />}
-              >
-                Очистить
-              </Button>
-            </div>
-          </Panel>
-          <div className="grid gap-4">
-            {snapshot.projects.map((project) => (
-              <ProjectCard key={project.id} project={project} snapshot={snapshot} refresh={refresh} />
-            ))}
-            {!snapshot.projects.length && (
-              <StatusPanel title="Нет проектов" text="Создайте первый школьный AR-альбом." />
-            )}
+    <AppShell
+      eyebrow="Обзор"
+      title="Добро пожаловать в AR Photo"
+      description="Управляйте проектами, группами, медиа и AR-фотографиями из единого кабинета."
+      actions={
+        <Button type="button" variant="quiet" onClick={() => seedDemo(refresh)} icon={<Plus size={17} />}>
+          Демо-проект
+        </Button>
+      }
+    >
+      <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard icon={<FolderKanban size={20} />} label="Проектов" value={snapshot.projects.length} />
+        <MetricCard icon={<Users size={20} />} label="Групп" value={snapshot.classes.length} />
+        <MetricCard icon={<ScanLine size={20} />} label="AR-фото" value={snapshot.livePhotos.length} />
+        <MetricCard
+          icon={<Eye size={20} />}
+          label="Медиафайлов"
+          value={snapshot.media.length}
+          hint="Локальное хранилище"
+        />
+      </section>
+      <section className="mt-6 grid gap-5 xl:grid-cols-[360px_1fr]">
+        <Panel>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Быстрый старт</p>
+          <h2 className="mt-2 text-2xl font-semibold">Новый проект</h2>
+          <form className="mt-5 space-y-3" onSubmit={createProject}>
+            <Input value={projectName} onValueChange={setProjectName} placeholder="Например, Выпускной 2026" />
+            <Button icon={<Plus size={18} />} full>
+              Новый проект
+            </Button>
+          </form>
+          <div className="mt-4 flex gap-2">
+            <input ref={importRef} type="file" accept=".zip" className="hidden" onChange={importZip} />
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => importRef.current?.click()}
+              icon={<Import size={18} />}
+            >
+              ZIP Import
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={async () => {
+                if (!window.confirm("Удалить все локальные данные AR Photo? Это действие нельзя отменить.")) return;
+                await clearAll();
+                await refresh();
+              }}
+              icon={<Trash2 size={18} />}
+            >
+              Очистить
+            </Button>
           </div>
-        </section>
-      </div>
-    </Shell>
+        </Panel>
+        <div className="grid gap-4">
+          {snapshot.projects.map((project) => (
+            <ProjectCard key={project.id} project={project} snapshot={snapshot} refresh={refresh} />
+          ))}
+          {!snapshot.projects.length && <StatusPanel title="Нет проектов" text="Создайте первый школьный AR-альбом." />}
+        </div>
+      </section>
+    </AppShell>
   );
 }
 
@@ -274,22 +312,15 @@ function ProjectPage({
   };
 
   return (
-    <Shell>
-      <div className="mx-auto max-w-7xl px-5 py-6">
-        <Topbar snapshot={snapshot} refresh={refresh} />
-        <button
-          className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-muted"
-          onClick={() => go("/dashboard")}
-        >
-          <ArrowLeft size={16} /> Проекты
-        </button>
-        <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-4xl font-semibold">{project.name}</h1>
-            <p className="mt-2 text-muted">
-              {classes.length} класса, {snapshot.livePhotos.length} live photo
-            </p>
-          </div>
+    <AppShell
+      eyebrow="Проект"
+      title={project.name}
+      description={`${classes.length} групп, ${snapshot.livePhotos.length} AR-фото`}
+      actions={
+        <>
+          <Button variant="quiet" onClick={() => go("/dashboard")} icon={<ArrowLeft size={17} />}>
+            Проекты
+          </Button>
           <Button
             variant="ghost"
             onClick={() => exportProjectZip(snapshot, project.id)}
@@ -297,64 +328,65 @@ function ProjectPage({
           >
             Экспорт проекта
           </Button>
-        </div>
-        <section className="mt-6 grid gap-5 lg:grid-cols-[320px_1fr]">
-          <Panel>
-            <form className="space-y-3" onSubmit={createClass}>
-              <Input value={className} onChange={setClassName} placeholder="4А" />
-              <Button icon={<Plus size={18} />} full>
-                Создать класс
-              </Button>
-            </form>
-            <div className="mt-5 grid gap-2">
-              {classes.map((item) => {
-                const stats = getClassStats(snapshot, item);
-                return (
-                  <button
-                    key={item.id}
-                    className={`rounded-2xl border p-4 text-left transition ${activeClass?.id === item.id ? "border-primary bg-blue-50" : "border-line bg-white"}`}
-                    onClick={() => setSelectedClassId(item.id)}
-                  >
-                    <div className="font-semibold">{item.name}</div>
-                    <div className="mt-1 text-sm text-muted">
-                      {stats.students} учеников, {stats.livePhotos} live photo
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </Panel>
-          <div className="space-y-5">
-            {activeClass && (
-              <Panel>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-2xl font-semibold">{activeClass.name}</h2>
-                  <Button
-                    variant="ghost"
-                    onClick={() => exportClassZip(snapshot, activeClass)}
-                    icon={<Download size={18} />}
-                  >
-                    4A_live_photos.zip
-                  </Button>
-                </div>
-                <form className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={createStudent}>
-                  <Input value={studentName} onChange={setStudentName} placeholder="Иванов Максим" />
-                  <Button icon={<UserPlus size={18} />}>Добавить ученика</Button>
-                </form>
-              </Panel>
-            )}
-            <div className="grid gap-4 xl:grid-cols-2">
-              {students.map((student) => (
-                <StudentCard key={student.id} student={student} snapshot={snapshot} refresh={refresh} />
-              ))}
-              {activeClass && !students.length && (
-                <StatusPanel title="Класс пустой" text="Добавьте ученика и загрузите фото с видео." />
-              )}
-            </div>
+        </>
+      }
+    >
+      <section className="mt-7 grid gap-5 lg:grid-cols-[320px_1fr]">
+        <Panel>
+          <form className="space-y-3" onSubmit={createClass}>
+            <Input value={className} onValueChange={setClassName} placeholder="Например, 11А класс" />
+            <Button icon={<Plus size={18} />} full>
+              Создать класс
+            </Button>
+          </form>
+          <div className="mt-5 grid gap-2">
+            {classes.map((item) => {
+              const stats = getClassStats(snapshot, item);
+              return (
+                <button
+                  key={item.id}
+                  className={`rounded-2xl border p-4 text-left transition ${activeClass?.id === item.id ? "border-primary bg-primary/10" : "border-line bg-white/[0.025] hover:border-white/15"}`}
+                  onClick={() => setSelectedClassId(item.id)}
+                >
+                  <div className="font-semibold">{item.name}</div>
+                  <div className="mt-1 text-sm text-muted">
+                    {stats.students} учеников, {stats.livePhotos} live photo
+                  </div>
+                </button>
+              );
+            })}
           </div>
-        </section>
-      </div>
-    </Shell>
+        </Panel>
+        <div className="space-y-5">
+          {activeClass && (
+            <Panel>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-2xl font-semibold">{activeClass.name}</h2>
+                <Button
+                  variant="ghost"
+                  onClick={() => exportClassZip(snapshot, activeClass)}
+                  icon={<Download size={18} />}
+                >
+                  4A_live_photos.zip
+                </Button>
+              </div>
+              <form className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={createStudent}>
+                <Input value={studentName} onValueChange={setStudentName} placeholder="Иванов Максим" />
+                <Button icon={<UserPlus size={18} />}>Добавить ученика</Button>
+              </form>
+            </Panel>
+          )}
+          <div className="grid gap-4 xl:grid-cols-2">
+            {students.map((student) => (
+              <StudentCard key={student.id} student={student} snapshot={snapshot} refresh={refresh} />
+            ))}
+            {activeClass && !students.length && (
+              <StatusPanel title="Класс пустой" text="Добавьте ученика и загрузите фото с видео." />
+            )}
+          </div>
+        </div>
+      </section>
+    </AppShell>
   );
 }
 
@@ -417,9 +449,9 @@ function StudentCard({
             {student.lastName} {student.firstName}
           </h3>
           <div className="mt-3 flex flex-wrap gap-2 text-sm font-medium">
-            <Badge ok={Boolean(image || draftImage)} label="Фото" />
-            <Badge ok={Boolean(video || draftVideo)} label="Видео" />
-            <Badge ok={Boolean(livePhoto)} label="QR" />
+            <StatusBadge ok={Boolean(image || draftImage)} label="Фото" />
+            <StatusBadge ok={Boolean(video || draftVideo)} label="Видео" />
+            <StatusBadge ok={Boolean(livePhoto)} label="QR" />
           </div>
         </div>
         {livePhoto && <QRCodeCanvas ref={qrRef} value={livePhoto.qrCode} size={84} bgColor="transparent" />}
@@ -449,7 +481,7 @@ function StudentCard({
           <Button type="button" variant="quiet" onClick={downloadQr} icon={<Download size={17} />}>
             PNG QR
           </Button>
-          <span className="min-w-0 flex-1 truncate rounded-xl bg-slate-100 px-3 py-2 text-xs text-muted">
+          <span className="min-w-0 flex-1 truncate rounded-xl bg-white/[0.04] px-3 py-2 text-xs text-muted">
             {livePhoto.qrCode}
           </span>
         </div>
@@ -796,25 +828,6 @@ function CalibrationButton({ icon, label, onClick }: { icon: React.ReactNode; la
   );
 }
 
-function Topbar({ snapshot, refresh }: { snapshot: StoreSnapshot; refresh: () => Promise<void> }) {
-  return (
-    <header className="flex items-center justify-between gap-4">
-      <button className="flex items-center gap-3" onClick={() => go("/")}>
-        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-white">
-          <Expand size={20} />
-        </span>
-        <span className="text-lg font-semibold">AR Photo</span>
-      </button>
-      <div className="flex items-center gap-2">
-        <span className="hidden text-sm text-muted sm:inline">{snapshot.projects.length} проектов</span>
-        <Button type="button" variant="quiet" onClick={() => seedDemo(refresh)} icon={<Plus size={17} />}>
-          Демо
-        </Button>
-      </div>
-    </header>
-  );
-}
-
 function ProjectCard({
   project,
   snapshot,
@@ -846,8 +859,9 @@ function ProjectCard({
             Открыть
           </Button>
           <Button
-            variant="quiet"
+            variant="danger"
             onClick={async () => {
+              if (!window.confirm(`Удалить проект «${project.name}» и все связанные данные?`)) return;
               await deleteProjectCascade(project.id);
               await refresh();
             }}
@@ -861,94 +875,8 @@ function ProjectCard({
   );
 }
 
-function Button({
-  children,
-  icon,
-  variant = "primary",
-  full = false,
-  ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  icon?: React.ReactNode;
-  variant?: "primary" | "ghost" | "quiet";
-  full?: boolean;
-}) {
-  return (
-    <button {...props} className={`btn btn-${variant} ${full ? "w-full" : ""} ${props.className ?? ""}`}>
-      {icon}
-      {children}
-    </button>
-  );
-}
-
-function FileButton({
-  children,
-  accept,
-  icon,
-  onPick,
-}: {
-  children: React.ReactNode;
-  accept: string;
-  icon: React.ReactNode;
-  onPick: (file?: File) => void;
-}) {
-  return (
-    <label className="btn btn-ghost cursor-pointer">
-      {icon}
-      {children}
-      <input
-        type="file"
-        accept={accept}
-        className="hidden"
-        onChange={(event) => onPick(event.currentTarget.files?.[0])}
-      />
-    </label>
-  );
-}
-
-function Panel({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-card border border-line bg-card p-4 shadow-soft">{children}</div>;
-}
-
-function Input({
-  value,
-  onChange,
-  placeholder,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-}) {
-  return (
-    <input
-      className="h-12 w-full rounded-2xl border border-line bg-white px-4 text-base outline-none transition focus:border-primary"
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      placeholder={placeholder}
-    />
-  );
-}
-
-function Badge({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <span
-      className={`rounded-full px-3 py-1 ${ok ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
-    >
-      {label}: {ok ? "✓" : "○"}
-    </span>
-  );
-}
-
 function MiniStep({ label }: { label: string }) {
-  return <div className="rounded-2xl bg-white p-3 text-center shadow-sm">{label}</div>;
-}
-
-function StatusPanel({ title, text }: { title: string; text: string }) {
-  return (
-    <Panel>
-      <h2 className="text-xl font-semibold">{title}</h2>
-      <p className="mt-2 text-muted">{text}</p>
-    </Panel>
-  );
+  return <div className="rounded-2xl bg-white/[0.05] p-3 text-center text-sm shadow-sm">{label}</div>;
 }
 
 function ControlButton({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
