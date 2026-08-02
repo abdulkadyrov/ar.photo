@@ -1,13 +1,13 @@
 create or replace function public.admin_create_account(
-  owner_user_id uuid,
-  account_name text,
-  account_slug text,
-  subscription_plan_id uuid,
-  subscription_status public.subscription_status,
-  subscription_starts_at timestamptz,
-  subscription_expires_at timestamptz,
-  subscription_grace_ends_at timestamptz,
-  custom_limits jsonb default '{}'::jsonb
+  p_owner_user_id uuid,
+  p_account_name text,
+  p_account_slug text,
+  p_subscription_plan_id uuid,
+  p_subscription_status public.subscription_status,
+  p_subscription_starts_at timestamptz,
+  p_subscription_expires_at timestamptz,
+  p_subscription_grace_ends_at timestamptz,
+  p_custom_limits jsonb default '{}'::jsonb
 )
 returns public.accounts
 language plpgsql
@@ -21,37 +21,37 @@ begin
   if (select auth.uid()) is null or not (select private.is_superadmin()) then
     raise exception 'Superadmin access required' using errcode = '42501';
   end if;
-  if jsonb_typeof(custom_limits) <> 'object' then
+  if jsonb_typeof(p_custom_limits) <> 'object' then
     raise exception 'custom_limits must be an object' using errcode = '22023';
   end if;
-  if not exists (select 1 from auth.users u where u.id = owner_user_id) then
+  if not exists (select 1 from auth.users u where u.id = p_owner_user_id) then
     raise exception 'Owner user does not exist' using errcode = '23503';
   end if;
-  if not exists (select 1 from public.subscription_plans p where p.id = subscription_plan_id and p.is_active) then
+  if not exists (select 1 from public.subscription_plans p where p.id = p_subscription_plan_id and p.is_active) then
     raise exception 'Subscription plan is not active' using errcode = '23503';
   end if;
 
-  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('account-owner:' || owner_user_id::text, 0));
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('account-owner:' || p_owner_user_id::text, 0));
 
   select a.* into existing_account
   from public.accounts a
-  where a.owner_user_id = owner_user_id and a.status <> 'closed'
+  where a.owner_user_id = p_owner_user_id and a.status <> 'closed'
   limit 1;
   if found then
     return existing_account;
   end if;
 
   insert into public.accounts (name, slug, owner_user_id)
-  values (trim(account_name), lower(trim(account_slug)), owner_user_id)
+  values (trim(p_account_name), lower(trim(p_account_slug)), p_owner_user_id)
   returning * into created_account;
 
   update public.profiles
   set account_id = created_account.id,
       is_active = true
-  where id = owner_user_id;
+  where id = p_owner_user_id;
 
   insert into public.account_members (account_id, user_id, role, is_active, invited_by, accepted_at)
-  values (created_account.id, owner_user_id, 'owner', true, (select auth.uid()), statement_timestamp());
+  values (created_account.id, p_owner_user_id, 'owner', true, (select auth.uid()), statement_timestamp());
 
   insert into public.subscriptions (
     account_id,
@@ -63,12 +63,12 @@ begin
     custom_limits
   ) values (
     created_account.id,
-    subscription_plan_id,
-    subscription_status,
-    subscription_starts_at,
-    subscription_expires_at,
-    subscription_grace_ends_at,
-    custom_limits
+    p_subscription_plan_id,
+    p_subscription_status,
+    p_subscription_starts_at,
+    p_subscription_expires_at,
+    p_subscription_grace_ends_at,
+    p_custom_limits
   );
 
   return created_account;

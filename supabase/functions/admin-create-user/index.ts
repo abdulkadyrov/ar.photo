@@ -38,7 +38,10 @@ export default {
     const payload = createAccountSchema.safeParse(await request.json().catch(() => null));
     if (!payload.success) {
       return Response.json(
-        { code: "invalid_request", issues: payload.error.issues.map((issue) => ({ path: issue.path, code: issue.code })) },
+        {
+          code: "invalid_request",
+          issues: payload.error.issues.map((issue) => ({ path: issue.path, code: issue.code })),
+        },
         { status: 400 },
       );
     }
@@ -74,15 +77,15 @@ export default {
     const createdUserId = authResult.data.user.id;
     const startsAt = input.startsAt ?? new Date().toISOString();
     const { data: account, error: accountError } = await context.supabase.rpc("admin_create_account", {
-      owner_user_id: createdUserId,
-      account_name: input.accountName,
-      account_slug: input.accountSlug,
-      subscription_plan_id: input.planId,
-      subscription_status: input.subscriptionStatus,
-      subscription_starts_at: startsAt,
-      subscription_expires_at: input.expiresAt ?? null,
-      subscription_grace_ends_at: input.gracePeriodEndsAt ?? null,
-      custom_limits: input.customLimits,
+      p_owner_user_id: createdUserId,
+      p_account_name: input.accountName,
+      p_account_slug: input.accountSlug,
+      p_subscription_plan_id: input.planId,
+      p_subscription_status: input.subscriptionStatus,
+      p_subscription_starts_at: startsAt,
+      p_subscription_expires_at: input.expiresAt ?? null,
+      p_subscription_grace_ends_at: input.gracePeriodEndsAt ?? null,
+      p_custom_limits: input.customLimits,
     });
 
     if (accountError || !account) {
