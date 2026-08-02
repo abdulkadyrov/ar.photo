@@ -2,7 +2,7 @@
 
 ## 1. Область документа
 
-Это проект целевой PostgreSQL/Supabase схемы, а не применённая миграция. На этапе 0 Supabase directory и SQL-файлы не создаются.
+Документ описывает применённую PostgreSQL/Supabase схему этапа 2. Источник истины — последовательные SQL-миграции в `supabase/migrations`; CI разворачивает их с нуля на PostgreSQL 17, выполняет seed, lint и pgTAP-тесты.
 
 Все UUID генерируются сервером. Все timestamps — `timestamptz`. Денормализованный `account_id` используется на tenant-bound таблицах для простых и быстрых RLS policies, но всегда устанавливается/проверяется доверенной server logic.
 
@@ -231,14 +231,16 @@ generated/qr/{itemId}/{version}.svg
 
 ## 9. Миграции и seed
 
-Этап 2 должен:
+Этап 2 реализован пятью reviewable миграциями:
 
-- инициализировать Supabase CLI и узнать актуальные команды через `--help`;
-- создать миграции штатной CLI-командой, не выдумывать timestamp filenames;
-- применить schema, constraints, grants, RLS и Storage policies;
-- добавить минимальные non-production seeds без реальных персональных данных;
-- запустить database tests: cross-tenant denial, permission matrix, expired subscription, quota race, public denial;
-- запустить Supabase advisors и устранить findings;
-- проверить чистое развёртывание с нуля.
+- foundation: extensions, enums, timestamps и 144-bit public slug;
+- core schema: 13 таблиц, constraints, foreign keys и supporting indexes;
+- security: explicit grants, forced RLS, membership/subscription helpers и audit triggers;
+- trusted mutations: account bootstrap и idempotent quota-aware project/group/item creation;
+- Storage: пять private buckets и явные object policies.
+
+`supabase/seed.sql` содержит только синтетические данные: superadmin, два изолированных аккаунта, active/expired subscription и role fixtures. `supabase/tests` проверяет schema/grants и RLS/Storage matrix. Тип `Database` генерируется Supabase CLI из реально поднятой схемы и хранится в `src/shared/api/database.types.ts`.
+
+Hosted advisors запускаются после привязки development Supabase project; их отсутствие не заменяется утверждением о проверке remote infrastructure.
 
 Особое правило 2026 года: exposed Data API grants задаются явно; RLS и GRANT проверяются как две отдельные границы.

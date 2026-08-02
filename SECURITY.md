@@ -1,10 +1,10 @@
-# AR Photo — аудит безопасности и security plan
+# AR Photo — security posture и plan
 
 ## 1. Текущий security posture
 
-Текущий репозиторий — single-user browser prototype. В нём нет backend или удалённой multi-tenant базы, поэтому сейчас нет утечки между tenant'ами, но также нет ни одной SaaS-гарантии: Auth, membership, RLS, subscription enforcement, server validation, signed URLs и audit logs отсутствуют.
+Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этап 2 добавил Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, private Storage policies, audit logs и доверенные quota-aware mutations.
 
-До устранения P0-находок продукт нельзя использовать для реальных клиентов или персональных фотографий.
+Это ещё не разрешение на работу с реальными клиентами: upload inspection, public manifest/signed URLs, rate limiting, MFA администратора, hosted advisors и production environment verification закрываются последующими этапами.
 
 ## 2. Findings
 
@@ -16,11 +16,15 @@
 
 Мера: Supabase Auth, `account_members`, RLS на каждой exposed table, явные grants, server-only admin operations и negative cross-tenant tests.
 
+Статус этапа 2: закрыто на уровне репозитория. Forced RLS включён на 13 application tables, `anon` не имеет table grants, cross-tenant/inactive/expired/storage сценарии покрыты pgTAP.
+
 #### SEC-002: media и QR не имеют безопасной публичной модели
 
 Blob остаются в IndexedDB, а QR содержит внутренний viewer id и origin текущего запуска. Попытка сделать Storage public без новой модели создаст утечку.
 
 Мера: unpredictable `public_slug`, public manifest endpoint, private originals, short-lived signed URLs и отдельный optimized asset.
+
+Статус этапа 2: частично закрыто. 144-bit slug и private buckets реализованы; public manifest и short-lived signed URLs относятся к этапу 6.
 
 #### SEC-003: файлы не валидируются
 
@@ -82,6 +86,8 @@ Frontend отсутствует, а будущие скрытые кнопки �
 
 Мера: quota-sensitive mutations только через trusted transaction; RLS/constraints остаются второй линией защиты.
 
+Статус этапа 2: project/group/AR-item creation защищены transaction-scoped advisory locks, subscription checks, effective limits и idempotency keys. Upload/team/storage quotas дополняются в этапах 4 и 8.
+
 #### SEC-012: отсутствует rate limiting и abuse control
 
 Public viewer/analytics endpoints пока нет, но без ограничения slug enumeration и event spam будут дешёвыми.
@@ -91,8 +97,8 @@ Public viewer/analytics endpoints пока нет, но без ограниче�
 ### P2 — hardening
 
 - нет CSP, frame-ancestors, Permissions-Policy и формализованных security headers;
-- нет central error redaction и observability policy;
-- отсутствуют audit logs;
+- нет central error redaction и observability integration;
+- audit logs добавлены для основных tenant mutations; coverage расширяется вместе с новыми mutation flows;
 - нет automatic secret scan/dependency review в CI;
 - unused `public/vendor` copies попадают в build и увеличивают supply-chain surface;
 - произвольные user strings пока безопасно экранируются React, но будущие rich text/SVG требуют отдельной sanitization policy;

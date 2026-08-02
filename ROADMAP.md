@@ -53,6 +53,8 @@ Gate:
 
 ## Этап 2 — Postgres, RLS, Storage и seeds
 
+Статус: repository gate выполнен. Чистое развёртывание PostgreSQL 17, SQL lint и 30 pgTAP-проверок подтверждены GitHub Actions; hosted-project advisors ожидают подключения отдельного Supabase project. Подробности: `STAGE_2_REPORT.md`.
+
 Цель: создать безопасный multi-tenant backend.
 
 Deliverables:
