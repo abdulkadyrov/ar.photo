@@ -216,7 +216,10 @@ declare
 begin
   row_data := case when tg_op = 'DELETE' then to_jsonb(old) else to_jsonb(new) end;
   previous_data := case when tg_op = 'UPDATE' then to_jsonb(old) else null end;
-  target_account_id := (row_data ->> 'account_id')::uuid;
+  target_account_id := case
+    when tg_table_name = 'accounts' then (row_data ->> 'id')::uuid
+    else (row_data ->> 'account_id')::uuid
+  end;
   target_entity_id := nullif(row_data ->> 'id', '')::uuid;
 
   insert into public.audit_logs (account_id, actor_user_id, action, entity_type, entity_id, metadata)
