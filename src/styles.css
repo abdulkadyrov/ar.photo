@@ -96,6 +96,10 @@ label:focus-within {
   box-shadow: 0 0 0 3px rgba(108, 92, 255, 0.12);
 }
 
+.auth-field-control {
+  padding-left: 2.5rem;
+}
+
 .btn {
   display: inline-flex;
   min-height: 44px;

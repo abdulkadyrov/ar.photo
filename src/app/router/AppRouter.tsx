@@ -1,5 +1,6 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { ProtectedRoute } from "../../features/auth/AuthProvider";
 import { AppShell } from "../layout/AppShell";
 import { Panel } from "../../shared/ui";
 import { getRouterBasename } from "./routerBase";
@@ -19,6 +20,15 @@ const PrototypeViewerRoute = lazy(() =>
 const PrototypeTestViewerRoute = lazy(() =>
   import("../../features/prototype/PrototypeApp").then((module) => ({ default: module.PrototypeTestViewerRoute })),
 );
+const LoginRoute = lazy(() =>
+  import("../../features/auth/AuthPages").then((module) => ({ default: module.LoginRoute })),
+);
+const ResetPasswordRoute = lazy(() =>
+  import("../../features/auth/AuthPages").then((module) => ({ default: module.ResetPasswordRoute })),
+);
+const UpdatePasswordRoute = lazy(() =>
+  import("../../features/auth/AuthPages").then((module) => ({ default: module.UpdatePasswordRoute })),
+);
 
 export function AppRouter() {
   return (
@@ -26,12 +36,15 @@ export function AppRouter() {
       <Suspense fallback={<RouteLoading />}>
         <Routes>
           <Route path="/" element={<PrototypeHomeRoute />} />
-          <Route path="/dashboard" element={<PrototypeDashboardRoute />} />
-          <Route path="/projects" element={<PrototypeDashboardRoute />} />
-          <Route path="/groups" element={<FoundationPlaceholder title="Группы" />} />
-          <Route path="/qr-codes" element={<FoundationPlaceholder title="QR-коды" />} />
-          <Route path="/settings" element={<FoundationPlaceholder title="Настройки" />} />
-          <Route path="/project/:projectId" element={<PrototypeProjectRoute />} />
+          <Route path="/login" element={<LoginRoute />} />
+          <Route path="/reset-password" element={<ResetPasswordRoute />} />
+          <Route path="/update-password" element={<Protected element={<UpdatePasswordRoute />} />} />
+          <Route path="/dashboard" element={<Protected element={<PrototypeDashboardRoute />} />} />
+          <Route path="/projects" element={<Protected element={<PrototypeDashboardRoute />} />} />
+          <Route path="/groups" element={<Protected element={<FoundationPlaceholder title="Группы" />} />} />
+          <Route path="/qr-codes" element={<Protected element={<FoundationPlaceholder title="QR-коды" />} />} />
+          <Route path="/settings" element={<Protected element={<FoundationPlaceholder title="Настройки" />} />} />
+          <Route path="/project/:projectId" element={<Protected element={<PrototypeProjectRoute />} />} />
           <Route path="/viewer/test" element={<PrototypeTestViewerRoute />} />
           <Route path="/viewer/:livePhotoId" element={<PrototypeViewerRoute />} />
           <Route path="*" element={<RouteNotFound />} />
@@ -39,6 +52,10 @@ export function AppRouter() {
       </Suspense>
     </BrowserRouter>
   );
+}
+
+function Protected({ element }: { element: ReactNode }) {
+  return <ProtectedRoute>{element}</ProtectedRoute>;
 }
 
 function FoundationPlaceholder({ title }: { title: string }) {

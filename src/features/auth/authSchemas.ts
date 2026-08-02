@@ -1,0 +1,24 @@
+import { z } from "zod";
+
+export const loginSchema = z.object({
+  email: z.string().trim().email("Введите корректный email"),
+  password: z.string().min(8, "Минимум 8 символов"),
+});
+
+export const resetPasswordSchema = z.object({
+  email: z.string().trim().email("Введите корректный email"),
+});
+
+export const updatePasswordSchema = z
+  .object({
+    password: z.string().min(10, "Минимум 10 символов"),
+    confirmPassword: z.string(),
+  })
+  .refine((value) => value.password === value.confirmPassword, {
+    message: "Пароли не совпадают",
+    path: ["confirmPassword"],
+  });
+
+export type LoginValues = z.infer<typeof loginSchema>;
+export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
+export type UpdatePasswordValues = z.infer<typeof updatePasswordSchema>;

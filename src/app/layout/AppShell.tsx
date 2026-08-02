@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { FolderKanban, House, Image, QrCode, ScanLine, Settings, Sparkles } from "lucide-react";
+import { FolderKanban, House, Image, LogOut, QrCode, ScanLine, Settings, Sparkles } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../../features/auth/authContext";
 
 const navigation = [
   { to: "/dashboard", label: "Главная", icon: House, end: true },
@@ -24,6 +25,8 @@ export function AppShell({
   actions?: ReactNode;
   children: ReactNode;
 }) {
+  const auth = useAuth();
+
   return (
     <div className="app-shell min-h-screen bg-background text-ink">
       <aside className="app-sidebar hidden lg:flex">
@@ -55,17 +58,29 @@ export function AppShell({
 
         <div className="mt-auto rounded-2xl border border-line bg-white/[0.025] p-4">
           <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/15 font-semibold text-primary">
-              AR
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/15 font-semibold uppercase text-primary">
+              {auth.session?.user.email.slice(0, 2) ?? "AR"}
             </span>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">Локальный режим</p>
-              <p className="truncate text-xs text-muted">Prototype workspace</p>
+              <p className="truncate text-sm font-semibold">{auth.session?.user.email ?? "AR Photo"}</p>
+              <p className="truncate text-xs text-muted">
+                {auth.mode === "demo" ? "Demo workspace" : "Supabase session"}
+              </p>
             </div>
           </div>
-          <span className="mt-3 inline-flex rounded-full bg-primary/15 px-2 py-1 text-[11px] font-semibold text-primary">
-            FOUNDATION
-          </span>
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <span className="inline-flex rounded-full bg-primary/15 px-2 py-1 text-[11px] font-semibold text-primary">
+              {auth.mode === "demo" ? "DEMO" : "ONLINE"}
+            </span>
+            <button
+              aria-label="Выйти"
+              className="grid h-9 w-9 place-items-center rounded-xl text-muted transition hover:bg-white/[0.05] hover:text-ink"
+              onClick={() => void auth.signOut()}
+              title="Выйти"
+            >
+              <LogOut size={17} />
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -80,7 +95,17 @@ export function AppShell({
               <p className="mt-2 max-w-3xl text-sm leading-6 text-muted md:text-base">{description}</p>
             ) : null}
           </div>
-          {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+          <div className="flex flex-wrap gap-2">
+            {actions}
+            <button
+              aria-label="Выйти"
+              className="btn btn-quiet lg:hidden"
+              onClick={() => void auth.signOut()}
+              title="Выйти"
+            >
+              <LogOut size={17} />
+            </button>
+          </div>
         </header>
         <main>{children}</main>
       </div>
