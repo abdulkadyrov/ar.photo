@@ -17,8 +17,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "check:bundle": "node scripts/check-bundle.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
-    "check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run check:secrets",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run check:bundle && npm run check:secrets",
     "build": "tsc -b && vite build",
     "generate:test-mind": "node scripts/generate-test-mind.mjs",
     "preview": "vite preview --host 0.0.0.0"

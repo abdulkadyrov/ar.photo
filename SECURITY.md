@@ -46,9 +46,11 @@ Picker accepts не являются защитой. Нет magic-byte inspectio
 
 #### SEC-006: необратимое удаление без подтверждения
 
-`deleteProjectCascade` и `clearAll` удаляют данные сразу. UI не запрашивает подтверждение.
+На этапе аудита `deleteProjectCascade` и `clearAll` удаляли данные сразу без подтверждения.
 
 Мера: typed confirmation, soft delete, retention, restore, background Storage cleanup и audit entry.
+
+Статус этапа 1: оба локальных destructive action требуют явного подтверждения. Soft delete, restore, retention и audit остаются обязательными для production CRUD этапа 3.
 
 #### SEC-007: ZIP import доверяет содержимому
 

@@ -32,9 +32,11 @@ test("renders the responsive SaaS navigation", async ({ page }) => {
 
   await expect(page.getByRole("navigation", { name: "Основная навигация" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Добро пожаловать в AR Photo" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("navigation", { name: "Мобильная навигация" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 test("protects the workspace and clears the demo session on logout", async ({ page }) => {
@@ -45,4 +47,11 @@ test("protects the workspace and clears the demo session on logout", async ({ pa
 
   await expect(page).toHaveURL(/\/ar\.photo\/login$/);
   await expect(page.getByRole("heading", { name: "Добро пожаловать" })).toBeVisible();
+});
+
+test("keeps the public MindAR regression route available without a camera grant", async ({ page }) => {
+  await page.goto("./viewer/test");
+
+  await expect(page.getByText("Test Viewer", { exact: true })).toBeVisible();
+  await expect(page.getByAltText("test target")).toBeVisible();
 });

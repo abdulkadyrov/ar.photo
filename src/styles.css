@@ -197,6 +197,69 @@ label:focus-within {
   color: #9c8cff;
 }
 
+.toast {
+  display: flex;
+  width: min(100%, 24rem);
+  align-items: flex-start;
+  gap: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(17, 25, 37, 0.96);
+  padding: 0.9rem;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.32);
+}
+
+.toast-success {
+  border-color: rgba(52, 211, 153, 0.22);
+}
+
+.toast-error {
+  border-color: rgba(248, 113, 113, 0.24);
+}
+
+.skeleton {
+  min-height: 1rem;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.035),
+    rgba(255, 255, 255, 0.085),
+    rgba(255, 255, 255, 0.035)
+  );
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.file-dropzone {
+  display: flex;
+  min-height: 168px;
+  cursor: pointer;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed rgba(139, 92, 246, 0.38);
+  border-radius: 18px;
+  background: rgba(108, 92, 255, 0.045);
+  padding: 1.25rem;
+  text-align: center;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.file-dropzone:hover,
+.file-dropzone-active {
+  border-color: #9c8cff;
+  background: rgba(108, 92, 255, 0.1);
+}
+
+@keyframes skeleton-shimmer {
+  to {
+    background-position: -220% 0;
+  }
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 1fr;

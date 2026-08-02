@@ -26,6 +26,8 @@ Gate: пользователь принимает план.
 
 ## Этап 1 — foundation, Auth и design shell
 
+Статус: repository gate выполнен; hosted Supabase и physical-device checks явно перенесены в соответствующие infrastructure/device gates. Подробности: `STAGE_1_REPORT.md`.
+
 Цель: превратить монолитный prototype в тестируемую основу, не ломая MindAR spike.
 
 Deliverables:

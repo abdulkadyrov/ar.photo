@@ -1,8 +1,9 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { ProtectedRoute } from "../../features/auth/AuthProvider";
 import { AppShell } from "../layout/AppShell";
 import { Panel } from "../../shared/ui";
+import { RouteErrorBoundary } from "../../shared/errors/RouteErrorBoundary";
 import { getRouterBasename } from "./routerBase";
 
 const PrototypeHomeRoute = lazy(() =>
@@ -33,6 +34,15 @@ const UpdatePasswordRoute = lazy(() =>
 export function AppRouter() {
   return (
     <BrowserRouter basename={getRouterBasename(import.meta.env.BASE_URL)}>
+      <RoutedContent />
+    </BrowserRouter>
+  );
+}
+
+function RoutedContent() {
+  const location = useLocation();
+  return (
+    <RouteErrorBoundary resetKey={location.key}>
       <Suspense fallback={<RouteLoading />}>
         <Routes>
           <Route path="/" element={<PrototypeHomeRoute />} />
@@ -50,7 +60,7 @@ export function AppRouter() {
           <Route path="*" element={<RouteNotFound />} />
         </Routes>
       </Suspense>
-    </BrowserRouter>
+    </RouteErrorBoundary>
   );
 }
 
