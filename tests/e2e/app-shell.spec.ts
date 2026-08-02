@@ -55,3 +55,27 @@ test("keeps the public MindAR regression route available without a camera grant"
   await expect(page.getByText("Test Viewer", { exact: true })).toBeVisible();
   await expect(page.getByAltText("test target")).toBeVisible();
 });
+
+test("creates a production project and group without duplicate submissions", async ({ page }) => {
+  await page.goto("./projects");
+  await signInToDemo(page);
+
+  await expect(page.getByRole("heading", { name: "Проекты", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Создать проект" }).first().click();
+  const projectDialog = page.getByRole("dialog", { name: "Новый проект" });
+  await projectDialog.getByPlaceholder("Например, Выпускной 2027").fill("Выпускной 2027 — Школа №25");
+  await projectDialog.getByPlaceholder("Краткое описание проекта").fill("Тест production catalog flow");
+  await projectDialog.getByRole("button", { name: "Создать проект" }).dblclick();
+
+  await expect(page.getByRole("link", { name: "Выпускной 2027 — Школа №25" })).toHaveCount(1);
+  await page.getByRole("link", { name: "Выпускной 2027 — Школа №25" }).click();
+  await expect(page.getByRole("heading", { name: "Выпускной 2027 — Школа №25" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Добавить группу" }).first().click();
+  const groupDialog = page.getByRole("dialog", { name: "Новая группа" });
+  await groupDialog.getByPlaceholder("Например, 11А класс").fill("11А класс");
+  await groupDialog.getByRole("button", { name: "Создать группу" }).dblclick();
+
+  await expect(page.getByRole("heading", { name: "11А класс" })).toHaveCount(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});

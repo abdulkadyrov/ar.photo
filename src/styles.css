@@ -57,7 +57,13 @@ button:disabled {
 button:focus-visible,
 input:focus-visible,
 a:focus-visible,
-label:focus-within {
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 80%, white);
+  outline-offset: 3px;
+}
+
+.file-dropzone:focus-within {
   outline: 2px solid color-mix(in srgb, var(--primary) 80%, white);
   outline-offset: 3px;
 }
