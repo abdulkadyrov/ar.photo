@@ -132,7 +132,7 @@ select is(
         'is_superadmin', 'has_account_access', 'has_account_role', 'shares_account',
         'subscription_allows_write', 'can_write_account', 'effective_limit',
         'has_storage_access', 'handle_new_user', 'write_audit_log', 'admin_create_account',
-        'create_project', 'create_group', 'create_ar_item'
+        'create_project', 'create_group', 'create_ar_item', 'reorder_groups', 'move_group'
       )
       and not exists (
         select 1
