@@ -329,11 +329,15 @@ create index media_assets_account_active_idx on public.media_assets(account_id, 
 create index media_assets_account_id_idx on public.media_assets(account_id);
 create index media_assets_project_id_idx on public.media_assets(project_id) where project_id is not null;
 create index media_assets_ar_item_id_idx on public.media_assets(ar_item_id) where ar_item_id is not null;
+create index media_assets_item_account_idx on public.media_assets(ar_item_id, account_id) where ar_item_id is not null;
 create index media_assets_created_by_idx on public.media_assets(created_by);
 create index processing_jobs_item_status_idx on public.processing_jobs(ar_item_id, status, created_at);
+create index processing_jobs_item_account_idx on public.processing_jobs(ar_item_id, account_id);
 create index processing_jobs_queue_idx on public.processing_jobs(status, created_at) where status = 'queued';
 create index qr_codes_account_id_idx on public.qr_codes(account_id);
+create index qr_codes_item_account_idx on public.qr_codes(ar_item_id, account_id);
 create index ar_view_sessions_item_started_idx on public.ar_view_sessions(ar_item_id, started_at desc, id);
+create index ar_view_sessions_item_account_idx on public.ar_view_sessions(ar_item_id, account_id);
 create index ar_view_sessions_account_started_idx on public.ar_view_sessions(account_id, started_at desc, id);
 create index audit_logs_account_created_idx on public.audit_logs(account_id, created_at desc, id);
 create index audit_logs_actor_user_idx on public.audit_logs(actor_user_id) where actor_user_id is not null;

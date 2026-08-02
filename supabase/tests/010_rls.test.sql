@@ -48,15 +48,14 @@ select is(
   1::bigint,
   'idempotency key creates one row'
 );
-select is(
-  (
-    with changed as (
-      update public.accounts set name = 'Cross-tenant write' where id = '20000000-0000-4000-8000-000000000002'
-      returning id
-    )
-    select count(*) from changed
-  ),
-  0::bigint,
+select results_eq(
+  $$
+    update public.accounts
+    set name = 'Cross-tenant write'
+    where id = '20000000-0000-4000-8000-000000000002'
+    returning id
+  $$,
+  array[]::uuid[],
   'owner A cannot update account B'
 );
 select is(
@@ -78,15 +77,14 @@ select is(
 
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000012', true);
 select is((select count(*) from public.accounts), 1::bigint, 'viewer can read their active account');
-select is(
-  (
-    with changed as (
-      update public.projects set name = 'Viewer write' where id = '50000000-0000-4000-8000-000000000001'
-      returning id
-    )
-    select count(*) from changed
-  ),
-  0::bigint,
+select results_eq(
+  $$
+    update public.projects
+    set name = 'Viewer write'
+    where id = '50000000-0000-4000-8000-000000000001'
+    returning id
+  $$,
+  array[]::uuid[],
   'viewer cannot update projects'
 );
 select throws_ok(
