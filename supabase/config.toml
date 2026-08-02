@@ -1,0 +1,82 @@
+project_id = "ar-photo"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 500
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[realtime]
+enabled = false
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+[local_smtp]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "500MiB"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:5173/ar.photo/"
+additional_redirect_urls = [
+  "http://127.0.0.1:5173/ar.photo/update-password",
+  "http://localhost:5173/ar.photo/update-password",
+]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = false
+enable_anonymous_sign_ins = false
+minimum_password_length = 10
+password_requirements = "lower_upper_letters_digits"
+
+[auth.rate_limit]
+email_sent = 5
+token_refresh = 150
+sign_in_sign_ups = 20
+token_verifications = 20
+
+[auth.email]
+enable_signup = false
+double_confirm_changes = true
+enable_confirmations = true
+secure_password_change = true
+max_frequency = "30s"
+otp_length = 6
+otp_expiry = 1800
+
+[analytics]
+enabled = false
+
+[edge_runtime]
+enabled = true
+policy = "per_worker"
+inspector_port = 8083
+deno_version = 2
+
+[functions.admin-create-user]
+enabled = true
+verify_jwt = true
+import_map = "./functions/admin-create-user/deno.json"
+entrypoint = "./functions/admin-create-user/index.ts"
