@@ -34,26 +34,30 @@ declare module "mind-ar/dist/mindar-image-three.prod.js" {
     scene: unknown;
     camera: unknown;
     addAnchor(index: number): {
-      group: { add: (mesh: unknown) => void };
+      group: { add: (mesh: unknown) => void; visible: boolean };
       onTargetFound?: () => void;
       onTargetLost?: () => void;
     };
     start(): Promise<void>;
     stop(): void;
+    resize?(): void;
   }
 }
 
 declare module "three" {
   export class VideoTexture {
     constructor(video: HTMLVideoElement);
+    dispose(): void;
   }
 
   export class PlaneGeometry {
     constructor(width: number, height: number);
+    dispose(): void;
   }
 
   export class MeshBasicMaterial {
     constructor(options: { map: unknown; transparent: boolean });
+    dispose(): void;
   }
 
   export class Mesh {

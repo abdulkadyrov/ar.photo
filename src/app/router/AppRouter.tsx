@@ -42,6 +42,15 @@ const PrototypeViewerRoute = lazy(() =>
 const PrototypeTestViewerRoute = lazy(() =>
   import("../../features/prototype/PrototypeApp").then((module) => ({ default: module.PrototypeTestViewerRoute })),
 );
+const PublicArViewerRoute = lazy(() =>
+  import("../../features/public-ar/PublicArViewerPage").then((module) => ({ default: module.PublicArViewerRoute })),
+);
+const PublicArPrivacyRoute = lazy(() =>
+  import("../../features/public-ar/PublicArViewerPage").then((module) => ({ default: module.PublicArPrivacyRoute })),
+);
+const PublicArUnsupportedRoute = lazy(() =>
+  import("../../features/public-ar/PublicArViewerPage").then((module) => ({ default: module.PublicArUnsupportedRoute })),
+);
 const LoginRoute = lazy(() =>
   import("../../features/auth/AuthPages").then((module) => ({ default: module.LoginRoute })),
 );
@@ -83,6 +92,9 @@ function RoutedContent() {
           <Route path="/project/:projectId" element={<Protected element={<PrototypeProjectRoute />} />} />
           <Route path="/viewer/test" element={<PrototypeTestViewerRoute />} />
           <Route path="/viewer/:livePhotoId" element={<PrototypeViewerRoute />} />
+          <Route path="/ar/:publicSlug" element={<PublicArViewerRoute />} />
+          <Route path="/privacy" element={<PublicArPrivacyRoute />} />
+          <Route path="/unsupported" element={<PublicArUnsupportedRoute />} />
           <Route path="*" element={<RouteNotFound />} />
         </Routes>
       </Suspense>

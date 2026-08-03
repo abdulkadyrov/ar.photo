@@ -56,6 +56,33 @@ test("keeps the public MindAR regression route available without a camera grant"
   await expect(page.getByAltText("test target")).toBeVisible();
 });
 
+test("keeps the public AR viewer camera-explicit with a no-camera fallback", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "__arPhotoCameraRequests", { value: 0, writable: true });
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: async () => {
+          (window as typeof window & { __arPhotoCameraRequests: number }).__arPhotoCameraRequests += 1;
+          throw new DOMException("denied", "NotAllowedError");
+        },
+      },
+    });
+  });
+  await page.goto("./ar/demo");
+
+  await expect(page.getByRole("heading", { name: "Демо AR Photo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Начать AR" })).toBeVisible();
+  expect(await page.evaluate(() => (window as typeof window & { __arPhotoCameraRequests: number }).__arPhotoCameraRequests)).toBe(0);
+
+  await page.getByRole("button", { name: "Смотреть обычное видео" }).click();
+  await expect(page.getByTestId("public-ar-fallback-video")).toBeVisible();
+  expect(await page.evaluate(() => (window as typeof window & { __arPhotoCameraRequests: number }).__arPhotoCameraRequests)).toBe(0);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test("creates a production project and group without duplicate submissions", async ({ page }) => {
   await page.goto("./projects");
   await signInToDemo(page);
