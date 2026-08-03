@@ -1006,6 +1006,14 @@ export type Database = {
         Args: { p_session_ids: string[]; p_succeeded: boolean };
         Returns: number;
       };
+      consume_public_manifest_rate_limit: {
+        Args: {
+          p_bucket_key: string;
+          p_max_requests: number;
+          p_window_seconds: number;
+        };
+        Returns: boolean;
+      };
       create_ar_item: {
         Args: {
           item_description: string;
@@ -1139,6 +1147,25 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      get_public_ar_manifest_source: {
+        Args: { p_public_slug: string };
+        Returns: {
+          audio_default: string;
+          autoplay: boolean;
+          fallback_enabled: boolean;
+          loop_video: boolean;
+          marker_height: number;
+          marker_lost_behavior: Database["public"]["Enums"]["marker_lost_behavior"];
+          marker_width: number;
+          poster_bucket: string;
+          poster_path: string;
+          title: string;
+          tracking_bucket: string;
+          tracking_path: string;
+          video_bucket: string;
+          video_path: string;
+        }[];
       };
       move_group: {
         Args: {
