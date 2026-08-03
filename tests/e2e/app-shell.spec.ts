@@ -227,8 +227,8 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
 
   await page.getByRole("link", { name: "AR-работы", exact: true }).click();
   await page.getByRole("link", { name: "Новая AR-работа" }).click();
-  await page.getByLabel("Проект").selectOption({ label: "AR workflow project" });
-  await page.getByLabel("Группа").selectOption({ label: "AR workflow group" });
+  await page.getByRole("combobox", { name: "Проект", exact: true }).selectOption({ label: "AR workflow project" });
+  await page.getByRole("combobox", { name: "Группа", exact: true }).selectOption({ label: "AR workflow group" });
   await page.getByRole("button", { name: "Продолжить" }).click();
 
   await page.getByPlaceholder("Например, Портрет Алексея").fill("Портрет Алексея");
@@ -387,5 +387,60 @@ test("filters privacy-safe analytics across every scope and date mode", async ({
   await expect(
     page.getByRole("navigation", { name: "Мобильная навигация" }).getByRole("link", { name: "Аналитика" }),
   ).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("runs MFA-gated admin support and dangerous operations with reason capture", async ({ page }) => {
+  await page.goto("./admin");
+  await signInToDemo(page);
+
+  await expect(page.getByRole("heading", { name: "Admin", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Admin overview" })).toBeVisible();
+  await expect(page.getByText("MFA verified", { exact: false }).first()).toBeVisible();
+  const adminNavigation = page.getByRole("navigation", { name: "Разделы admin-панели" });
+  await expect(adminNavigation.getByRole("button")).toHaveCount(10);
+
+  await adminNavigation.getByRole("button", { name: "Accounts" }).click();
+  const alphaAccount = page.getByRole("article").filter({ hasText: "Alpha Studio" });
+  await alphaAccount.getByRole("button", { name: "Открыть с причиной" }).click();
+  const supportDialog = page.getByRole("dialog", { name: "Support access: Alpha Studio" });
+  await expect(supportDialog.getByRole("button", { name: "Открыть аккаунт" })).toBeDisabled();
+  await supportDialog.getByLabel("Причина обращения").fill("Диагностика обращения клиента SUPPORT-1042");
+  await supportDialog.getByRole("button", { name: "Открыть аккаунт" }).click();
+  await expect(page.getByRole("heading", { name: "Users · Alpha Studio" })).toBeVisible();
+  await expect(page.getByText("Иван Иванов", { exact: true })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("encrypted_password");
+
+  await page.getByRole("button", { name: "Отправить сброс" }).first().click();
+  const resetDialog = page.getByRole("dialog", { name: /Отправить сброс/ });
+  await resetDialog.getByLabel("Причина").fill("Подтверждённый запрос клиента SUPPORT-1042");
+  await resetDialog.getByLabel("Введите СБРОС").fill("СБРОС");
+  await resetDialog.getByRole("button", { name: "Подтвердить" }).click();
+  await expect(page.getByText("Операция выполнена", { exact: true })).toBeVisible();
+
+  await adminNavigation.getByRole("button", { name: "AR Items" }).click();
+  await page.getByLabel("Поиск проектов и AR-работ").fill("Выпускной");
+  await page.getByRole("button", { name: "Найти" }).click();
+  const publishedItem = page.getByRole("article").filter({ hasText: "Алексей Иванов" });
+  await publishedItem.getByRole("button", { name: "Приостановить" }).click();
+  const itemDialog = page.getByRole("dialog", { name: "Приостановить Алексей Иванов?" });
+  await itemDialog.getByLabel("Причина").fill("Обращение правообладателя CONTENT-44");
+  await itemDialog.getByLabel("Введите ПРИОСТАНОВИТЬ").fill("ПРИОСТАНОВИТЬ");
+  await itemDialog.getByRole("button", { name: "Подтвердить" }).click();
+  await expect(publishedItem.getByText("suspended", { exact: true })).toBeVisible();
+
+  await adminNavigation.getByRole("button", { name: "Errors" }).click();
+  await page.getByRole("button", { name: "Повторить задачу" }).first().click();
+  const retryDialog = page.getByRole("dialog", { name: /Повторить processing/ });
+  await retryDialog.getByLabel("Причина").fill("Повтор после диагностики безопасной ошибки");
+  await retryDialog.getByLabel("Введите ПОВТОРИТЬ").fill("ПОВТОРИТЬ");
+  await retryDialog.getByRole("button", { name: "Подтвердить" }).click();
+  await expect(page.getByRole("button", { name: "Повторить задачу" })).toHaveCount(1);
+
+  await adminNavigation.getByRole("button", { name: "Audit" }).click();
+  await expect(page.getByText("admin.processing.retry", { exact: true })).toBeVisible();
+  await expect(page.getByText("admin.password_reset.request", { exact: true })).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

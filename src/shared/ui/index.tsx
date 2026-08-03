@@ -55,7 +55,7 @@ export function FileButton({
 
 export function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <section className={`surface-card rounded-card border border-line p-4 shadow-soft ${className}`}>
+    <section className={`surface-card min-w-0 rounded-card border border-line p-4 shadow-soft ${className}`}>
       {children}
     </section>
   );

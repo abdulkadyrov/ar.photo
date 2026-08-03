@@ -78,6 +78,9 @@ const TeamRoute = lazy(() =>
 const AnalyticsRoute = lazy(() =>
   import("../../features/analytics/AnalyticsPage").then((module) => ({ default: module.AnalyticsRoute })),
 );
+const AdminRoute = lazy(() =>
+  import("../../features/admin/AdminPage").then((module) => ({ default: module.AdminRoute })),
+);
 
 export function AppRouter() {
   return (
@@ -108,6 +111,7 @@ function RoutedContent() {
           <Route path="/items/:itemId/qr" element={<Protected element={<QrPublicationRoute />} />} />
           <Route path="/qr-codes" element={<Protected element={<QrCodesRoute />} />} />
           <Route path="/analytics" element={<Protected element={<AnalyticsRoute />} />} />
+          <Route path="/admin" element={<Protected element={<AdminRoute />} />} />
           <Route path="/settings" element={<Protected element={<SettingsRoute />} />} />
           <Route path="/settings/subscription" element={<Protected element={<SubscriptionRoute />} />} />
           <Route path="/settings/team" element={<Protected element={<TeamRoute />} />} />

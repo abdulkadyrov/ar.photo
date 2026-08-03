@@ -9,6 +9,7 @@ import {
   QrCode,
   ScanLine,
   Settings,
+  ShieldCheck,
   Sparkles,
   Users,
   WandSparkles,
@@ -25,6 +26,7 @@ const navigation = [
   { to: "/viewer/test", label: "AR-проверка", icon: ScanLine },
   { to: "/qr-codes", label: "QR-коды", icon: QrCode },
   { to: "/analytics", label: "Аналитика", icon: BarChart3 },
+  { to: "/admin", label: "Admin", icon: ShieldCheck },
   { to: "/settings/team", label: "Команда", icon: Users },
   { to: "/settings", label: "Настройки", icon: Settings },
 ] as const;
