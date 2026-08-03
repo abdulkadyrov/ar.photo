@@ -85,7 +85,9 @@ export function isManifestFresh(manifest: PublicArManifest, now = Date.now()) {
 }
 
 function loadDemoManifest(publicSlug: string): PublicArManifest {
-  if (publicSlug !== "demo") throw new PublicManifestError("not_found", "AR-фотография не найдена");
+  if (publicSlug !== "demo" && !/^[a-f0-9]{36}$/.test(publicSlug)) {
+    throw new PublicManifestError("not_found", "AR-фотография не найдена");
+  }
   const base = new URL(import.meta.env.BASE_URL, window.location.origin).toString();
   const h264Video = new URL("../../../test-assets/fixtures/h264-aac.mp4", import.meta.url).toString();
   return {

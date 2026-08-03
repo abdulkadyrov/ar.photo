@@ -4,11 +4,14 @@ import type {
   MediaAsset,
   PrepareArItemInput,
   ProcessingJob,
+  QrCode,
+  QrStyle,
 } from "../../entities/ar-item/model";
 import { getMediaRepository, type MediaRepository } from "../media/mediaRepository";
+import { buildPublicArUrl, defaultQrStyle, parseQrStyle } from "../qr/qrDesign";
 import { ArItemRepositoryError, type ArItemRepository } from "./arItemRepository";
 
-type DemoArItemState = { items: ArItem[]; jobs: ProcessingJob[] };
+type DemoArItemState = { items: ArItem[]; jobs: ProcessingJob[]; qrCodes: QrCode[] };
 
 export interface DemoArItemStore {
   read(): DemoArItemState;
@@ -71,7 +74,7 @@ export class DemoArItemRepository implements ArItemRepository {
       idempotency_key: input.requestId,
       title: input.title.trim(),
       description: input.description.trim() || null,
-      public_slug: crypto.randomUUID(),
+      public_slug: randomPublicSlug(),
       status: "draft",
       visibility: "private",
       marker_asset_id: null,
@@ -214,8 +217,98 @@ export class DemoArItemRepository implements ArItemRepository {
     return state.jobs.filter((job) => job.ar_item_id === itemId);
   }
 
+  async getQrCode(accountId: string, itemId: string) {
+    return (
+      this.reconcile().qrCodes.find((qrCode) => qrCode.account_id === accountId && qrCode.ar_item_id === itemId) ?? null
+    );
+  }
+
+  async publish(accountId: string, itemId: string, publicBaseUrl: string, expiresAt?: string) {
+    const state = this.reconcile();
+    const item = state.items.find((candidate) => candidate.account_id === accountId && candidate.id === itemId);
+    if (!item) throw new ArItemRepositoryError("not_found", "AR-работа не найдена");
+    if (item.status !== "ready" && item.status !== "published") {
+      throw new ArItemRepositoryError("conflict", "AR-работа ещё не готова к публикации");
+    }
+    if (!item.tracking_dataset_path || !item.video_thumbnail_path || item.tracking_status !== "ready") {
+      throw new ArItemRepositoryError("conflict", "Обработка AR-работы не завершена");
+    }
+
+    const timestamp = new Date(this.now()).toISOString();
+    item.status = "published";
+    item.visibility = "public";
+    item.published_at ??= timestamp;
+    item.expires_at = expiresAt ?? null;
+    item.updated_at = timestamp;
+    const publicUrl = buildPublicArUrl(publicBaseUrl, item.public_slug, true);
+    let qrCode = state.qrCodes.find((candidate) => candidate.account_id === accountId && candidate.ar_item_id === itemId);
+    if (qrCode) qrCode.public_url = publicUrl;
+    else {
+      qrCode = {
+        id: crypto.randomUUID(),
+        account_id: accountId,
+        ar_item_id: itemId,
+        public_url: publicUrl,
+        svg_path: null,
+        png_path: null,
+        style: defaultQrStyle,
+        version: 1,
+        created_at: timestamp,
+        updated_at: timestamp,
+      };
+      state.qrCodes.push(qrCode);
+    }
+    this.store.write(state);
+    return qrCode;
+  }
+
+  async unpublish(accountId: string, itemId: string) {
+    const state = this.reconcile();
+    const item = state.items.find((candidate) => candidate.account_id === accountId && candidate.id === itemId);
+    if (!item) throw new ArItemRepositoryError("not_found", "AR-работа не найдена");
+    if (item.status !== "published") throw new ArItemRepositoryError("conflict", "AR-работа не опубликована");
+    item.status = "ready";
+    item.visibility = "private";
+    item.published_at = null;
+    item.updated_at = new Date(this.now()).toISOString();
+    this.store.write(state);
+    return item;
+  }
+
+  async rotatePublicSlug(accountId: string, itemId: string, publicBaseUrl: string) {
+    const state = this.reconcile();
+    const item = state.items.find((candidate) => candidate.account_id === accountId && candidate.id === itemId);
+    const qrCode = state.qrCodes.find((candidate) => candidate.account_id === accountId && candidate.ar_item_id === itemId);
+    if (!item || !qrCode) throw new ArItemRepositoryError("not_found", "Публикация не найдена");
+    if (item.status !== "published") throw new ArItemRepositoryError("conflict", "Сначала опубликуйте AR-работу");
+    item.public_slug = randomPublicSlug();
+    item.updated_at = new Date(this.now()).toISOString();
+    qrCode.public_url = buildPublicArUrl(publicBaseUrl, item.public_slug, true);
+    qrCode.svg_path = null;
+    qrCode.png_path = null;
+    qrCode.version += 1;
+    qrCode.updated_at = item.updated_at;
+    this.store.write(state);
+    return qrCode;
+  }
+
+  async updateQrStyle(accountId: string, itemId: string, style: QrStyle) {
+    const state = this.reconcile();
+    const item = state.items.find((candidate) => candidate.account_id === accountId && candidate.id === itemId);
+    const qrCode = state.qrCodes.find((candidate) => candidate.account_id === accountId && candidate.ar_item_id === itemId);
+    if (!item || !qrCode) throw new ArItemRepositoryError("not_found", "Публикация не найдена");
+    if (item.status !== "published") throw new ArItemRepositoryError("conflict", "Сначала опубликуйте AR-работу");
+    qrCode.style = parseQrStyle(style);
+    qrCode.svg_path = null;
+    qrCode.png_path = null;
+    qrCode.version += 1;
+    qrCode.updated_at = new Date(this.now()).toISOString();
+    this.store.write(state);
+    return qrCode;
+  }
+
   private reconcile() {
-    const state = this.store.read();
+    const state = normalizeState(this.store.read());
     let changed = false;
     for (const item of state.items) {
       if (item.status !== "processing") continue;
@@ -310,13 +403,26 @@ function browserStore(): DemoArItemStore {
   return {
     read() {
       try {
-        return JSON.parse(localStorage.getItem(DEMO_AR_ITEMS_KEY) ?? '{"items":[],"jobs":[]}') as DemoArItemState;
+        return normalizeState(JSON.parse(localStorage.getItem(DEMO_AR_ITEMS_KEY) ?? '{}'));
       } catch {
-        return { items: [], jobs: [] };
+        return { items: [], jobs: [], qrCodes: [] };
       }
     },
     write(state) {
       localStorage.setItem(DEMO_AR_ITEMS_KEY, JSON.stringify(state));
     },
   };
+}
+
+function normalizeState(value: unknown): DemoArItemState {
+  const candidate = value as Partial<DemoArItemState> | null;
+  return {
+    items: Array.isArray(candidate?.items) ? candidate.items : [],
+    jobs: Array.isArray(candidate?.jobs) ? candidate.jobs : [],
+    qrCodes: Array.isArray(candidate?.qrCodes) ? candidate.qrCodes : [],
+  };
+}
+
+function randomPublicSlug() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(18)), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }

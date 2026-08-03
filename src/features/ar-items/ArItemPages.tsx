@@ -123,6 +123,11 @@ export function ArItemsRoute() {
               <Link className="btn btn-ghost mt-4 w-full" to={`/items/${item.id}/edit`}>
                 Открыть мастер <ArrowRight size={16} />
               </Link>
+              {item.status === "ready" || item.status === "published" ? (
+                <Link className="btn btn-primary mt-2 w-full" to={`/items/${item.id}/qr`}>
+                  {item.status === "published" ? "QR и публикация" : "Опубликовать"} <ScanLine size={16} />
+                </Link>
+              ) : null}
             </article>
           ))}
         </section>
@@ -924,12 +929,12 @@ function PublicationStep({ itemId }: { itemId: string }) {
       </span>
       <h3 className="mt-5 text-2xl font-semibold">AR-работа готова к публикации</h3>
       <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted">
-        Workflow и generated assets проверены. Публичная ссылка активируется в Stage 6, а настоящий QR — в Stage 7; до
-        этого кнопка публикации намеренно недоступна.
+        Workflow и generated assets проверены. Следующий экран атомарно активирует public manifest и создаст QR без
+        внутренних UUID, Storage path или signed URL.
       </p>
-      <Button className="mt-5" disabled>
+      <Link className="btn btn-primary mt-5" to={`/items/${itemId}/qr`}>
         Опубликовать и создать QR
-      </Button>
+      </Link>
       <div className="mt-4">
         <Link className="text-sm font-semibold text-primary" to={`/items/${itemId}/edit`}>
           Сохранено как готовая ревизия

@@ -36,6 +36,12 @@ const NewArItemRoute = lazy(() =>
 const EditArItemRoute = lazy(() =>
   import("../../features/ar-items/ArItemPages").then((module) => ({ default: module.EditArItemRoute })),
 );
+const QrCodesRoute = lazy(() =>
+  import("../../features/qr/QrPublicationPage").then((module) => ({ default: module.QrCodesRoute })),
+);
+const QrPublicationRoute = lazy(() =>
+  import("../../features/qr/QrPublicationPage").then((module) => ({ default: module.QrPublicationRoute })),
+);
 const PrototypeViewerRoute = lazy(() =>
   import("../../features/prototype/PrototypeApp").then((module) => ({ default: module.PrototypeViewerRoute })),
 );
@@ -87,7 +93,8 @@ function RoutedContent() {
           <Route path="/items" element={<Protected element={<ArItemsRoute />} />} />
           <Route path="/items/new" element={<Protected element={<NewArItemRoute />} />} />
           <Route path="/items/:itemId/edit" element={<Protected element={<EditArItemRoute />} />} />
-          <Route path="/qr-codes" element={<Protected element={<FoundationPlaceholder title="QR-коды" />} />} />
+          <Route path="/items/:itemId/qr" element={<Protected element={<QrPublicationRoute />} />} />
+          <Route path="/qr-codes" element={<Protected element={<QrCodesRoute />} />} />
           <Route path="/settings" element={<Protected element={<FoundationPlaceholder title="Настройки" />} />} />
           <Route path="/project/:projectId" element={<Protected element={<PrototypeProjectRoute />} />} />
           <Route path="/viewer/test" element={<PrototypeTestViewerRoute />} />

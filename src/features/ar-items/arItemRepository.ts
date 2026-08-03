@@ -1,4 +1,11 @@
-import type { ArItem, CreateArItemInput, PrepareArItemInput, ProcessingJob } from "../../entities/ar-item/model";
+import type {
+  ArItem,
+  CreateArItemInput,
+  PrepareArItemInput,
+  ProcessingJob,
+  QrCode,
+  QrStyle,
+} from "../../entities/ar-item/model";
 import { getSupabaseBrowserClient } from "../../shared/api/supabase";
 import { createDemoArItemRepository } from "./demoArItemRepository";
 
@@ -24,6 +31,11 @@ export interface ArItemRepository {
   listJobs(accountId: string, itemId: string): Promise<ProcessingJob[]>;
   overrideMarkerQuality(accountId: string, itemId: string, reason: string): Promise<ArItem>;
   retry(accountId: string, itemId: string): Promise<ProcessingJob[]>;
+  getQrCode(accountId: string, itemId: string): Promise<QrCode | null>;
+  publish(accountId: string, itemId: string, publicBaseUrl: string, expiresAt?: string): Promise<QrCode>;
+  unpublish(accountId: string, itemId: string): Promise<ArItem>;
+  rotatePublicSlug(accountId: string, itemId: string, publicBaseUrl: string): Promise<QrCode>;
+  updateQrStyle(accountId: string, itemId: string, style: QrStyle): Promise<QrCode>;
 }
 
 export class SupabaseArItemRepository implements ArItemRepository {
@@ -128,6 +140,57 @@ export class SupabaseArItemRepository implements ArItemRepository {
     if (error) throw mapArItemError(error);
     return data;
   }
+
+  async getQrCode(accountId: string, itemId: string) {
+    const { data, error } = await this.client
+      .from("qr_codes")
+      .select("*")
+      .eq("account_id", accountId)
+      .eq("ar_item_id", itemId)
+      .maybeSingle();
+    if (error) throw mapArItemError(error);
+    return data;
+  }
+
+  async publish(accountId: string, itemId: string, publicBaseUrl: string, expiresAt?: string) {
+    const { data, error } = await this.client.rpc("publish_ar_item", {
+      p_target_account_id: accountId,
+      p_item_id: itemId,
+      p_public_base_url: publicBaseUrl,
+      p_expires_at: expiresAt,
+    });
+    if (error) throw mapArItemError(error);
+    return data;
+  }
+
+  async unpublish(accountId: string, itemId: string) {
+    const { data, error } = await this.client.rpc("unpublish_ar_item", {
+      p_target_account_id: accountId,
+      p_item_id: itemId,
+    });
+    if (error) throw mapArItemError(error);
+    return data;
+  }
+
+  async rotatePublicSlug(accountId: string, itemId: string, publicBaseUrl: string) {
+    const { data, error } = await this.client.rpc("rotate_ar_item_public_slug", {
+      p_target_account_id: accountId,
+      p_item_id: itemId,
+      p_public_base_url: publicBaseUrl,
+    });
+    if (error) throw mapArItemError(error);
+    return data;
+  }
+
+  async updateQrStyle(accountId: string, itemId: string, style: QrStyle) {
+    const { data, error } = await this.client.rpc("update_ar_item_qr_style", {
+      p_target_account_id: accountId,
+      p_item_id: itemId,
+      p_style: style,
+    });
+    if (error) throw mapArItemError(error);
+    return data;
+  }
 }
 
 function mapArItemError(error: { code?: string; message?: string }) {
@@ -135,6 +198,9 @@ function mapArItemError(error: { code?: string; message?: string }) {
   if (error.code === "42501") return new ArItemRepositoryError("forbidden", message, error);
   if (error.code === "23514") return new ArItemRepositoryError("limit_reached", message, error);
   if (error.code === "23505") return new ArItemRepositoryError("conflict", message, error);
+  if (error.code === "55000" || error.code === "22023") {
+    return new ArItemRepositoryError("conflict", message, error);
+  }
   if (error.code === "23503" || error.code === "PGRST116") {
     return new ArItemRepositoryError("not_found", message, error);
   }

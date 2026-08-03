@@ -207,7 +207,7 @@ test("validates and uploads a marker through the resumable media queue", async (
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("completes the nine-step AR item workflow before publication", async ({ page }) => {
+test("publishes the completed AR workflow and rotates a printable QR", async ({ page }) => {
   await page.goto("./projects");
   await signInToDemo(page);
 
@@ -276,7 +276,39 @@ test("completes the nine-step AR item workflow before publication", async ({ pag
   await page.getByRole("button", { name: "Проверка завершена" }).click();
 
   await expect(page.getByRole("heading", { name: "AR-работа готова к публикации" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Опубликовать и создать QR" })).toBeDisabled();
+  await page.getByRole("link", { name: "Опубликовать и создать QR" }).click();
+  await expect(page.getByRole("heading", { name: "Портрет Алексея" })).toBeVisible();
+  await page.getByRole("button", { name: "Опубликовать и создать QR" }).click();
+  await expect(page.getByText("AR-работа опубликована", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("qr-preview")).toBeVisible();
+
+  const initialPublicUrl = await page.getByTestId("public-qr-url").textContent();
+  expect(initialPublicUrl).toMatch(/^http:\/\/(localhost|127\.0\.0\.1):\d+\/ar\.photo\/ar\/[a-f0-9]{36}$/);
+  expect(initialPublicUrl).not.toContain("88000000-0000-4000-8000-000000000001");
+  await expect(page.getByText("QR прошёл software gate", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: /^AR Photo/ }).click();
+  await expect(page.getByText("Стиль QR сохранён", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Quiet zone 4 · ECC H · contrast/)).toBeVisible();
+  const svgDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "SVG" }).click();
+  await expect((await svgDownloadPromise).suggestedFilename()).toMatch(/Портрет-Алексея-qr-v2\.svg$/);
+
+  await page.getByRole("button", { name: "Обновить публичную ссылку" }).click();
+  const rotateDialog = page.getByRole("dialog", { name: "Отозвать старую ссылку?" });
+  await expect(rotateDialog.getByRole("button", { name: "Обновить ссылку" })).toBeDisabled();
+  await rotateDialog.getByLabel("Введите ОБНОВИТЬ").fill("ОБНОВИТЬ");
+  await rotateDialog.getByRole("button", { name: "Обновить ссылку" }).click();
+  await expect(page.getByText("Публичная ссылка обновлена", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("public-qr-url")).not.toHaveText(initialPublicUrl!);
+
+  const rotatedPublicUrl = await page.getByTestId("public-qr-url").textContent();
+  await page.getByRole("button", { name: "Отключить публикацию" }).click();
+  await page.getByRole("dialog", { name: "Отключить публикацию?" }).getByRole("button", { name: "Отключить" }).click();
+  await expect(page.getByText("Публикация отключена", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Опубликовать и создать QR" }).click();
+  await expect(page.getByTestId("public-qr-url")).toHaveText(rotatedPublicUrl!);
+
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

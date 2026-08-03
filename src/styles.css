@@ -412,3 +412,36 @@ textarea:focus-visible {
     animation-iteration-count: 1 !important;
   }
 }
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  [data-print-root],
+  [data-print-root] * {
+    visibility: visible !important;
+  }
+
+  [data-print-root] {
+    position: fixed;
+    inset: 12mm;
+    color: black !important;
+  }
+
+  [data-print-hide] {
+    display: none !important;
+  }
+
+  [data-print-qr] {
+    width: var(--qr-print-size) !important;
+    height: var(--qr-print-size) !important;
+    margin-inline: auto;
+    padding: 0 !important;
+  }
+}

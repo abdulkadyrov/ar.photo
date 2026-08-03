@@ -32,7 +32,7 @@ const replacementMarker = asset("83000000-0000-4000-8000-000000000003", "marker"
 const video = asset("83000000-0000-4000-8000-000000000002", "video");
 
 const createFixture = () => {
-  let state: ReturnType<DemoArItemStore["read"]> = { items: [], jobs: [] };
+  let state: ReturnType<DemoArItemStore["read"]> = { items: [], jobs: [], qrCodes: [] };
   let timestamp = Date.parse("2026-08-03T00:00:00.000Z");
   const store: DemoArItemStore = {
     read: () => structuredClone(state),
@@ -139,5 +139,46 @@ describe("demo AR item repository", () => {
     await expect(
       repository.prepare(accountId, draft.id, { ...prepareInput, videoAssetId: crypto.randomUUID() }),
     ).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("publishes idempotently, revokes and rotates a public QR capability", async () => {
+    const { repository, advance } = createFixture();
+    const draft = await repository.createDraft(accountId, draftInput);
+    await repository.prepare(accountId, draft.id, prepareInput);
+    advance(1_000);
+    await repository.getItem(accountId, draft.id);
+
+    const published = await repository.publish(accountId, draft.id, "http://localhost:4173/ar.photo/");
+    const repeated = await repository.publish(accountId, draft.id, "http://localhost:4173/ar.photo/");
+    expect(repeated.id).toBe(published.id);
+    expect(published.public_url).toMatch(/^http:\/\/localhost:4173\/ar\.photo\/ar\/[a-f0-9]{36}$/);
+    expect(await repository.getQrCode(accountId, draft.id)).toMatchObject({ version: 1 });
+    await expect(repository.getItem(accountId, draft.id)).resolves.toMatchObject({
+      status: "published",
+      visibility: "public",
+    });
+
+    const oldUrl = published.public_url;
+    const rotated = await repository.rotatePublicSlug(accountId, draft.id, "http://localhost:4173/ar.photo/");
+    expect(rotated.public_url).not.toBe(oldUrl);
+    expect(rotated.version).toBe(2);
+
+    const styled = await repository.updateQrStyle(accountId, draft.id, {
+      preset: "brand",
+      foreground: "#4B35D2",
+      background: "#FFFFFF",
+      quietZone: 4,
+      logo: true,
+      logoScale: 0.12,
+    });
+    expect(styled).toMatchObject({ version: 3, style: { preset: "brand", quietZone: 4 } });
+
+    await repository.unpublish(accountId, draft.id);
+    await expect(repository.getItem(accountId, draft.id)).resolves.toMatchObject({
+      status: "ready",
+      visibility: "private",
+      published_at: null,
+    });
+    expect(await repository.getQrCode(accountId, draft.id)).not.toBeNull();
   });
 });
