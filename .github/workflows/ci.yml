@@ -33,6 +33,20 @@ jobs:
         run: npm run check:bundle
       - name: Secret scan
         run: npm run check:secrets
+      - name: Public metadata scan
+        run: npm run check:metadata
+      - name: Production dependency audit
+        run: npm run check:dependencies
+      - name: Security headers and PWA cache contract
+        run: npm run check:security
+      - name: Generate CycloneDX SBOM
+        run: npm run --silent sbom > sbom.cdx.json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cdx.json
+          if-no-files-found: error
 
   e2e:
     runs-on: ubuntu-latest

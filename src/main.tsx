@@ -9,12 +9,6 @@ if (sessionStorage.redirect) {
   history.replaceState(null, "", redirected.pathname + redirected.search + redirected.hash);
 }
 
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => undefined);
-  });
-}
-
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />

@@ -1,0 +1,43 @@
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+
+const ALLOWED_ADVISORY = 1124282;
+const ALLOWED_PACKAGES = new Set(["react-router", "react-router-dom"]);
+const lock = JSON.parse(readFileSync("package-lock.json", "utf8"));
+
+if (lock.packages?.["node_modules/react-router"]?.version !== "7.18.2") {
+  throw new Error("The reviewed React Router audit exception is valid only for exact version 7.18.2");
+}
+
+const audit = spawnSync("npm", ["audit", "--omit=dev", "--json"], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+if (!audit.stdout) throw new Error(`npm audit produced no JSON: ${audit.stderr}`);
+const report = JSON.parse(audit.stdout);
+const vulnerabilities = Object.values(report.vulnerabilities ?? {});
+const unexpected = vulnerabilities.filter((item) => {
+  if (!ALLOWED_PACKAGES.has(item.name)) return true;
+  if (item.name === "react-router-dom") return item.via.some((via) => via !== "react-router");
+  return item.via.some((via) => typeof via !== "object" || via.source !== ALLOWED_ADVISORY);
+});
+
+if (unexpected.length) {
+  console.error(`Dependency audit failed:\n${unexpected.map((item) => `- ${item.name}: ${item.severity}`).join("\n")}`);
+  process.exit(1);
+}
+
+const rscImports = spawnSync(
+  "rg",
+  ["-n", "react-router/(dom|node)|RSCRouter|createCallServer|routeRSCServerRequest", "src"],
+  {
+    encoding: "utf8",
+  },
+);
+if (rscImports.status === 0) {
+  console.error(`Reviewed RSC exception is reachable from application code:\n${rscImports.stdout}`);
+  process.exit(1);
+}
+if (rscImports.status !== 1) throw new Error(`Unable to scan RSC imports: ${rscImports.stderr}`);
+
+const totals = report.metadata?.vulnerabilities ?? {};
+console.log(
+  `Dependency audit passed: ${totals.critical ?? 0} critical; only reviewed client-inapplicable RSC advisory ${ALLOWED_ADVISORY} remains.`,
+);

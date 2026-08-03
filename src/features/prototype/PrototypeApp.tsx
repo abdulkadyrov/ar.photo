@@ -185,10 +185,20 @@ function Dashboard({ snapshot, refresh }: { snapshot: StoreSnapshot; refresh: ()
   const importZip = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
     if (!file) return;
-    const imported = await parseImportZip(file);
-    await importSnapshot(imported.data, imported.blobs);
-    await refresh();
-    event.currentTarget.value = "";
+    try {
+      const imported = await parseImportZip(file);
+      const accepted = window.confirm(
+        `ZIP проверен: ${imported.summary.projects} проектов, ${imported.summary.classes} групп, ${imported.summary.livePhotos} AR-фото и ${imported.summary.media} media-файлов. Заменить локальные demo-данные одной транзакцией?`,
+      );
+      if (accepted) {
+        await importSnapshot(imported.data, imported.blobs);
+        await refresh();
+      }
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "ZIP не прошёл безопасную проверку");
+    } finally {
+      event.currentTarget.value = "";
+    }
   };
 
   return (

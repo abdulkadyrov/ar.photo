@@ -444,3 +444,42 @@ test("runs MFA-gated admin support and dangerous operations with reason capture"
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+
+test("keeps PWA caching static-only and restores the last visited shell offline", async ({ page, context }) => {
+  await page.goto("./dashboard");
+  await signInToDemo(page);
+  await expect(page.getByRole("heading", { name: "Добро пожаловать в AR Photo" })).toBeVisible();
+
+  await page.evaluate(async () => navigator.serviceWorker.ready);
+  await page.reload();
+  await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Добро пожаловать в AR Photo" })).toBeVisible();
+  await page.reload();
+
+  const cacheState = await page.evaluate(async () => {
+    const privateCandidate = new URL("test-assets/test.jpg", document.baseURI).href;
+    await fetch(privateCandidate);
+    const staticAsset = [...document.scripts].map((script) => script.src).find((source) => source.includes("/assets/"));
+    if (!staticAsset) throw new Error("Built application script was not found");
+    await fetch(staticAsset);
+    const keys = await caches.keys();
+    const entries = (
+      await Promise.all(keys.map(async (key) => (await (await caches.open(key)).keys()).map((request) => request.url)))
+    ).flat();
+    return {
+      keys,
+      privateCandidateCached: entries.includes(privateCandidate),
+      staticAssetCached: entries.includes(staticAsset),
+    };
+  });
+
+  expect(cacheState.keys).toEqual(["ar-photo-static-v3"]);
+  expect(cacheState.privateCandidateCached).toBe(false);
+  expect(cacheState.staticAssetCached).toBe(true);
+
+  await context.setOffline(true);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "Добро пожаловать в AR Photo" })).toBeVisible();
+  await context.setOffline(false);
+});

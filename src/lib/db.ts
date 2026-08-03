@@ -91,14 +91,20 @@ export async function clearAll() {
 }
 
 export async function importSnapshot(data: AppData, blobs: MediaBlob[]) {
-  await Promise.all([
-    ...data.projects.map((item) => put("projects", item)),
-    ...data.classes.map((item) => put("classes", item)),
-    ...data.students.map((item) => put("students", item)),
-    ...data.livePhotos.map((item) => put("livePhotos", item)),
-    ...data.media.map((item) => put("media", item)),
-    ...blobs.map((item) => put("mediaBlobs", item)),
-  ]);
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction([...stores], "readwrite");
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("Import transaction failed"));
+    transaction.onabort = () => reject(transaction.error ?? new Error("Import transaction aborted"));
+    for (const storeName of stores) transaction.objectStore(storeName).clear();
+    for (const item of data.projects) transaction.objectStore("projects").put(item);
+    for (const item of data.classes) transaction.objectStore("classes").put(item);
+    for (const item of data.students) transaction.objectStore("students").put(item);
+    for (const item of data.livePhotos) transaction.objectStore("livePhotos").put(item);
+    for (const item of data.media) transaction.objectStore("media").put(item);
+    for (const item of blobs) transaction.objectStore("mediaBlobs").put(item);
+  });
 }
 
 export async function deleteProjectCascade(projectId: string) {
