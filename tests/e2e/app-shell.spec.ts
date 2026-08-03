@@ -361,3 +361,31 @@ test("shows subscription usage and manages team permissions within the tariff", 
   ).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+
+test("filters privacy-safe analytics across every scope and date mode", async ({ page }) => {
+  await page.goto("./analytics");
+  await signInToDemo(page);
+
+  await expect(page.getByRole("heading", { name: "Аналитика", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Ключевые показатели" })).toBeVisible();
+  await expect(page.getByTestId("analytics-chart")).toBeVisible();
+  await expect(page.getByText("Приватность по умолчанию", { exact: true })).toBeVisible();
+  await expect(page.getByText(/не сохраняет IP-адреса/)).toBeVisible();
+
+  const scope = page.getByLabel("Раздел аналитики");
+  for (const label of ["Проект · Выпускной 2027", "Группа · 11А класс", "AR-работа · Алексей Иванов"]) {
+    await scope.selectOption({ label });
+    await expect(page.getByText(label.split(" · ")[1], { exact: true }).first()).toBeVisible();
+  }
+
+  await page.getByLabel("Период аналитики").selectOption("custom");
+  await page.getByLabel("С даты").fill("2026-07-01");
+  await page.getByLabel("По дату").fill("2026-07-07");
+  await expect(page.getByRole("img", { name: "График активности за 7 дней" })).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    page.getByRole("navigation", { name: "Мобильная навигация" }).getByRole("link", { name: "Аналитика" }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});

@@ -356,7 +356,7 @@ textarea:focus-visible {
   inset: auto 0 0;
   z-index: 30;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   border-top: 1px solid var(--line);
   background: rgba(7, 11, 17, 0.9);
   padding: 0.55rem max(0.5rem, env(safe-area-inset-right)) calc(0.55rem + env(safe-area-inset-bottom))

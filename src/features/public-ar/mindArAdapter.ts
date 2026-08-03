@@ -1,5 +1,6 @@
 import type * as ThreeModule from "three";
 import type { PublicArManifest } from "./publicManifest";
+import { videoMilestones, type PublicArAnalyticsEvent } from "./telemetry";
 
 export type PublicArTrackingState = "searching" | "tracking";
 
@@ -14,13 +15,14 @@ export async function startPublicMindAr(options: {
   manifest: PublicArManifest;
   muted: boolean;
   onTrackingState(state: PublicArTrackingState): void;
+  onPlaybackEvent(event: PublicArAnalyticsEvent, valueSeconds?: number | null, errorCode?: string | null): void;
 }): Promise<PublicArSession> {
   const [{ MindARThree }, THREE] = await Promise.all([
     import("mind-ar/dist/mindar-image-three.prod.js"),
     import("three"),
   ]);
   const Three = THREE as typeof ThreeModule;
-  const { container, manifest, onTrackingState } = options;
+  const { container, manifest, onTrackingState, onPlaybackEvent } = options;
   const video = document.createElement("video");
   video.src = manifest.assets.videoUrl;
   video.loop = manifest.behavior.loop;
@@ -52,6 +54,18 @@ export async function startPublicMindAr(options: {
 
   let stopped = false;
   let targetVisible = false;
+  const playbackStarted = () => onPlaybackEvent("playback_started", video.currentTime);
+  const playbackProgress = () => {
+    for (const event of videoMilestones(video.currentTime, video.duration)) {
+      onPlaybackEvent(event, video.currentTime);
+    }
+  };
+  const playbackEnded = () => onPlaybackEvent("completed", video.duration || video.currentTime);
+  const playbackError = () => onPlaybackEvent("error", null, "playback_failed");
+  video.addEventListener("play", playbackStarted);
+  video.addEventListener("timeupdate", playbackProgress);
+  video.addEventListener("ended", playbackEnded);
+  video.addEventListener("error", playbackError);
   anchor.onTargetFound = () => {
     targetVisible = true;
     anchor.group.visible = true;
@@ -97,6 +111,7 @@ export async function startPublicMindAr(options: {
       // MindAR can fail before its camera controller is fully initialized.
     }
     video.pause();
+    removePlaybackListeners();
     video.removeAttribute("src");
     video.load();
     texture.dispose();
@@ -132,6 +147,7 @@ export async function startPublicMindAr(options: {
         // Resource disposal below must continue even after a partial MindAR shutdown.
       }
       video.pause();
+      removePlaybackListeners();
       video.removeAttribute("src");
       video.load();
       texture.dispose();
@@ -140,6 +156,13 @@ export async function startPublicMindAr(options: {
       container.replaceChildren();
     },
   };
+
+  function removePlaybackListeners() {
+    video.removeEventListener("play", playbackStarted);
+    video.removeEventListener("timeupdate", playbackProgress);
+    video.removeEventListener("ended", playbackEnded);
+    video.removeEventListener("error", playbackError);
+  }
 }
 
 function keepCameraVisible(mindar: {

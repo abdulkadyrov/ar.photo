@@ -1,10 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Camera, Expand, Play, RotateCcw, ScanLine, ShieldCheck, Volume2, VolumeX } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { Button } from "../../shared/ui";
-import { isManifestFresh, loadPublicManifest, manifestRefreshDelay, PublicManifestError, type PublicArManifest } from "./publicManifest";
+import {
+  isManifestFresh,
+  loadPublicManifest,
+  manifestRefreshDelay,
+  PublicManifestError,
+  type PublicArManifest,
+} from "./publicManifest";
 import type { PublicArSession, PublicArTrackingState } from "./mindArAdapter";
 import { capabilityMessage, classifyViewerError, detectViewerCapabilities } from "./viewerCapabilities";
+import { createPublicArTelemetry, videoMilestones, viewerErrorCode } from "./telemetry";
 
 type ViewerMode = "loading" | "intro" | "starting" | "searching" | "tracking" | "fallback" | "error";
 
@@ -17,6 +24,7 @@ export function PublicArViewerRoute() {
   const [playing, setPlaying] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const sessionRef = useRef<PublicArSession | null>(null);
+  const telemetry = useMemo(() => createPublicArTelemetry(publicSlug), [publicSlug]);
 
   const refreshManifest = useCallback(
     async (signal?: AbortSignal) => {
@@ -34,7 +42,10 @@ export function PublicArViewerRoute() {
       setManifest(null);
       setMode("loading");
       refreshManifest(controller.signal)
-        .then(() => setMode("intro"))
+        .then(() => {
+          telemetry.track("page_open");
+          setMode("intro");
+        })
         .catch((error) => {
           if (controller.signal.aborted) return;
           setMode("error");
@@ -42,7 +53,7 @@ export function PublicArViewerRoute() {
         });
     });
     return () => controller.abort();
-  }, [refreshManifest]);
+  }, [refreshManifest, telemetry]);
 
   useEffect(() => {
     if (!manifest) return;
@@ -65,9 +76,11 @@ export function PublicArViewerRoute() {
     if (!capabilities.supported) {
       setMode("error");
       setMessage(capabilities.issues.map(capabilityMessage).join(" "));
+      telemetry.track("error", null, capabilities.issues[0] ?? "camera_unavailable");
       return;
     }
 
+    telemetry.track("camera_started");
     setMode("starting");
     setMessage("");
     sessionRef.current?.stop();
@@ -82,13 +95,16 @@ export function PublicArViewerRoute() {
         onTrackingState: (state: PublicArTrackingState) => {
           setMode(state);
           setPlaying(state === "tracking" && current.behavior.autoplay);
+          if (state === "tracking") telemetry.track("marker_detected");
         },
+        onPlaybackEvent: (event, valueSeconds, errorCode) => telemetry.track(event, valueSeconds, errorCode),
       });
     } catch (error) {
       sessionRef.current?.stop();
       sessionRef.current = null;
       setMode("error");
       setMessage(classifyViewerError(error));
+      telemetry.track("error", null, viewerErrorCode(error));
     }
   };
 
@@ -111,10 +127,12 @@ export function PublicArViewerRoute() {
       if (typeof next === "boolean") setPlaying(next);
     } catch {
       setMessage("Браузер заблокировал воспроизведение. Нажмите ещё раз после включения звука.");
+      telemetry.track("error", null, "playback_failed");
     }
   };
 
-  if (mode === "loading") return <ViewerNotice title="Загружаем AR Photo" text="Проверяем безопасную публичную ссылку…" />;
+  if (mode === "loading")
+    return <ViewerNotice title="Загружаем AR Photo" text="Проверяем безопасную публичную ссылку…" />;
   if (!manifest) return <ViewerNotice title="AR-фотография недоступна" text={message} error />;
 
   const active = mode === "starting" || mode === "searching" || mode === "tracking";
@@ -125,7 +143,11 @@ export function PublicArViewerRoute() {
 
       {(mode === "intro" || mode === "error") && (
         <section className="relative grid min-h-[100dvh] place-items-end overflow-hidden px-5 py-7 sm:place-items-center">
-          <img className="absolute inset-0 h-full w-full object-cover opacity-55 blur-[2px]" src={manifest.assets.posterUrl} alt="" />
+          <img
+            className="absolute inset-0 h-full w-full object-cover opacity-55 blur-[2px]"
+            src={manifest.assets.posterUrl}
+            alt=""
+          />
           <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/45 to-black/95" />
           <div className="relative w-full max-w-md rounded-[28px] border border-white/15 bg-black/65 p-6 shadow-2xl backdrop-blur-xl">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">
@@ -141,7 +163,12 @@ export function PublicArViewerRoute() {
               </div>
             )}
             <div className="mt-6 grid gap-3">
-              <Button type="button" onClick={startAr} icon={mode === "error" ? <RotateCcw size={18} /> : <Camera size={18} />} full>
+              <Button
+                type="button"
+                onClick={startAr}
+                icon={mode === "error" ? <RotateCcw size={18} /> : <Camera size={18} />}
+                full
+              >
                 {mode === "error" ? "Повторить AR" : "Начать AR"}
               </Button>
               {allowFallback && (
@@ -151,7 +178,8 @@ export function PublicArViewerRoute() {
               )}
             </div>
             <p className="mt-5 flex items-start gap-2 text-xs leading-5 text-white/55">
-              <ShieldCheck className="mt-0.5 shrink-0" size={15} /> Камера запускается только после нажатия и не записывает кадры.
+              <ShieldCheck className="mt-0.5 shrink-0" size={15} /> Камера запускается только после нажатия и не
+              записывает кадры.
             </p>
           </div>
         </section>
@@ -163,14 +191,32 @@ export function PublicArViewerRoute() {
           <div className="absolute inset-x-4 top-4 rounded-2xl border border-white/10 bg-black/55 p-4 backdrop-blur-xl">
             <div className="flex items-center gap-2 text-sm font-semibold">
               {mode === "tracking" ? <Play size={17} /> : <Camera size={17} />}
-              {mode === "starting" ? "Подготавливаем камеру…" : mode === "tracking" ? "Фотография найдена" : "Наведите камеру на фотографию"}
+              {mode === "starting"
+                ? "Подготавливаем камеру…"
+                : mode === "tracking"
+                  ? "Фотография найдена"
+                  : "Наведите камеру на фотографию"}
             </div>
-            <p className="mt-1 text-xs text-white/65">{mode === "tracking" ? "Видео привязано к маркеру" : "Держите всю фотографию внутри рамки"}</p>
+            <p className="mt-1 text-xs text-white/65">
+              {mode === "tracking" ? "Видео привязано к маркеру" : "Держите всю фотографию внутри рамки"}
+            </p>
           </div>
           <div className="absolute inset-x-4 bottom-4 grid grid-cols-4 gap-2">
-            <ViewerControl label={muted ? "Звук" : "Без звука"} onClick={toggleMuted} icon={muted ? <Volume2 /> : <VolumeX />} />
-            <ViewerControl label={playing ? "Пауза" : "Видео"} onClick={togglePlayback} icon={playing ? <RotateCcw /> : <Play />} />
-            <ViewerControl label="Экран" onClick={() => document.documentElement.requestFullscreen?.()} icon={<Expand />} />
+            <ViewerControl
+              label={muted ? "Звук" : "Без звука"}
+              onClick={toggleMuted}
+              icon={muted ? <Volume2 /> : <VolumeX />}
+            />
+            <ViewerControl
+              label={playing ? "Пауза" : "Видео"}
+              onClick={togglePlayback}
+              icon={playing ? <RotateCcw /> : <Play />}
+            />
+            <ViewerControl
+              label="Экран"
+              onClick={() => document.documentElement.requestFullscreen?.()}
+              icon={<Expand />}
+            />
             <ViewerControl label="Обычно" onClick={openFallback} icon={<ScanLine />} />
           </div>
         </>
@@ -196,6 +242,19 @@ export function PublicArViewerRoute() {
               controls
               playsInline
               preload="metadata"
+              onPlay={(event) => telemetry.track("playback_started", event.currentTarget.currentTime)}
+              onTimeUpdate={(event) => {
+                for (const milestone of videoMilestones(
+                  event.currentTarget.currentTime,
+                  event.currentTarget.duration,
+                )) {
+                  telemetry.track(milestone, event.currentTarget.currentTime);
+                }
+              }}
+              onEnded={(event) =>
+                telemetry.track("completed", event.currentTarget.duration || event.currentTarget.currentTime)
+              }
+              onError={() => telemetry.track("error", null, "asset_failed")}
             />
           </div>
           <p className="p-4 text-center text-xs leading-5 text-white/55">Видео доступно без камеры и image tracking.</p>
@@ -206,16 +265,30 @@ export function PublicArViewerRoute() {
 }
 
 export function PublicArPrivacyRoute() {
-  return <ViewerNotice title="Камера и приватность" text="AR Photo обрабатывает изображение камеры на устройстве для поиска маркера. Кадры не загружаются и не сохраняются." />;
+  return (
+    <ViewerNotice
+      title="Камера и приватность"
+      text="AR Photo обрабатывает изображение камеры на устройстве для поиска маркера. Кадры не загружаются и не сохраняются."
+    />
+  );
 }
 
 export function PublicArUnsupportedRoute() {
-  return <ViewerNotice title="AR не поддерживается" text="Откройте QR-ссылку в актуальном Safari или Chrome либо используйте обычный просмотр видео." error />;
+  return (
+    <ViewerNotice
+      title="AR не поддерживается"
+      text="Откройте QR-ссылку в актуальном Safari или Chrome либо используйте обычный просмотр видео."
+      error
+    />
+  );
 }
 
 function ViewerControl({ label, icon, onClick }: { label: string; icon: React.ReactNode; onClick: () => void }) {
   return (
-    <button className="grid min-h-14 place-items-center gap-1 rounded-2xl bg-white/92 px-2 py-2 text-xs font-semibold text-slate-950" onClick={onClick}>
+    <button
+      className="grid min-h-14 place-items-center gap-1 rounded-2xl bg-white/92 px-2 py-2 text-xs font-semibold text-slate-950"
+      onClick={onClick}
+    >
       {icon}
       <span>{label}</span>
     </button>
@@ -226,7 +299,9 @@ function ViewerNotice({ title, text, error = false }: { title: string; text: str
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-black px-5 text-white">
       <div className="w-full max-w-md rounded-[28px] border border-white/10 bg-white/[0.06] p-6 text-center">
-        <span className={`mx-auto grid h-14 w-14 place-items-center rounded-2xl ${error ? "bg-amber-300/10 text-amber-200" : "bg-violet-400/10 text-violet-300"}`}>
+        <span
+          className={`mx-auto grid h-14 w-14 place-items-center rounded-2xl ${error ? "bg-amber-300/10 text-amber-200" : "bg-violet-400/10 text-violet-300"}`}
+        >
           {error ? <AlertTriangle /> : <ScanLine />}
         </span>
         <h1 className="mt-5 text-2xl font-semibold">{title}</h1>

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  BarChart3,
   FolderKanban,
   House,
   Images,
@@ -23,12 +24,13 @@ const navigation = [
   { to: "/items", label: "AR-работы", icon: WandSparkles },
   { to: "/viewer/test", label: "AR-проверка", icon: ScanLine },
   { to: "/qr-codes", label: "QR-коды", icon: QrCode },
+  { to: "/analytics", label: "Аналитика", icon: BarChart3 },
   { to: "/settings/team", label: "Команда", icon: Users },
   { to: "/settings", label: "Настройки", icon: Settings },
 ] as const;
 
 const mobileNavigation = navigation.filter((item) =>
-  ["/dashboard", "/projects", "/items", "/settings"].includes(item.to),
+  ["/dashboard", "/projects", "/items", "/analytics", "/settings"].includes(item.to),
 );
 
 export function AppShell({
