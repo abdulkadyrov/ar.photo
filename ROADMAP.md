@@ -184,6 +184,8 @@ Gate:
 
 ## Этап 7 — QR и publication
 
+Статус: repository gate выполнен. Trusted publish/unpublish/rotate lifecycle, durable QR metadata, SVG/PNG export, безопасные presets, print layout, 88 unit-тестов, 9 E2E и 171 pgTAP-проверка подтверждены GitHub Actions. Физическое сканирование распечаток на iPhone/Android ожидает device gate. Подробности: `STAGE_7_REPORT.md`.
+
 Цель: стабильная публичная ссылка и печатаемый QR.
 
 Deliverables:

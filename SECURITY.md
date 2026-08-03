@@ -2,9 +2,9 @@
 
 ## 1. Текущий security posture
 
-Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этапы 2–6 добавили Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, private Storage policies, audit logs, quota-aware mutations, resumable upload lifecycle, service-only media processing и минимальный публичный AR boundary.
+Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этапы 2–7 добавили Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, private Storage policies, audit logs, quota-aware mutations, resumable upload lifecycle, service-only media processing, минимальный публичный AR boundary и trusted publication/QR lifecycle.
 
-Это ещё не разрешение на работу с реальными клиентами: publication/slug rotation, analytics abuse controls, MFA администратора, hosted advisors, deployed-function/worker observability и production environment verification закрываются последующими этапами.
+Это ещё не разрешение на работу с реальными клиентами: analytics abuse controls, MFA администратора, hosted advisors, deployed-function/worker observability, physical-device QR/AR matrix и production environment verification закрываются последующими этапами.
 
 ## 2. Findings
 
@@ -24,7 +24,7 @@ Blob остаются в IndexedDB, а QR содержит внутренний 
 
 Мера: unpredictable `public_slug`, public manifest endpoint, private originals, short-lived signed URLs и отдельный optimized asset.
 
-Статус этапа 6: public media boundary закрыт на уровне репозитория. Service-only RPC допускает только published/public/ready item активного account с trial/active/grace subscription; Edge Function возвращает минимальный контракт и signed URLs на 300 секунд. Publication/rotation и QR lifecycle закрываются этапом 7.
+Статус этапа 7: закрыто на уровне репозитория. Service-only manifest возвращает минимальный контракт и signed URLs на 300 секунд, а authenticated publish RPC атомарно перепроверяет текущую processing revision и private assets. Unpublish закрывает manifest, rotate отзывает старый capability slug, QR содержит только configured public URL, а style schema/quiet zone/logo scale валидируются в Postgres и UI. Физическая scan/print matrix остаётся device gate.
 
 #### SEC-003: файлы не валидируются
 
@@ -69,6 +69,8 @@ JSON приводится к TypeScript type без runtime validation. Нет �
 `createId` оставляет 14 hex characters (56 bits) и этот id используется в QR. Публичная ссылка раскрывает внутреннюю структуру `viewer/livephoto_*`.
 
 Мера: отдельный 128+ bit random slug, уникальный index, rate limit и возможность rotate/revoke.
+
+Статус этапа 7: закрыто на уровне репозитория. Публичный slug содержит 144 bits CSPRNG entropy, имеет unique index и строгий 36-hex contract. QR URL не содержит internal UUID/PII/path/signed credential; rotate выполняется audited trusted RPC и немедленно инвалидирует старый manifest URL, unpublish/restriction predicates закрывают capability без удаления данных.
 
 #### SEC-009: service worker имеет слишком широкую cache policy
 

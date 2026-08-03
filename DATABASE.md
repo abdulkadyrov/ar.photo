@@ -130,9 +130,9 @@ Fields: `id`, `account_id`, `ar_item_id`, `type`, `status`, `progress`, `attempt
 
 ### `qr_codes`
 
-Fields: `id`, `ar_item_id` unique, `public_url`, `svg_path`, `png_path`, `style jsonb`, `created_at`, `updated_at`.
+Fields: `id`, `account_id`, `ar_item_id` unique, `public_url`, `svg_path`, `png_path`, `style jsonb`, `version`, `created_at`, `updated_at`.
 
-`public_url` is derived from configured public origin and `public_slug`; it never contains signed URLs or internal ids.
+`public_url` is derived from configured public origin and `public_slug`; it never contains signed URLs or internal ids. `style` допускает только строгий preset contract, а `version` увеличивается при rotate/style change, чтобы скачанные QR assets имели детерминированные имена и не смешивались между ревизиями.
 
 ### `ar_view_sessions`
 
@@ -244,7 +244,18 @@ accounts/{accountId}/projects/{projectId}/groups/{groupId}/uploads/{sessionId}/v
 
 `private.public_manifest_rate_limits` хранит только ключи вида `ip:<salted_sha256>` и `slug:<salted_sha256>`, начало окна и счётчик. `consume_public_manifest_rate_limit` обновляет bucket атомарным upsert; таблица полностью закрыта от browser roles. Edge Function применяет окна 60 секунд с бюджетами 60 запросов для network identifier и 240 для slug. Raw IP и raw slug в таблицу не попадают.
 
-## 10. Миграции и seed
+## 10. Publication boundary
+
+Authenticated clients используют четыре audited RPC вместо прямой записи lifecycle-полей:
+
+- `publish_ar_item(account, item, public_base_url, expires_at)` блокирует item, требует write permission и действующую subscription, перепроверяет private marker/video assets, generated tracking/poster и четыре `succeeded` job текущей revision, затем атомарно открывает item и upsert-ит один QR;
+- `unpublish_ar_item(account, item)` доступен owner/manager/editor независимо от create quota/subscription, чтобы публикацию всегда можно было безопасно отозвать;
+- `rotate_ar_item_public_slug(account, item, public_base_url)` меняет CSPRNG slug только у опубликованной работы, очищает ссылки на generated QR assets и увеличивает QR version;
+- `update_ar_item_qr_style(account, item, style)` нормализует строгий allowlist `preset/foreground/background/quietZone/logo/logoScale` и увеличивает version.
+
+Прямые browser grants на `ar_items.status`, `visibility`, `published_at`, `expires_at` и `public_slug` не являются publication API. Старый URL после rotate и manifest после unpublish закрываются теми же server-side predicates. Все QR mutations создают минимальный audit log без URL, slug, PII и Storage credentials.
+
+## 11. Миграции и seed
 
 Основа этапа 2 реализована reviewable миграциями, а этапы 3–4 добавляют только последующие migrations:
 
@@ -257,6 +268,7 @@ accounts/{accountId}/projects/{projectId}/groups/{groupId}/uploads/{sessionId}/v
 - media uploads: reservation lifecycle, private versions, accounting, metadata limits и cleanup lease/ack;
 - AR processing: idempotent draft, media attachment/revision, four-job DAG, worker lease/heartbeat, retry, marker override и immutable generated-asset accounting.
 - public AR manifest: service-only filtered source и durable privacy-preserving rate buckets.
+- publication/QR: trusted readiness gate, reversible unpublish, slug rotation, strict style normalization и audit coverage.
 
 `supabase/seed.sql` содержит только синтетические данные: superadmin, два изолированных аккаунта, active/expired subscription и role fixtures. `supabase/tests` проверяет schema/grants и RLS/Storage matrix. Тип `Database` генерируется Supabase CLI из реально поднятой схемы и хранится в `src/shared/api/database.types.ts`.
 

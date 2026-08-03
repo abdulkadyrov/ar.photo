@@ -180,6 +180,8 @@ Viewer вызывает public manifest endpoint, который:
 
 Этап 6 реализует этот boundary функцией `public-ar-manifest`. Endpoint принимает только `GET/OPTIONS`, проверяет allowlist origin, требует 36-символьный hex slug и работает с `verify_jwt = false`, но использует service role только внутри Edge runtime. PostgreSQL source RPC и rate-limit RPC отозваны у `public`, `anon` и `authenticated`. Лимиты составляют 60 запросов на hashed network identifier и 240 на hashed slug за 60 секунд; raw IP/slug в rate buckets и логах не сохраняются. Tracking, optimized video и poster подписываются на 300 секунд, ответ имеет `private, no-store`, а viewer запрашивает обновление до истечения TTL.
 
+Этап 7 добавляет отдельную authenticated publication boundary. Browser не обновляет authoritative lifecycle-поля напрямую: `publish_ar_item` под блокировкой перепроверяет membership, subscription, marker/video ownership, tracking/poster и четыре успешные job текущей revision; `unpublish_ar_item` немедленно закрывает manifest даже при уже истёкшей подписке; `rotate_ar_item_public_slug` отзывает старый capability URL; `update_ar_item_qr_style` принимает только allowlisted style schema. QR metadata сохраняется отдельно от signed media и остаётся доступной для повторной публикации.
+
 Пример контракта:
 
 ```ts
@@ -200,7 +202,20 @@ type PublicArManifest = {
 };
 ```
 
-## 8. AR viewer state machine
+## 8. Publication и QR lifecycle
+
+```mermaid
+stateDiagram-v2
+  [*] --> Ready: processing revision подтверждена
+  Ready --> Published: trusted publish
+  Published --> Ready: unpublish / revoke manifest
+  Published --> Published: rotate slug / invalidate old QR
+  Published --> Published: update safe QR style
+```
+
+Публичный URL строится только из configured HTTPS origin, optional base path и 144-bit random slug. SVG/PNG генерируются в browser из одного durable URL с ECC H и quiet zone 4–8 модулей; пресеты ограничены white, transparent и AR Photo brand, а logo scale — 8–20%. QR download/print не содержит item UUID, account id, PII, Storage path или signed URL. Custom domain меняет только origin; rotate обязателен только при отзыве capability, а смена стиля увеличивает QR version без смены public URL.
+
+## 9. AR viewer state machine
 
 ```mermaid
 stateDiagram-v2
@@ -231,7 +246,7 @@ Viewer обязан:
 
 Реализованный viewer lazy-loads MindAR/Three только после кнопки «Начать AR». Plane масштабируется по `markerAspectRatio`; `targetFound/targetLost` применяют `pause_hide`, `continue_audio_hide` или `stop_reset`. Orientation/resize, `visibilitychange`, fullscreen, muted user gesture и полный teardown камеры, renderer, texture, geometry, material и video source находятся внутри provider adapter. Capability, permission, asset и tracking failures переводятся в безопасный fallback без внутренних error details.
 
-## 9. Upload pipeline
+## 10. Upload pipeline
 
 ```mermaid
 sequenceDiagram
@@ -257,7 +272,7 @@ sequenceDiagram
 
 Файл не считается валидным по имени или browser MIME. До publication worker проверяет magic bytes, размер, декодирование, duration, dimensions и codec.
 
-## 10. Deployment
+## 11. Deployment
 
 Для коммерческой версии static GitHub Pages недостаточно. Минимальная схема:
 
@@ -271,7 +286,7 @@ sequenceDiagram
 
 PWA caching должен иметь allowlist: hashed application assets и явно разрешённые metadata. Signed media responses, auth endpoints и private API responses не кэшируются service worker по умолчанию.
 
-## 11. Architecture decisions
+## 12. Architecture decisions
 
 - ADR-001 resolved: отдельный containerized Node 22 worker; Edge Functions остаются orchestration boundary, но не media processor;
 - ADR-002: signed URLs против публичного optimized-media CDN;
@@ -281,7 +296,7 @@ PWA caching должен иметь allowlist: hashed application assets и яв
 - ADR-006: data residency и legal basis;
 - ADR-007: миграция локальных ZIP-проектов.
 
-## 12. Ссылки на актуальные Supabase правила
+## 13. Ссылки на актуальные Supabase правила
 
 - [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security)
 - [Storage access control](https://supabase.com/docs/guides/storage/security/access-control)
