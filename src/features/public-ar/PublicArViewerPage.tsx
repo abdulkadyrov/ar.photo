@@ -193,7 +193,13 @@ export function PublicArViewerRoute() {
 
       {active && (
         <>
-          <div className="pointer-events-none absolute left-1/2 top-1/2 aspect-[3/4] w-[78vw] max-w-[430px] -translate-x-1/2 -translate-y-1/2 rounded-[22px] border-2 border-dashed border-white/65 bg-white/[0.025] shadow-[0_30px_90px_rgba(0,0,0,0.3)]" />
+          {mode !== "tracking" ? (
+            <div
+              data-testid="marker-scan-guide"
+              className="pointer-events-none absolute left-1/2 top-1/2 max-h-[62dvh] w-[78vw] max-w-[430px] -translate-x-1/2 -translate-y-1/2 rounded-[22px] border-2 border-dashed border-white/65 bg-white/[0.025] shadow-[0_30px_90px_rgba(0,0,0,0.3)]"
+              style={{ aspectRatio: `${manifest.marker.width} / ${manifest.marker.height}` }}
+            />
+          ) : null}
           <div className="absolute inset-x-4 top-4 rounded-2xl border border-white/10 bg-black/55 p-4 backdrop-blur-xl">
             <div className="flex items-center gap-2 text-sm font-semibold">
               {mode === "tracking" ? <Play size={17} /> : <Camera size={17} />}

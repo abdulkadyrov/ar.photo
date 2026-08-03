@@ -4,6 +4,46 @@ import { videoMilestones, type PublicArAnalyticsEvent } from "./telemetry";
 
 export type PublicArTrackingState = "searching" | "tracking";
 
+export const publicArTrackingConfig = Object.freeze({
+  filterMinCF: 0.001,
+  filterBeta: 100,
+  warmupTolerance: 5,
+  missTolerance: 5,
+});
+
+export type MarkerDimensions = { width: number; height: number };
+
+export function markerPlaneGeometry(marker: MarkerDimensions) {
+  if (!Number.isFinite(marker.width) || !Number.isFinite(marker.height) || marker.width <= 0 || marker.height <= 0) {
+    throw new Error("Invalid marker geometry");
+  }
+  return {
+    width: 1,
+    height: marker.height / marker.width,
+    z: 0,
+  } as const;
+}
+
+export function coverTextureTransform(videoAspectRatio: number, markerAspectRatio: number) {
+  if (
+    !Number.isFinite(videoAspectRatio) ||
+    !Number.isFinite(markerAspectRatio) ||
+    videoAspectRatio <= 0 ||
+    markerAspectRatio <= 0
+  ) {
+    throw new Error("Invalid texture aspect ratio");
+  }
+  if (videoAspectRatio > markerAspectRatio) {
+    const repeatX = markerAspectRatio / videoAspectRatio;
+    return { repeatX, repeatY: 1, offsetX: (1 - repeatX) / 2, offsetY: 0 };
+  }
+  if (videoAspectRatio < markerAspectRatio) {
+    const repeatY = videoAspectRatio / markerAspectRatio;
+    return { repeatX: 1, repeatY, offsetX: 0, offsetY: (1 - repeatY) / 2 };
+  }
+  return { repeatX: 1, repeatY: 1, offsetX: 0, offsetY: 0 };
+}
+
 export type PublicArSession = {
   setMuted(muted: boolean): void;
   togglePlayback(): Promise<boolean>;
@@ -30,6 +70,8 @@ export async function startPublicMindAr(options: {
   video.playsInline = true;
   video.preload = "auto";
   video.crossOrigin = "anonymous";
+  video.disablePictureInPicture = true;
+  video.setAttribute("webkit-playsinline", "");
   video.load();
 
   const mindar = new MindARThree({
@@ -39,18 +81,40 @@ export async function startPublicMindAr(options: {
     uiScanning: "no",
     uiError: "no",
     maxTrack: 1,
-    warmupTolerance: 5,
-    missTolerance: 8,
+    ...publicArTrackingConfig,
   });
   const { renderer, scene, camera } = mindar;
+  renderer.setPixelRatio?.(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setClearColor(0x000000, 0);
   const texture = new Three.VideoTexture(video);
-  const geometry = new Three.PlaneGeometry(1, 1 / manifest.marker.aspectRatio);
-  const material = new Three.MeshBasicMaterial({ map: texture, transparent: true });
+  const markerGeometry = markerPlaneGeometry(manifest.marker);
+  const geometry = new Three.PlaneGeometry(markerGeometry.width, markerGeometry.height);
+  const material = new Three.MeshBasicMaterial({
+    map: texture,
+    transparent: false,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false,
+  });
   const plane = new Three.Mesh(geometry, material);
-  plane.position.set(0, 0, 0.01);
+  plane.position.set(0, 0, markerGeometry.z);
+  plane.frustumCulled = false;
+  plane.renderOrder = 1;
   const anchor = mindar.addAnchor(0);
   anchor.group.add(plane);
+
+  const fitVideoToMarker = () => {
+    if (!video.videoWidth || !video.videoHeight) return;
+    const transform = coverTextureTransform(
+      video.videoWidth / video.videoHeight,
+      manifest.marker.width / manifest.marker.height,
+    );
+    texture.repeat.set(transform.repeatX, transform.repeatY);
+    texture.offset.set(transform.offsetX, transform.offsetY);
+    texture.needsUpdate = true;
+  };
+  video.addEventListener("loadedmetadata", fitVideoToMarker);
+  fitVideoToMarker();
 
   let stopped = false;
   let targetVisible = false;
@@ -83,7 +147,6 @@ export async function startPublicMindAr(options: {
     }
   };
 
-  const resize = () => mindar.resize?.();
   const visibility = () => {
     if (document.hidden) {
       video.pause();
@@ -91,8 +154,6 @@ export async function startPublicMindAr(options: {
       video.play().catch(() => undefined);
     }
   };
-  window.addEventListener("resize", resize);
-  window.addEventListener("orientationchange", resize);
   document.addEventListener("visibilitychange", visibility);
 
   try {
@@ -101,17 +162,12 @@ export async function startPublicMindAr(options: {
     renderer.setAnimationLoop(() => renderer.render(scene, camera));
     onTrackingState("searching");
   } catch (error) {
-    window.removeEventListener("resize", resize);
-    window.removeEventListener("orientationchange", resize);
     document.removeEventListener("visibilitychange", visibility);
     renderer.setAnimationLoop(null);
-    try {
-      mindar.stop();
-    } catch {
-      // MindAR can fail before its camera controller is fully initialized.
-    }
+    stopMindAr(mindar);
     video.pause();
     removePlaybackListeners();
+    video.removeEventListener("loadedmetadata", fitVideoToMarker);
     video.removeAttribute("src");
     video.load();
     texture.dispose();
@@ -137,17 +193,12 @@ export async function startPublicMindAr(options: {
     stop() {
       if (stopped) return;
       stopped = true;
-      window.removeEventListener("resize", resize);
-      window.removeEventListener("orientationchange", resize);
       document.removeEventListener("visibilitychange", visibility);
       renderer.setAnimationLoop(null);
-      try {
-        mindar.stop();
-      } catch {
-        // Resource disposal below must continue even after a partial MindAR shutdown.
-      }
+      stopMindAr(mindar);
       video.pause();
       removePlaybackListeners();
+      video.removeEventListener("loadedmetadata", fitVideoToMarker);
       video.removeAttribute("src");
       video.load();
       texture.dispose();
@@ -163,6 +214,25 @@ export async function startPublicMindAr(options: {
     video.removeEventListener("ended", playbackEnded);
     video.removeEventListener("error", playbackError);
   }
+}
+
+function stopMindAr(mindar: {
+  stop(): void;
+  controller?: { dispose?: () => void };
+  renderer: { dispose?: () => void; forceContextLoss?: () => void };
+}) {
+  try {
+    mindar.stop();
+  } catch {
+    // MindAR can fail before its camera controller is fully initialized.
+  }
+  try {
+    mindar.controller?.dispose?.();
+  } catch {
+    // A partially initialized worker must not block the remaining teardown.
+  }
+  mindar.renderer.dispose?.();
+  mindar.renderer.forceContextLoss?.();
 }
 
 function keepCameraVisible(mindar: {

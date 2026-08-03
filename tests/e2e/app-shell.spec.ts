@@ -77,6 +77,7 @@ test("keeps the public AR viewer camera-explicit with a no-camera fallback", asy
       value: {
         getUserMedia: async () => {
           (window as typeof window & { __arPhotoCameraRequests: number }).__arPhotoCameraRequests += 1;
+          await new Promise((resolve) => window.setTimeout(resolve, 150));
           throw new DOMException("denied", "NotAllowedError");
         },
       },
@@ -94,11 +95,16 @@ test("keeps the public AR viewer camera-explicit with a no-camera fallback", asy
     await page.evaluate(() => (window as typeof window & { __arPhotoCameraRequests: number }).__arPhotoCameraRequests),
   ).toBe(0);
 
+  await page.getByRole("button", { name: "Начать AR" }).click();
+  const guide = page.getByTestId("marker-scan-guide");
+  await expect(guide).toHaveCSS("aspect-ratio", "1200 / 1600");
+  await expect(page.getByText("AR не удалось запустить", { exact: false })).toBeVisible();
+
   await page.getByRole("button", { name: "Смотреть обычное видео" }).click();
   await expect(page.getByTestId("public-ar-fallback-video")).toBeVisible();
   expect(
     await page.evaluate(() => (window as typeof window & { __arPhotoCameraRequests: number }).__arPhotoCameraRequests),
-  ).toBe(0);
+  ).toBe(1);
 
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
