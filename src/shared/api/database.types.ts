@@ -137,11 +137,18 @@ export type Database = {
           fallback_enabled: boolean;
           group_id: string;
           id: string;
+          idempotency_key: string;
           loop_video: boolean;
+          marker_asset_id: string | null;
           marker_height: number | null;
           marker_image_path: string | null;
           marker_lost_behavior: Database["public"]["Enums"]["marker_lost_behavior"];
           marker_preview_path: string | null;
+          marker_quality_details: Json;
+          marker_quality_overridden_at: string | null;
+          marker_quality_overridden_by: string | null;
+          marker_quality_override_reason: string | null;
+          marker_quality_score: number | null;
           marker_width: number | null;
           project_id: string;
           public_slug: string;
@@ -152,6 +159,7 @@ export type Database = {
           tracking_status: Database["public"]["Enums"]["tracking_status"] | null;
           updated_at: string;
           version: number;
+          video_asset_id: string | null;
           video_duration_seconds: number | null;
           video_path: string | null;
           video_thumbnail_path: string | null;
@@ -169,11 +177,18 @@ export type Database = {
           fallback_enabled?: boolean;
           group_id: string;
           id?: string;
+          idempotency_key?: string;
           loop_video?: boolean;
+          marker_asset_id?: string | null;
           marker_height?: number | null;
           marker_image_path?: string | null;
           marker_lost_behavior?: Database["public"]["Enums"]["marker_lost_behavior"];
           marker_preview_path?: string | null;
+          marker_quality_details?: Json;
+          marker_quality_overridden_at?: string | null;
+          marker_quality_overridden_by?: string | null;
+          marker_quality_override_reason?: string | null;
+          marker_quality_score?: number | null;
           marker_width?: number | null;
           project_id: string;
           public_slug?: string;
@@ -184,6 +199,7 @@ export type Database = {
           tracking_status?: Database["public"]["Enums"]["tracking_status"] | null;
           updated_at?: string;
           version?: number;
+          video_asset_id?: string | null;
           video_duration_seconds?: number | null;
           video_path?: string | null;
           video_thumbnail_path?: string | null;
@@ -201,11 +217,18 @@ export type Database = {
           fallback_enabled?: boolean;
           group_id?: string;
           id?: string;
+          idempotency_key?: string;
           loop_video?: boolean;
+          marker_asset_id?: string | null;
           marker_height?: number | null;
           marker_image_path?: string | null;
           marker_lost_behavior?: Database["public"]["Enums"]["marker_lost_behavior"];
           marker_preview_path?: string | null;
+          marker_quality_details?: Json;
+          marker_quality_overridden_at?: string | null;
+          marker_quality_overridden_by?: string | null;
+          marker_quality_override_reason?: string | null;
+          marker_quality_score?: number | null;
           marker_width?: number | null;
           project_id?: string;
           public_slug?: string;
@@ -216,6 +239,7 @@ export type Database = {
           tracking_status?: Database["public"]["Enums"]["tracking_status"] | null;
           updated_at?: string;
           version?: number;
+          video_asset_id?: string | null;
           video_duration_seconds?: number | null;
           video_path?: string | null;
           video_thumbnail_path?: string | null;
@@ -228,6 +252,20 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "groups";
             referencedColumns: ["id", "project_id", "account_id"];
+          },
+          {
+            foreignKeyName: "ar_items_marker_asset_account_fkey";
+            columns: ["marker_asset_id", "account_id"];
+            isOneToOne: false;
+            referencedRelation: "media_assets";
+            referencedColumns: ["id", "account_id"];
+          },
+          {
+            foreignKeyName: "ar_items_video_asset_account_fkey";
+            columns: ["video_asset_id", "account_id"];
+            isOneToOne: false;
+            referencedRelation: "media_assets";
+            referencedColumns: ["id", "account_id"];
           },
         ];
       };
@@ -940,6 +978,30 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      claim_processing_jobs: {
+        Args: { p_limit?: number; p_worker_id: string };
+        Returns: Database["public"]["Tables"]["processing_jobs"]["Row"][];
+        SetofOptions: {
+          from: "*";
+          to: "processing_jobs";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
+      complete_processing_job: {
+        Args: {
+          p_job_id: number;
+          p_output_metadata: Json;
+          p_worker_id: string;
+        };
+        Returns: Database["public"]["Tables"]["processing_jobs"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "processing_jobs";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       complete_upload_cleanup: {
         Args: { p_session_ids: string[]; p_succeeded: boolean };
         Returns: number;
@@ -952,38 +1014,24 @@ export type Database = {
           target_group_id: string;
           target_project_id: string;
         };
-        Returns: {
-          account_id: string;
-          audio_default: string;
-          autoplay: boolean;
-          created_at: string;
-          created_by: string;
-          deleted_at: string | null;
-          description: string | null;
-          expires_at: string | null;
-          fallback_enabled: boolean;
-          group_id: string;
-          id: string;
-          loop_video: boolean;
-          marker_height: number | null;
-          marker_image_path: string | null;
-          marker_lost_behavior: Database["public"]["Enums"]["marker_lost_behavior"];
-          marker_preview_path: string | null;
-          marker_width: number | null;
-          project_id: string;
-          public_slug: string;
-          published_at: string | null;
-          status: Database["public"]["Enums"]["ar_item_status"];
-          title: string;
-          tracking_dataset_path: string | null;
-          tracking_status: Database["public"]["Enums"]["tracking_status"] | null;
-          updated_at: string;
-          version: number;
-          video_duration_seconds: number | null;
-          video_path: string | null;
-          video_thumbnail_path: string | null;
-          visibility: Database["public"]["Enums"]["content_visibility"];
+        Returns: Database["public"]["Tables"]["ar_items"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "ar_items";
+          isOneToOne: true;
+          isSetofReturn: false;
         };
+      };
+      create_ar_item_draft: {
+        Args: {
+          p_description: string;
+          p_request_id: string;
+          p_target_account_id: string;
+          p_target_group_id: string;
+          p_target_project_id: string;
+          p_title: string;
+        };
+        Returns: Database["public"]["Tables"]["ar_items"]["Row"];
         SetofOptions: {
           from: "*";
           to: "ar_items";
@@ -1072,6 +1120,16 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      fail_processing_job: {
+        Args: { p_error_code: string; p_job_id: number; p_worker_id: string };
+        Returns: Database["public"]["Tables"]["processing_jobs"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "processing_jobs";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       finalize_media_upload: {
         Args: { p_metadata: Json; p_session_id: string; p_sha256: string };
         Returns: Database["public"]["Tables"]["media_assets"]["Row"];
@@ -1110,6 +1168,40 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      override_marker_quality: {
+        Args: {
+          p_item_id: string;
+          p_reason: string;
+          p_target_account_id: string;
+        };
+        Returns: Database["public"]["Tables"]["ar_items"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "ar_items";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      prepare_ar_item_processing: {
+        Args: {
+          p_audio_default: string;
+          p_autoplay: boolean;
+          p_fallback_enabled: boolean;
+          p_item_id: string;
+          p_loop_video: boolean;
+          p_marker_asset_id: string;
+          p_marker_lost_behavior: Database["public"]["Enums"]["marker_lost_behavior"];
+          p_target_account_id: string;
+          p_video_asset_id: string;
+        };
+        Returns: Database["public"]["Tables"]["ar_items"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "ar_items";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       reorder_groups: {
         Args: {
           p_ordered_group_ids: string[];
@@ -1134,6 +1226,26 @@ export type Database = {
         SetofOptions: {
           from: "*";
           to: "groups";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
+      report_processing_progress: {
+        Args: { p_job_id: number; p_progress: number; p_worker_id: string };
+        Returns: Database["public"]["Tables"]["processing_jobs"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "processing_jobs";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      retry_ar_item_processing: {
+        Args: { p_item_id: string; p_target_account_id: string };
+        Returns: Database["public"]["Tables"]["processing_jobs"]["Row"][];
+        SetofOptions: {
+          from: "*";
+          to: "processing_jobs";
           isOneToOne: false;
           isSetofReturn: true;
         };
