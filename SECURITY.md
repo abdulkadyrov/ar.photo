@@ -2,9 +2,9 @@
 
 ## 1. Текущий security posture
 
-Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этапы 2–4 добавили Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, private Storage policies, audit logs, quota-aware mutations и resumable upload lifecycle.
+Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этапы 2–5 добавили Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, private Storage policies, audit logs, quota-aware mutations, resumable upload lifecycle и service-only media processing.
 
-Это ещё не разрешение на работу с реальными клиентами: upload inspection, public manifest/signed URLs, rate limiting, MFA администратора, hosted advisors и production environment verification закрываются последующими этапами.
+Это ещё не разрешение на работу с реальными клиентами: public manifest/signed viewer URLs, rate limiting, MFA администратора, hosted advisors, deployed-worker observability и production environment verification закрываются последующими этапами.
 
 ## 2. Findings
 
@@ -32,7 +32,7 @@ Picker accepts не являются защитой. Нет magic-byte inspectio
 
 Мера: client preflight + bucket constraints + trusted post-upload inspection; publication запрещена до успешной проверки.
 
-Статус этапа 4: browser preflight проверяет magic bytes, decode, image dimensions/EXIF strip и MP4 H.264/AAC metadata; server независимо проверяет private object MIME/size, quota и metadata contract. Browser metadata остаются недоверенными, поэтому authoritative worker inspection и запрет публикации до успешного processing job обязательны в этапе 5.
+Статус этапа 5: закрыто на уровне репозитория. Worker повторно декодирует marker, вычисляет quality score, компилирует MindAR dataset, проверяет видео через ffprobe как H.264/AAC-or-none и создаёт WebP thumbnail. Browser не может claim/complete jobs; publication UI не выдаёт ложный publish до этапов 6–7.
 
 #### SEC-004: публичный test asset содержит metadata
 

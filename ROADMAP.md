@@ -131,6 +131,8 @@ Gate:
 
 ## Этап 5 — AR Item wizard и processing
 
+Статус: repository gate выполнен. Девятишаговый workflow, authoritative marker/video worker, lease/retry/idempotency, quality override, immutable generated assets, 70 unit-тестов, 8 E2E и 108 pgTAP-проверок подтверждены GitHub Actions. Hosted worker/Supabase и field matrix из реальных маркеров ожидают infrastructure/device gate. Подробности: `STAGE_5_REPORT.md`.
+
 Цель: пройти от выбора проекта до готового tracking dataset.
 
 Deliverables:
@@ -298,4 +300,4 @@ Gate:
 | Commercial beta | 8–10  | Лимиты, команда, статистика, admin     |
 | MVP launch      | 11    | Проверенный коммерческий продукт       |
 
-Сроки уточняются после решений по processing worker, data residency, hosting и объёму team/admin MVP. Эти решения сильнее всего влияют на календарный план.
+Сроки уточняются после решений по data residency, hosting и объёму team/admin MVP. Runtime processing worker уже выбран и зафиксирован этапом 5.

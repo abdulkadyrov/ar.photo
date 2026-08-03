@@ -112,9 +112,9 @@ Fields:
 - identity: `id`, `account_id`, `project_id`, `group_id`;
 - content: `title`, `description`, unpredictable unique `public_slug`;
 - lifecycle: `status`, `visibility`, `published_at`, `expires_at`, `deleted_at`;
-- marker: `marker_image_path`, `marker_preview_path`, `marker_width`, `marker_height`, `marker_sha256`, `marker_quality_score`, `marker_quality_details jsonb`;
-- video: `video_path`, `optimized_video_path`, `video_thumbnail_path`, `video_duration_seconds`, `video_width`, `video_height`, `video_codec`, `video_has_audio`;
-- tracking: `tracking_dataset_path`, `tracking_status`, `tracking_provider`, `tracking_version`;
+- marker: `marker_asset_id`, `marker_image_path`, `marker_preview_path`, `marker_width`, `marker_height`, `marker_quality_score`, `marker_quality_details jsonb`, override timestamp/actor/reason;
+- video: `video_asset_id`, `video_path`, `video_thumbnail_path`, `video_duration_seconds`;
+- tracking: `tracking_dataset_path`, `tracking_status`, revision в `version`;
 - behavior: `autoplay`, `loop_video`, `marker_lost_behavior`, `audio_default`, `fallback_enabled`;
 - audit: `created_by`, `created_at`, `updated_at`.
 
@@ -124,9 +124,9 @@ Indexes: unique `public_slug`; `(account_id, status, updated_at desc)`; `(group_
 
 ### `processing_jobs`
 
-Fields: `id`, `account_id`, `ar_item_id`, `job_type`, `status`, `progress`, `attempt`, `max_attempts`, `error_code`, `error_message_safe`, `input_metadata`, `output_metadata`, `locked_at`, `locked_by`, `started_at`, `completed_at`, `created_at`, `updated_at`.
+Fields: `id`, `account_id`, `ar_item_id`, `type`, `status`, `progress`, `attempt_count`, `max_attempts`, `dedupe_key`, `error_code`, `error_message`, `input_metadata`, `output_metadata`, `locked_at`, `locked_by`, `started_at`, `completed_at`, `created_at`, `updated_at`.
 
-`progress` is 0–100. Technical stack traces go to protected logs, not user-readable columns. Idempotency key prevents duplicate processing after retries.
+`progress` is 0–100. `dedupe_key` делает `(account_id, revision, job type)` уникальным, а claim использует `FOR UPDATE SKIP LOCKED`. `locked_at` одновременно служит heartbeat lease; stale jobs повторяются до `max_attempts`. Technical stack traces остаются в protected worker logs, а таблица получает только allowlisted code и безопасное сообщение.
 
 ### `qr_codes`
 
@@ -248,7 +248,8 @@ accounts/{accountId}/projects/{projectId}/groups/{groupId}/uploads/{sessionId}/v
 - trusted mutations: account bootstrap и idempotent quota-aware project/group/item creation;
 - Storage: пять private buckets и явные object policies.
 - catalog mutations: atomic group reorder/move и cover constraints;
-- media uploads: reservation lifecycle, private versions, accounting, metadata limits и cleanup lease/ack.
+- media uploads: reservation lifecycle, private versions, accounting, metadata limits и cleanup lease/ack;
+- AR processing: idempotent draft, media attachment/revision, four-job DAG, worker lease/heartbeat, retry, marker override и immutable generated-asset accounting.
 
 `supabase/seed.sql` содержит только синтетические данные: superadmin, два изолированных аккаунта, active/expired subscription и role fixtures. `supabase/tests` проверяет schema/grants и RLS/Storage matrix. Тип `Database` генерируется Supabase CLI из реально поднятой схемы и хранится в `src/shared/api/database.types.ts`.
 

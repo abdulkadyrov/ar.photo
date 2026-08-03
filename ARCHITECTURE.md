@@ -162,7 +162,9 @@ interface VideoProcessingProvider {
 }
 ```
 
-MindAR adapter — первая реализация `MarkerTrackingProvider`. Перед выбором worker runtime нужен spike: compile time, RAM, concurrency, cancellation и стоимость на реальных фото. Supabase Edge Functions не считаются подходящими для ffmpeg/тяжёлой compilation без измерений.
+MindAR adapter — первая реализация `MarkerTrackingProvider`. Этап 5 зафиксировал runtime: отдельный Docker worker на Node 22/Debian с MindAR OfflineCompiler, FFmpeg/ffprobe и `cwebp`. Он получает только service-only credentials, claim-ит PostgreSQL jobs с lease/heartbeat, скачивает private inputs по короткоживущим signed URL и пишет immutable outputs по детерминированным путям. Concurrency ограничивается 1–4 процессами. Supabase Edge Functions не используются для ffmpeg/тяжёлой compilation.
+
+Одна revision ставит четыре дедуплицированных job: marker analysis и video inspection выполняются первыми; marker compilation допускается только после подходящего score или явного override, thumbnail generation — после успешной video inspection. Heartbeat продлевает lease каждые 30 секунд, зависшая job возвращается в очередь после 20 минут до `max_attempts`, затем получает безопасный terminal error. Замена marker/video увеличивает revision, отменяет старые queued/running jobs и создаёт новые deterministic outputs.
 
 ## 7. Public AR manifest
 
@@ -265,9 +267,9 @@ sequenceDiagram
 
 PWA caching должен иметь allowlist: hashed application assets и явно разрешённые metadata. Signed media responses, auth endpoints и private API responses не кэшируются service worker по умолчанию.
 
-## 11. Architecture decisions pending
+## 11. Architecture decisions
 
-- ADR-001: processing worker runtime;
+- ADR-001 resolved: отдельный containerized Node 22 worker; Edge Functions остаются orchestration boundary, но не media processor;
 - ADR-002: signed URLs против публичного optimized-media CDN;
 - ADR-003: offline metadata и черновики;
 - ADR-004: analytics retention/aggregation;
