@@ -144,7 +144,14 @@ select is(
         'create_team_invitation', 'revoke_team_invitation', 'accept_team_invitation',
         'update_team_member', 'set_team_member_active', 'admin_update_subscription',
         'consume_public_analytics_rate_limit', 'record_public_ar_event',
-        'get_analytics_summary', 'purge_analytics_before'
+        'get_analytics_summary', 'purge_analytics_before',
+        'admin_mfa_verified', 'require_admin_mfa', 'write_admin_audit', 'get_admin_access',
+        'admin_get_overview', 'admin_list_accounts', 'admin_get_account_detail',
+        'admin_list_plans', 'admin_get_processing_errors', 'admin_search_content',
+        'admin_get_audit_logs', 'admin_get_system_settings', 'admin_update_system_setting',
+        'admin_upsert_plan', 'admin_update_subscription_with_reason', 'admin_set_account_status',
+        'admin_set_ar_item_suspended', 'admin_retry_processing_job',
+        'admin_authorize_password_reset', 'admin_create_account_with_reason'
       )
       and not exists (
         select 1

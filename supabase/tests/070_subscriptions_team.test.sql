@@ -35,7 +35,7 @@ select ok(
 select ok(
   pg_catalog.has_function_privilege(
     'authenticated',
-    'public.admin_update_subscription(uuid,uuid,public.subscription_status,timestamptz,timestamptz,timestamptz,jsonb)',
+    'public.admin_update_subscription_with_reason(uuid,uuid,public.subscription_status,timestamptz,timestamptz,timestamptz,jsonb,text)',
     'EXECUTE'
   ),
   'subscription administration is exposed only through a trusted RPC'
@@ -72,6 +72,11 @@ values (
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000010', true);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-4000-8000-000000000010","aal":"aal1","role":"authenticated"}',
+  true
+);
 select is(
   public.get_account_entitlements('20000000-0000-4000-8000-000000000001') -> 'plan' ->> 'code',
   'studio',
@@ -180,6 +185,11 @@ select is(
 );
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000010', true);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-4000-8000-000000000010","aal":"aal1","role":"authenticated"}',
+  true
+);
 select is(
   jsonb_array_length(public.get_team_roster('20000000-0000-4000-8000-000000000001') -> 'invitations'),
   1,
@@ -357,14 +367,15 @@ select lives_ok(
   'owner reactivates an employee while quota allows it'
 );
 select throws_ok(
-  $$ select public.admin_update_subscription(
+  $$ select public.admin_update_subscription_with_reason(
     '20000000-0000-4000-8000-000000000001',
     '00000000-0000-4000-8000-000000000002',
     'active',
     statement_timestamp() - interval '1 day',
     statement_timestamp() + interval '90 days',
     null,
-    '{}'::jsonb
+    '{}'::jsonb,
+    'Проверка запрета для владельца аккаунта'
   ) $$,
   '42501',
   'Superadmin access required',
@@ -372,34 +383,46 @@ select throws_ok(
 );
 
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000001', true);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-4000-8000-000000000001","aal":"aal2","role":"authenticated"}',
+  true
+);
 select throws_ok(
-  $$ select public.admin_update_subscription(
+  $$ select public.admin_update_subscription_with_reason(
     '20000000-0000-4000-8000-000000000001',
     '00000000-0000-4000-8000-000000000002',
     'active',
     statement_timestamp() - interval '1 day',
     statement_timestamp() + interval '90 days',
     null,
-    '{"unknown_limit":1}'::jsonb
+    '{"unknown_limit":1}'::jsonb,
+    'Проверка неизвестного ограничения тарифа'
   ) $$,
   '22023',
   'Invalid custom limits',
   'superadmin cannot persist unknown custom limits'
 );
 select lives_ok(
-  $$ select public.admin_update_subscription(
+  $$ select public.admin_update_subscription_with_reason(
     '20000000-0000-4000-8000-000000000001',
     '00000000-0000-4000-8000-000000000002',
     'active',
     statement_timestamp() - interval '1 day',
     statement_timestamp() + interval '90 days',
     null,
-    '{"team_limit":4,"project_limit":12}'::jsonb
+    '{"team_limit":4,"project_limit":12}'::jsonb,
+    'Обновление тестовых лимитов подписки'
   ) $$,
   'superadmin applies strict custom subscription limits'
 );
 
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000010', true);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-4000-8000-000000000010","aal":"aal1","role":"authenticated"}',
+  true
+);
 select is(
   (public.get_account_entitlements('20000000-0000-4000-8000-000000000001') -> 'limits' ->> 'teamMembers')::integer,
   4,
@@ -419,19 +442,30 @@ select throws_ok(
 );
 
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000001', true);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-4000-8000-000000000001","aal":"aal2","role":"authenticated"}',
+  true
+);
 select lives_ok(
-  $$ select public.admin_update_subscription(
+  $$ select public.admin_update_subscription_with_reason(
     '20000000-0000-4000-8000-000000000001',
     '00000000-0000-4000-8000-000000000002',
     'suspended',
     statement_timestamp() - interval '1 day',
     statement_timestamp() + interval '90 days',
     null,
-    '{"team_limit":4,"project_limit":12}'::jsonb
+    '{"team_limit":4,"project_limit":12}'::jsonb,
+    'Приостановка тестовой подписки аккаунта'
   ) $$,
   'superadmin suspends the subscription'
 );
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000010', true);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-4000-8000-000000000010","aal":"aal1","role":"authenticated"}',
+  true
+);
 select is(
   (public.get_account_entitlements('20000000-0000-4000-8000-000000000001') ->> 'canWrite')::boolean,
   false,

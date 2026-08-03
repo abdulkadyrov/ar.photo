@@ -83,6 +83,14 @@ verify_jwt = true
 import_map = "./functions/admin-create-user/deno.json"
 entrypoint = "./functions/admin-create-user/index.ts"
 
+[functions.admin-reset-password]
+enabled = true
+# Only an authenticated superadmin with an aal2 JWT can authorize delivery.
+# The Edge runtime resolves the email server-side and never reads or returns a password.
+verify_jwt = true
+import_map = "./functions/admin-reset-password/deno.json"
+entrypoint = "./functions/admin-reset-password/index.ts"
+
 [functions.cleanup-stale-uploads]
 enabled = true
 # This endpoint is invoked by a scheduler with a dedicated 32+ byte secret.
