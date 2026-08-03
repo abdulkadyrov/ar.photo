@@ -7,6 +7,10 @@ test("fails closed instead of exposing demo data without backend configuration",
   await expect(page.getByRole("button", { name: "Войти" })).toHaveCount(0);
   await expect(page.getByText("demo-режим", { exact: false })).toHaveCount(0);
 
+  await page.goto("./register");
+  await expect(page.getByRole("heading", { name: "Конфигурация сервиса недоступна" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Зарегистрироваться" })).toHaveCount(0);
+
   await page.goto("./dashboard");
   await expect(page.getByRole("heading", { name: "Конфигурация сервиса недоступна" })).toBeVisible();
 

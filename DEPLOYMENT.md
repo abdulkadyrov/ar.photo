@@ -108,6 +108,7 @@ Secrets устанавливать через platform UI/secret manager или 
 - проверить migration history и hosted database/security advisors;
 - проверить все buckets private, limits/MIME и Storage policies;
 - проверить Auth site URL/redirect allowlist/email templates/rate limits;
+- для выбранного direct email/password signup отключить `Confirm email` в Auth Email provider и убедиться, что `signUp` сразу возвращает session; SMS/phone provider не требуется;
 - выполнить owner login, invite delivery, password recovery и superadmin TOTP `aal2`;
 - вызвать cleanup functions с scheduler credential и убедиться, что неверный secret получает отказ;
 - проверить public manifest CORS/no-store/rate-limit и analytics payload rejection.

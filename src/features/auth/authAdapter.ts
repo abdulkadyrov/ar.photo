@@ -11,10 +11,20 @@ export type AuthSession = {
   user: AuthUser;
 };
 
+export type SignUpInput = {
+  email: string;
+  password: string;
+};
+
+export type SignUpResult = {
+  confirmationRequired: boolean;
+};
+
 export interface AuthAdapter {
   readonly mode: "supabase" | "demo" | "unconfigured";
   getSession(): Promise<AuthSession | null>;
   signIn(email: string, password: string): Promise<void>;
+  signUp(input: SignUpInput): Promise<SignUpResult>;
   signOut(): Promise<void>;
   requestPasswordReset(email: string): Promise<void>;
   updatePassword(password: string): Promise<void>;
@@ -28,12 +38,32 @@ class SupabaseAuthAdapter implements AuthAdapter {
   async getSession() {
     const { data, error } = await this.client.auth.getSession();
     if (error) throw error;
-    return mapSession(data.session);
+    return this.prepareSession(data.session);
   }
 
   async signIn(email: string, password: string) {
-    const { error } = await this.client.auth.signInWithPassword({ email, password });
+    const { data, error } = await this.client.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    await this.prepareSession(data.session);
+  }
+
+  async signUp(input: SignUpInput) {
+    const config = getPublicRuntimeConfig();
+    const appUrl = config.publicAppUrl ?? new URL(import.meta.env.BASE_URL, window.location.origin).toString();
+    const emailRedirectTo = new URL("login?confirmed=1", ensureTrailingSlash(appUrl)).toString();
+    const { data, error } = await this.client.auth.signUp({
+      email: input.email.trim().toLowerCase(),
+      password: input.password,
+      options: {
+        emailRedirectTo,
+        data: {
+          registration_source: "self_service",
+        },
+      },
+    });
+    if (error) throw error;
+    if (data.session) await this.prepareSession(data.session);
+    return { confirmationRequired: !data.session };
   }
 
   async signOut() {
@@ -56,9 +86,22 @@ class SupabaseAuthAdapter implements AuthAdapter {
 
   onAuthStateChange(listener: (session: AuthSession | null) => void) {
     const { data } = this.client.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
-      listener(mapSession(session));
+      window.setTimeout(() => {
+        void this.prepareSession(session)
+          .then(listener)
+          .catch(() => listener(null));
+      }, 0);
     });
     return () => data.subscription.unsubscribe();
+  }
+
+  private async prepareSession(session: Session | null) {
+    if (!session) return null;
+    if (session.user.user_metadata.registration_source === "self_service") {
+      const { error } = await this.client.rpc("bootstrap_self_service_account");
+      if (error) throw error;
+    }
+    return mapSession(session);
   }
 }
 
@@ -91,6 +134,11 @@ export class DemoAuthAdapter implements AuthAdapter {
     };
     window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(session));
     this.emit(session);
+  }
+
+  async signUp(input: SignUpInput) {
+    await this.signIn(input.email, input.password);
+    return { confirmationRequired: false };
   }
 
   async signOut() {
@@ -130,6 +178,11 @@ export class UnconfiguredAuthAdapter implements AuthAdapter {
   async signIn(_email: string, _password: string) {
     void _email;
     void _password;
+    throw configurationError();
+  }
+
+  async signUp(_input: SignUpInput): Promise<SignUpResult> {
+    void _input;
     throw configurationError();
   }
 

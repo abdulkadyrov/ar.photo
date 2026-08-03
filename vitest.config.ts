@@ -4,6 +4,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [react()],
   define: {
+    "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(""),
+    "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(""),
     "import.meta.env.VITE_ENABLE_DEMO_MODE": JSON.stringify("true"),
   },
   test: {

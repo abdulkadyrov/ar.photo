@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loginSchema, updatePasswordSchema } from "./authSchemas";
+import { loginSchema, registerSchema, updatePasswordSchema } from "./authSchemas";
 
 describe("auth schemas", () => {
   it("normalizes a valid login", () => {
@@ -11,5 +11,17 @@ describe("auth schemas", () => {
     expect(
       updatePasswordSchema.safeParse({ password: "new-password", confirmPassword: "different-password" }).success,
     ).toBe(false);
+  });
+
+  it("validates self-service registration details and consent", () => {
+    const valid = {
+      email: "owner@example.com",
+      password: "strong-password",
+      confirmPassword: "strong-password",
+      termsAccepted: true,
+    };
+    expect(registerSchema.parse(valid).email).toBe("owner@example.com");
+    expect(registerSchema.safeParse({ ...valid, termsAccepted: false }).success).toBe(false);
+    expect(registerSchema.safeParse({ ...valid, confirmPassword: "different-password" }).success).toBe(false);
   });
 });

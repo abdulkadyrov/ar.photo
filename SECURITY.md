@@ -169,7 +169,8 @@ Data API GRANT и RLS тестируются отдельно: отсутств�
 ## 6. Auth и admin
 
 - Email/password обрабатывает Supabase Auth; приложение не хранит пароль/хэш.
-- Hosted email confirmation/reset flow использует allowlisted redirect URLs.
+- Self-service signup принимает только email/password и выдаёт фиксированный trial через idempotent trusted RPC; server authorization не доверяет editable `user_metadata`.
+- При direct signup `Confirm email` отключается в hosted Auth configuration; reset и optional confirmation fallback используют только allowlisted redirect URLs.
 - Суперадмин создаёт пользователя через server-only Admin API только после active-role и `aal2` проверки; пользователю отправляется invitation без временного пароля.
 - Password reset — только account-scoped recovery delivery: email разрешается server-side, password/token/link не возвращаются администратору.
 - Suspended account/member проверяется на каждом privileged request, не только при login.

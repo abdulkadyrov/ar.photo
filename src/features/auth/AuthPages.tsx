@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, KeyRound, LoaderCircle, LockKeyhole, Mail, Sparkles } from "lucide-react";
+import { ArrowLeft, KeyRound, LoaderCircle, LockKeyhole, Mail, Sparkles, UserRound } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useForm, type FieldError, type UseFormRegisterReturn } from "react-hook-form";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
@@ -7,9 +7,11 @@ import { Button, Panel } from "../../shared/ui";
 import { useAuth } from "./authContext";
 import {
   loginSchema,
+  registerSchema,
   resetPasswordSchema,
   updatePasswordSchema,
   type LoginValues,
+  type RegisterValues,
   type ResetPasswordValues,
   type UpdatePasswordValues,
 } from "./authSchemas";
@@ -90,6 +92,112 @@ export function LoginRoute() {
       <Link className="mt-5 inline-flex text-sm font-semibold text-primary" to="/reset-password">
         Забыли пароль?
       </Link>
+      <p className="mt-4 text-sm text-muted">
+        Нет аккаунта?{" "}
+        <Link className="font-semibold text-primary" to="/register">
+          Зарегистрироваться
+        </Link>
+      </p>
+    </AuthLayout>
+  );
+}
+
+export function RegisterRoute() {
+  const auth = useAuth();
+  const navigate = useNavigate();
+  const [confirmationEmail, setConfirmationEmail] = useState("");
+  const [formError, setFormError] = useState("");
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      confirmPassword: "",
+      termsAccepted: false,
+    },
+  });
+
+  if (auth.status === "authenticated") return <Navigate replace to="/dashboard" />;
+
+  const submit = handleSubmit(async (values) => {
+    setFormError("");
+    try {
+      const result = await auth.signUp(values);
+      if (result.confirmationRequired) {
+        setConfirmationEmail(values.email);
+        return;
+      }
+      navigate("/dashboard", { replace: true });
+    } catch {
+      setFormError("Не удалось создать аккаунт. Проверьте данные или попробуйте войти с этим email.");
+    }
+  });
+
+  return (
+    <AuthLayout title="Создать аккаунт" description="Регистрация по email и паролю, без номера телефона.">
+      {confirmationEmail ? (
+        <div aria-live="polite">
+          <FormNotice tone="success">
+            Письмо отправлено на {confirmationEmail}. Подтвердите email, затем войдите — рабочее пространство создастся
+            автоматически.
+          </FormNotice>
+          <Link className="btn btn-ghost mt-5 w-full" to="/login">
+            Перейти ко входу
+          </Link>
+        </div>
+      ) : (
+        <form className="space-y-4" onSubmit={submit} noValidate>
+          <AuthField
+            label="Email"
+            icon={<Mail size={17} />}
+            error={errors.email}
+            inputProps={register("email")}
+            type="email"
+            autoComplete="email"
+            placeholder="name@example.com"
+          />
+          <AuthField
+            label="Пароль"
+            icon={<LockKeyhole size={17} />}
+            error={errors.password}
+            inputProps={register("password")}
+            type="password"
+            autoComplete="new-password"
+            placeholder="Не менее 10 символов"
+          />
+          <AuthField
+            label="Повторите пароль"
+            icon={<LockKeyhole size={17} />}
+            error={errors.confirmPassword}
+            inputProps={register("confirmPassword")}
+            type="password"
+            autoComplete="new-password"
+            placeholder="Повторите пароль"
+          />
+          <label className="flex cursor-pointer items-start gap-3 text-sm leading-5 text-muted">
+            <input className="mt-1 h-4 w-4 accent-primary" type="checkbox" {...register("termsAccepted")} />
+            <span>Я подтверждаю право использовать загружаемые фотографии и видео.</span>
+          </label>
+          {errors.termsAccepted ? (
+            <p className="text-xs font-medium text-rose-300">{errors.termsAccepted.message}</p>
+          ) : null}
+          {formError ? <FormNotice tone="error">{formError}</FormNotice> : null}
+          <Button
+            full
+            disabled={isSubmitting}
+            icon={isSubmitting ? <LoaderCircle className="animate-spin" size={18} /> : <UserRound size={18} />}
+          >
+            {isSubmitting ? "Создаём…" : "Зарегистрироваться"}
+          </Button>
+          <Link className="inline-flex items-center gap-2 text-sm font-semibold text-muted" to="/login">
+            <ArrowLeft size={16} /> Уже есть аккаунт
+          </Link>
+        </form>
+      )}
     </AuthLayout>
   );
 }

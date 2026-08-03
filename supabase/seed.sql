@@ -39,7 +39,17 @@ values
     524288000,
     20
   )
-on conflict (id) do nothing;
+on conflict (code) do update
+set name = excluded.name,
+    description = excluded.description,
+    storage_limit_bytes = excluded.storage_limit_bytes,
+    project_limit = excluded.project_limit,
+    group_limit = excluded.group_limit,
+    ar_item_limit = excluded.ar_item_limit,
+    video_duration_limit_seconds = excluded.video_duration_limit_seconds,
+    max_video_size_bytes = excluded.max_video_size_bytes,
+    team_limit = excluded.team_limit,
+    is_active = true;
 
 insert into auth.users (
   instance_id,
@@ -263,7 +273,7 @@ values
   (
     '40000000-0000-4000-8000-000000000002',
     '20000000-0000-4000-8000-000000000002',
-    '00000000-0000-4000-8000-000000000001',
+    (select id from public.subscription_plans where code = 'trial'),
     'expired',
     now() - interval '60 days',
     now() - interval '30 days',

@@ -151,7 +151,8 @@ select is(
         'admin_get_audit_logs', 'admin_get_system_settings', 'admin_update_system_setting',
         'admin_upsert_plan', 'admin_update_subscription_with_reason', 'admin_set_account_status',
         'admin_set_ar_item_suspended', 'admin_retry_processing_job',
-        'admin_authorize_password_reset', 'admin_create_account_with_reason'
+        'admin_authorize_password_reset', 'admin_create_account_with_reason',
+        'bootstrap_self_service_account'
       )
       and not exists (
         select 1

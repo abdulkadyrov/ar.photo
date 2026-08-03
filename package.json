@@ -17,7 +17,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npm run build:demo && playwright test",
-    "test:e2e:configuration": "npm run build && playwright test --config playwright.unconfigured.config.ts",
+    "test:e2e:configuration": "npm run build:unconfigured && playwright test --config playwright.unconfigured.config.ts",
     "test:e2e:cross-browser": "npm run build:demo && playwright test --config playwright.cross-browser.config.ts",
     "check:bundle": "node scripts/check-bundle.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
@@ -29,6 +29,7 @@
     "release:manifest": "node scripts/create-release-manifest.mjs",
     "build": "tsc -b && vite build",
     "build:demo": "tsc -b && vite build --mode demo",
+    "build:unconfigured": "tsc -b && vite build --mode unconfigured",
     "build:worker": "tsc -p tsconfig.worker.json --pretty false",
     "generate:test-mind": "node scripts/generate-test-mind.mjs",
     "preview": "vite preview --host 0.0.0.0"

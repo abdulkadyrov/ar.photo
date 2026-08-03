@@ -61,6 +61,9 @@ const PublicArUnsupportedRoute = lazy(() =>
 const LoginRoute = lazy(() =>
   import("../../features/auth/AuthPages").then((module) => ({ default: module.LoginRoute })),
 );
+const RegisterRoute = lazy(() =>
+  import("../../features/auth/AuthPages").then((module) => ({ default: module.RegisterRoute })),
+);
 const ResetPasswordRoute = lazy(() =>
   import("../../features/auth/AuthPages").then((module) => ({ default: module.ResetPasswordRoute })),
 );
@@ -102,6 +105,7 @@ function RoutedContent() {
         <Routes>
           <Route path="/" element={<PrototypeHomeRoute />} />
           <Route path="/login" element={<LoginRoute />} />
+          <Route path="/register" element={<RegisterRoute />} />
           <Route path="/reset-password" element={<ResetPasswordRoute />} />
           <Route path="/update-password" element={<Protected element={<UpdatePasswordRoute />} />} />
           <Route path="/dashboard" element={<Protected element={<PrototypeDashboardRoute />} />} />

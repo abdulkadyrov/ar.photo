@@ -15,6 +15,9 @@ class FakeAuthAdapter implements AuthAdapter {
   }
 
   async signIn() {}
+  async signUp() {
+    return { confirmationRequired: false };
+  }
   async signOut() {}
   async requestPasswordReset() {}
   async updatePassword() {}

@@ -38,6 +38,17 @@ describe("demo auth adapter", () => {
 
     unsubscribe();
   });
+
+  it("creates a local demo session through the registration boundary", async () => {
+    const adapter = new DemoAuthAdapter();
+    await expect(
+      adapter.signUp({
+        email: "New@Example.com",
+        password: "demo-password",
+      }),
+    ).resolves.toEqual({ confirmationRequired: false });
+    expect((await adapter.getSession())?.user.email).toBe("new@example.com");
+  });
 });
 
 describe("unconfigured auth adapter", () => {
@@ -47,5 +58,11 @@ describe("unconfigured auth adapter", () => {
     await expect(adapter.signIn("owner@example.com", "correct horse battery staple")).rejects.toThrow(
       /not configured/i,
     );
+    await expect(
+      adapter.signUp({
+        email: "owner@example.com",
+        password: "correct horse battery staple",
+      }),
+    ).rejects.toThrow(/not configured/i);
   });
 });

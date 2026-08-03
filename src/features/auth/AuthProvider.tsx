@@ -41,6 +41,7 @@ export function AuthProvider({ children, adapter = getAuthAdapter() }: { childre
       status: loading ? "loading" : session ? "authenticated" : "unauthenticated",
       mode: adapter.mode,
       signIn: (email, password) => adapter.signIn(email, password),
+      signUp: (input) => adapter.signUp(input),
       signOut: () => adapter.signOut(),
       requestPasswordReset: (email) => adapter.requestPasswordReset(email),
       updatePassword: (password) => adapter.updatePassword(password),

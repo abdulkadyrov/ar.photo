@@ -49,6 +49,19 @@ test("protects the workspace and clears the demo session on logout", async ({ pa
   await expect(page.getByRole("heading", { name: "Добро пожаловать" })).toBeVisible();
 });
 
+test("registers with email and password through the explicit signup route", async ({ page }) => {
+  await page.goto("./register");
+
+  await page.getByPlaceholder("name@example.com").fill("new-owner@example.com");
+  await page.getByPlaceholder("Не менее 10 символов").fill("strong-password");
+  await page.getByPlaceholder("Повторите пароль").fill("strong-password");
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+
+  await expect(page).toHaveURL(/\/ar\.photo\/dashboard$/);
+  await expect(page.getByRole("heading", { name: "Добро пожаловать в AR Photo" })).toBeVisible();
+});
+
 test("keeps the public MindAR regression route available without a camera grant", async ({ page }) => {
   await page.goto("./viewer/test");
 
