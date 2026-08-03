@@ -51,6 +51,7 @@ Production launch намеренно не отмечен выполненным:
 - 18 Chromium E2E, включая отдельный production configuration boundary;
 - 12 cross-browser/mobile-emulation E2E;
 - 323 pgTAP assertions после clean reset;
+- full local Supabase backup/isolated restore с sanitized evidence и проверкой forced RLS/grants;
 - TypeScript, ESLint, production build, bundle budget;
 - secret/metadata/dependency/security checks;
 - release manifest и CycloneDX SBOM artifacts;

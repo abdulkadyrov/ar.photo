@@ -19,6 +19,7 @@ supabase db start
 supabase db reset
 supabase db lint --local --schema public,private --level error --fail-on error
 supabase test db --local supabase/tests
+bash scripts/rehearse-local-restore.sh artifacts/local-restore-evidence.txt
 supabase gen types typescript --local --schema public > /tmp/ar-photo-database.types.ts
 supabase stop --no-backup
 ```
@@ -31,6 +32,7 @@ supabase stop --no-backup
 | Browser E2E           | auth shell, CRUD, upload, publish/QR, subscriptions/team, analytics, admin, PWA, WCAG                | `npm run test:e2e`                      |
 | Cross-browser         | responsive protected shell, public AR fallback, admin on Chromium/Firefox/WebKit + mobile profiles   | `npm run test:e2e:cross-browser`        |
 | PostgreSQL pgTAP      | grants, forced RLS, tenant isolation, trusted mutations, quotas, jobs, public/admin boundaries       | `supabase test db`                      |
+| Backup/restore        | full local Supabase dump, isolated restore, migrations/fixtures/RLS/grants and guaranteed cleanup    | `scripts/rehearse-local-restore.sh`     |
 | SQL lint              | function/schema errors for `public` и `private`                                                      | `supabase db lint`                      |
 | Worker                | processing contract and executable container dependencies                                            | Vitest + `.github/workflows/worker.yml` |
 | Security/supply chain | secrets, metadata, headers/cache, audit exception, SBOM                                              | `npm run check:*`, `npm run sbom`       |
@@ -42,6 +44,7 @@ supabase stop --no-backup
 - 18 Chromium E2E: отдельный fail-closed production-configuration smoke плюс demo suite с accessibility и PWA.
 - 12 cross-browser/mobile-emulation E2E: desktop Firefox/WebKit, Pixel 7 Chromium, iPhone 14 WebKit.
 - 323 pgTAP assertions после clean reset PostgreSQL 17.
+- Full local Supabase backup восстанавливается в отдельную временную БД; CI сохраняет только sanitized SHA/count/policy evidence, не сам dump.
 - Initial JS graph 555 KiB, dashboard graph 715 KiB, CSS 33 KiB; MindAR/Three остаются lazy.
 - Axe не находит serious/critical violations на landing, login, dashboard, admin и public AR intro для выбранных WCAG tags.
 

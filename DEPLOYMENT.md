@@ -182,6 +182,8 @@ Rollback считается подтверждённым только после
 - ежеквартально восстанавливать backup в изолированный project, выполнять migrations/read-only consistency queries и основной smoke;
 - фиксировать дату, backup id, restore duration, recovered point, reviewer и отклонения.
 
+Repository CI выполняет отдельный local rehearsal после pgTAP: создаёт полный custom-format dump синтетического Supabase, восстанавливает его в новую временную БД, проверяет 14 migrations, fixtures, forced RLS и отсутствие `anon`/`private` privileges, затем уничтожает restore database и dump. В artifacts попадает только sanitized evidence с SHA-256/размером/результатами. Это подтверждает процедуру на локальном PostgreSQL, но не заменяет provider backup/PITR и Storage restore rehearsal в staging.
+
 Restore никогда не репетируется поверх production. После восстановления ротировать временные credentials и уничтожить изолированную среду по approved procedure.
 
 ## Incident response

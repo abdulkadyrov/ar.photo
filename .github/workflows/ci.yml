@@ -95,6 +95,14 @@ jobs:
         run: supabase db lint --local --schema public,private --level error --fail-on error
       - name: Run pgTAP policy tests
         run: supabase test db --local supabase/tests
+      - name: Rehearse full backup and isolated restore
+        run: bash scripts/rehearse-local-restore.sh artifacts/local-restore-evidence.txt
+      - name: Upload sanitized restore evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: local-restore-evidence
+          path: artifacts/local-restore-evidence.txt
+          if-no-files-found: error
       - name: Generate database types
         run: |
           mkdir -p artifacts

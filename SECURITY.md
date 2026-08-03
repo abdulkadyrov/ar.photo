@@ -251,6 +251,7 @@ Retention настраивается server-side в диапазоне 30–730 
 - camera permission/privacy device checklist;
 - hosted TOTP/advisors/headers/scheduler/alert verification;
 - incident response, rollback и backup/restore rehearsal;
+- local full-database restore автоматизирован; provider PITR/Storage restore остаются staging gate;
 - legal/privacy/data residency approval.
 
 ## 9. Secrets и environment

@@ -51,6 +51,7 @@
 - [x] Secrets/public metadata/security contract/dependency audit.
 - [x] Release manifest + CycloneDX SBOM artifacts.
 - [x] Clean PostgreSQL 17 reset/lint + 323 pgTAP.
+- [x] Full local Supabase backup/isolated restore с проверкой migrations, fixtures, forced RLS и grants.
 - [x] 18 Chromium E2E, включая fail-closed config, WCAG и PWA.
 - [x] 12 Firefox/WebKit/mobile-emulation E2E.
 - [x] Production worker Docker build/runtime.
@@ -67,7 +68,7 @@
 - [ ] External redacted error sink, dashboards, alert thresholds и on-call test.
 - [ ] Worker queue/failed/restart monitoring.
 - [ ] Staging deploy/rollback rehearsal на immutable artifacts.
-- [ ] Backup/PITR и изолированный restore rehearsal в RPO/RTO.
+- [ ] Provider backup/PITR и Storage restore rehearsal в staging в пределах утверждённых RPO/RTO; local database restore автоматизирован в CI.
 - [ ] Retention, privacy/legal copy, data processing terms и support/security contacts approved.
 - [ ] Human launch approval от product, security, operations и legal.
 
