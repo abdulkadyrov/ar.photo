@@ -38,8 +38,10 @@ file_size_limit = "50MiB"
 
 [auth]
 enabled = true
-site_url = "http://127.0.0.1:5173/ar.photo/"
+site_url = "https://abdulkadyrov.github.io/ar.photo/"
 additional_redirect_urls = [
+  "https://abdulkadyrov.github.io/ar.photo/update-password",
+  "https://abdulkadyrov.github.io/ar.photo/settings/team",
   "http://127.0.0.1:5173/ar.photo/update-password",
   "http://localhost:5173/ar.photo/update-password",
   "http://127.0.0.1:5173/ar.photo/settings/team",

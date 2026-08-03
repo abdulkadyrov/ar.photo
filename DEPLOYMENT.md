@@ -2,7 +2,7 @@
 
 ## Статус среды
 
-GitHub Pages workflow в репозитории является только frontend preview: он явно использует `build:demo` и base path `/ar.photo/`, но GitHub Pages не применяет Netlify-style `public/_headers` и не разворачивает Supabase/worker. Обычный production build без Supabase variables fail-closed и не показывает demo data. Preview нельзя считать production SaaS deployment.
+GitHub Pages публикует production frontend на `https://abdulkadyrov.github.io/ar.photo/`: workflow использует обычный fail-closed `build`, получает только browser-safe Supabase variables из GitHub Actions secrets и добавляет `404.html` для прямого открытия SPA/QR маршрутов. GitHub Pages не применяет Netlify-style `public/_headers`, поэтому перед обработкой реальных клиентских данных frontend нужно перенести на host/CDN с управляемыми security headers.
 
 Production требует отдельно управляемые frontend host/CDN, Supabase project, processing worker, DNS/TLS, scheduler, secrets, monitoring и backup policy.
 
@@ -11,11 +11,11 @@ Production требует отдельно управляемые frontend host/
 | Среда      | Данные                                    | Назначение                      | Допустимые интеграции                              |
 | ---------- | ----------------------------------------- | ------------------------------- | -------------------------------------------------- |
 | Local      | synthetic seed                            | разработка, pgTAP, worker smoke | local Supabase/Docker                              |
-| Preview    | synthetic/demo                            | UI/PR review                    | GitHub Pages без production secrets                |
+| Hosted beta | тестовые/пилотные                        | публичный QR и Supabase rehearsal | GitHub Pages + hosted Supabase                    |
 | Staging    | synthetic/anonymized                      | полный hosted rehearsal         | отдельный Supabase project/worker/domain           |
 | Production | реальные клиентские данные после approval | клиентский сервис               | отдельные project, secrets, domain, alerts/backups |
 
-Нельзя использовать production Storage/Auth/database в preview deployment.
+Demo mode остаётся только для локальных и автоматизированных тестов и не публикуется в Pages workflow.
 
 ## Предварительные решения
 

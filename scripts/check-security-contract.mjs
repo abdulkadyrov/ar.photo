@@ -4,7 +4,7 @@ const headers = await readFile("public/_headers", "utf8");
 const worker = await readFile("public/sw.js", "utf8");
 const runtimeConfig = await readFile("src/shared/config/env.ts", "utf8");
 const packageManifest = await readFile("package.json", "utf8");
-const previewWorkflow = await readFile(".github/workflows/deploy.yml", "utf8");
+const pagesWorkflow = await readFile(".github/workflows/deploy.yml", "utf8");
 const supabaseConfig = await readFile("supabase/config.toml", "utf8");
 
 function getTomlSection(source, name) {
@@ -40,7 +40,11 @@ const requiredDemoBoundaryRules = [
   [runtimeConfig, "VITE_ENABLE_DEMO_MODE", "runtime demo opt-in"],
   [runtimeConfig, '"unconfigured"', "fail-closed runtime mode"],
   [packageManifest, '"build:demo"', "explicit demo build"],
-  [previewWorkflow, "npm run build:demo", "preview-only demo build"],
+  [pagesWorkflow, "VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}", "Pages Supabase URL secret"],
+  [pagesWorkflow, "VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}", "Pages publishable key secret"],
+  [pagesWorkflow, "VITE_PUBLIC_APP_URL: https://abdulkadyrov.github.io/ar.photo/", "canonical Pages origin"],
+  [pagesWorkflow, "run: npm run build", "production Pages build"],
+  [pagesWorkflow, "cp dist/index.html dist/404.html", "Pages SPA fallback"],
 ];
 const requiredAuthConfigRules = [
   [authConfig, /enable_signup\s*=\s*true/, "self-service Auth signup"],
