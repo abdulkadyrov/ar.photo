@@ -198,7 +198,6 @@ select is(
   'only marker analysis and video inspection run before prerequisites'
 );
 
-set local role service_role;
 select lives_ok(
   $$
     select public.report_processing_progress(
@@ -217,7 +216,6 @@ select is(
   'reported progress is visible to the account'
 );
 
-set local role service_role;
 select lives_ok(
   $$
     select public.complete_processing_job(
@@ -277,7 +275,6 @@ select ok(
 );
 
 reset role;
-set local role service_role;
 select lives_ok(
   $$ select public.claim_processing_jobs('worker-stage-five', 10) $$,
   'quality override releases marker compilation'
@@ -301,7 +298,6 @@ values
     '{"mimetype":"image/webp","size":400}'::jsonb
   );
 
-set local role service_role;
 select lives_ok(
   $$
     select public.complete_processing_job(
@@ -430,6 +426,7 @@ select lives_ok(
   'worker claims replacement root jobs'
 );
 
+reset role;
 select lives_ok(
   $$
     select public.fail_processing_job(
