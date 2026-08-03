@@ -1,5 +1,31 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
+type UploadSessionRow = {
+  account_id: string;
+  ar_item_id: string | null;
+  asset_id: string | null;
+  bytes_uploaded: number;
+  completed_at: string | null;
+  created_at: string;
+  created_by: string;
+  error_code: string | null;
+  expires_at: string;
+  group_id: string;
+  id: string;
+  idempotency_key: string;
+  kind: string;
+  metadata: Json;
+  mime_type: string;
+  original_file_name: string;
+  project_id: string;
+  size_bytes: number;
+  status: Database["public"]["Enums"]["media_upload_status"];
+  storage_bucket: string;
+  storage_path: string;
+  updated_at: string;
+  version: number;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -374,6 +400,7 @@ export type Database = {
           created_at: string;
           created_by: string;
           deleted_at: string | null;
+          group_id: string | null;
           id: string;
           kind: string;
           metadata: Json;
@@ -392,6 +419,7 @@ export type Database = {
           created_at?: string;
           created_by: string;
           deleted_at?: string | null;
+          group_id?: string | null;
           id?: string;
           kind: string;
           metadata?: Json;
@@ -410,6 +438,7 @@ export type Database = {
           created_at?: string;
           created_by?: string;
           deleted_at?: string | null;
+          group_id?: string | null;
           id?: string;
           kind?: string;
           metadata?: Json;
@@ -429,6 +458,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "accounts";
             referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "media_assets_group_project_account_fkey";
+            columns: ["group_id", "project_id", "account_id"];
+            isOneToOne: false;
+            referencedRelation: "groups";
+            referencedColumns: ["id", "project_id", "account_id"];
           },
           {
             foreignKeyName: "media_assets_item_account_fkey";
@@ -778,11 +814,80 @@ export type Database = {
           },
         ];
       };
+      upload_sessions: {
+        Row: UploadSessionRow;
+        Insert: {
+          account_id: string;
+          ar_item_id?: string | null;
+          asset_id?: string | null;
+          bytes_uploaded?: number;
+          completed_at?: string | null;
+          created_at?: string;
+          created_by: string;
+          error_code?: string | null;
+          expires_at?: string;
+          group_id: string;
+          id?: string;
+          idempotency_key: string;
+          kind: string;
+          metadata?: Json;
+          mime_type: string;
+          original_file_name: string;
+          project_id: string;
+          size_bytes: number;
+          status?: Database["public"]["Enums"]["media_upload_status"];
+          storage_bucket: string;
+          storage_path: string;
+          updated_at?: string;
+          version: number;
+        };
+        Update: Partial<UploadSessionRow>;
+        Relationships: [
+          {
+            foreignKeyName: "upload_sessions_account_id_fkey";
+            columns: ["account_id"];
+            isOneToOne: false;
+            referencedRelation: "accounts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "upload_sessions_asset_id_fkey";
+            columns: ["asset_id"];
+            isOneToOne: false;
+            referencedRelation: "media_assets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "upload_sessions_group_project_account_fkey";
+            columns: ["group_id", "project_id", "account_id"];
+            isOneToOne: false;
+            referencedRelation: "groups";
+            referencedColumns: ["id", "project_id", "account_id"];
+          },
+          {
+            foreignKeyName: "upload_sessions_item_account_fkey";
+            columns: ["ar_item_id", "account_id"];
+            isOneToOne: false;
+            referencedRelation: "ar_items";
+            referencedColumns: ["id", "account_id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
+      abort_media_upload: {
+        Args: { p_session_id: string };
+        Returns: UploadSessionRow;
+        SetofOptions: {
+          from: "*";
+          to: "upload_sessions";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       admin_create_account: {
         Args: {
           p_account_name: string;
@@ -812,6 +917,25 @@ export type Database = {
         SetofOptions: {
           from: "*";
           to: "accounts";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      begin_media_upload: {
+        Args: {
+          p_kind: string;
+          p_mime_type: string;
+          p_original_file_name: string;
+          p_request_id: string;
+          p_size_bytes: number;
+          p_target_account_id: string;
+          p_target_group_id: string;
+          p_target_project_id: string;
+        };
+        Returns: UploadSessionRow;
+        SetofOptions: {
+          from: "*";
+          to: "upload_sessions";
           isOneToOne: true;
           isSetofReturn: false;
         };
@@ -924,6 +1048,36 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      expire_stale_uploads: {
+        Args: { p_limit?: number };
+        Returns: UploadSessionRow[];
+        SetofOptions: {
+          from: "*";
+          to: "upload_sessions";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
+      fail_media_upload: {
+        Args: { p_error_code: string; p_session_id: string };
+        Returns: UploadSessionRow;
+        SetofOptions: {
+          from: "*";
+          to: "upload_sessions";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      finalize_media_upload: {
+        Args: { p_metadata: Json; p_session_id: string; p_sha256: string };
+        Returns: Database["public"]["Tables"]["media_assets"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "media_assets";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       move_group: {
         Args: {
           p_destination_project_id: string;
@@ -980,6 +1134,16 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      start_media_upload: {
+        Args: { p_session_id: string };
+        Returns: UploadSessionRow;
+        SetofOptions: {
+          from: "*";
+          to: "upload_sessions";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
     };
     Enums: {
       account_status: "active" | "suspended" | "closed";
@@ -1005,6 +1169,7 @@ export type Database = {
         | "qr_generation"
         | "storage_cleanup";
       marker_lost_behavior: "pause_hide" | "continue_audio_hide" | "stop_reset";
+      media_upload_status: "pending" | "uploading" | "failed" | "finalized" | "aborted" | "expired";
       member_role: "owner" | "manager" | "editor" | "viewer";
       profile_role: "superadmin" | "account_user";
       project_category:
@@ -1154,6 +1319,7 @@ export const Constants = {
         "storage_cleanup",
       ],
       marker_lost_behavior: ["pause_hide", "continue_audio_hide", "stop_reset"],
+      media_upload_status: ["pending", "uploading", "failed", "finalized", "aborted", "expired"],
       member_role: ["owner", "manager", "editor", "viewer"],
       profile_role: ["superadmin", "account_user"],
       project_category: ["graduation", "wedding", "family", "birthday", "travel", "advertising", "museum", "other"],
