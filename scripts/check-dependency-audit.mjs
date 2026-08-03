@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
 const ALLOWED_ADVISORY = 1124282;
 const ALLOWED_PACKAGES = new Set(["react-router", "react-router-dom"]);
@@ -24,18 +25,19 @@ if (unexpected.length) {
   process.exit(1);
 }
 
-const rscImports = spawnSync(
-  "rg",
-  ["-n", "react-router/(dom|node)|RSCRouter|createCallServer|routeRSCServerRequest", "src"],
-  {
-    encoding: "utf8",
-  },
-);
-if (rscImports.status === 0) {
-  console.error(`Reviewed RSC exception is reachable from application code:\n${rscImports.stdout}`);
+function sourceFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    return entry.isDirectory() ? sourceFiles(path) : /\.[cm]?[jt]sx?$/.test(entry.name) ? [path] : [];
+  });
+}
+
+const rscPattern = /react-router\/(?:dom|node)|RSCRouter|createCallServer|routeRSCServerRequest/;
+const rscImports = sourceFiles("src").filter((path) => rscPattern.test(readFileSync(path, "utf8")));
+if (rscImports.length) {
+  console.error(`Reviewed RSC exception is reachable from application code:\n${rscImports.join("\n")}`);
   process.exit(1);
 }
-if (rscImports.status !== 1) throw new Error(`Unable to scan RSC imports: ${rscImports.stderr}`);
 
 const totals = report.metadata?.vulnerabilities ?? {};
 console.log(
