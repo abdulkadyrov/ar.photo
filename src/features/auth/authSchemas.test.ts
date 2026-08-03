@@ -16,12 +16,14 @@ describe("auth schemas", () => {
   it("validates self-service registration details and consent", () => {
     const valid = {
       email: "owner@example.com",
-      password: "strong-password",
-      confirmPassword: "strong-password",
+      password: "Strong-password1",
+      confirmPassword: "Strong-password1",
       termsAccepted: true,
     };
     expect(registerSchema.parse(valid).email).toBe("owner@example.com");
     expect(registerSchema.safeParse({ ...valid, termsAccepted: false }).success).toBe(false);
     expect(registerSchema.safeParse({ ...valid, confirmPassword: "different-password" }).success).toBe(false);
+    expect(registerSchema.safeParse({ ...valid, password: "strong-password1" }).success).toBe(false);
+    expect(registerSchema.safeParse({ ...valid, password: "Strong-password" }).success).toBe(false);
   });
 });

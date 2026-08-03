@@ -5,6 +5,7 @@ import { useForm, type FieldError, type UseFormRegisterReturn } from "react-hook
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Button, Panel } from "../../shared/ui";
 import { useAuth } from "./authContext";
+import { getSignUpErrorMessage } from "./authErrors";
 import {
   loginSchema,
   registerSchema,
@@ -132,8 +133,8 @@ export function RegisterRoute() {
         return;
       }
       navigate("/dashboard", { replace: true });
-    } catch {
-      setFormError("Не удалось создать аккаунт. Проверьте данные или попробуйте войти с этим email.");
+    } catch (error) {
+      setFormError(getSignUpErrorMessage(error));
     }
   });
 
@@ -167,8 +168,11 @@ export function RegisterRoute() {
             inputProps={register("password")}
             type="password"
             autoComplete="new-password"
-            placeholder="Не менее 10 символов"
+            placeholder="10+ символов, A–Z, a–z и цифра"
           />
+          <p className="-mt-2 text-xs leading-5 text-muted">
+            Минимум 10 символов: строчная и заглавная латинские буквы и хотя бы одна цифра.
+          </p>
           <AuthField
             label="Повторите пароль"
             icon={<LockKeyhole size={17} />}
@@ -294,8 +298,11 @@ export function UpdatePasswordRoute() {
           inputProps={register("password")}
           type="password"
           autoComplete="new-password"
-          placeholder="Не менее 10 символов"
+          placeholder="10+ символов, A–Z, a–z и цифра"
         />
+        <p className="-mt-2 text-xs leading-5 text-muted">
+          Минимум 10 символов: строчная и заглавная латинские буквы и хотя бы одна цифра.
+        </p>
         <AuthField
           label="Повторите пароль"
           icon={<LockKeyhole size={17} />}

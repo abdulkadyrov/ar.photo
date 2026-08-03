@@ -53,8 +53,8 @@ test("registers with email and password through the explicit signup route", asyn
   await page.goto("./register");
 
   await page.getByPlaceholder("name@example.com").fill("new-owner@example.com");
-  await page.getByPlaceholder("Не менее 10 символов").fill("strong-password");
-  await page.getByPlaceholder("Повторите пароль").fill("strong-password");
+  await page.getByPlaceholder("10+ символов, A–Z, a–z и цифра").fill("Strong-password1");
+  await page.getByPlaceholder("Повторите пароль").fill("Strong-password1");
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Зарегистрироваться" }).click();
 

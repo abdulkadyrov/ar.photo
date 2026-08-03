@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+const strongPasswordSchema = z
+  .string()
+  .min(10, "Минимум 10 символов")
+  .regex(/[a-z]/, "Добавьте строчную латинскую букву")
+  .regex(/[A-Z]/, "Добавьте заглавную латинскую букву")
+  .regex(/\d/, "Добавьте хотя бы одну цифру");
+
 export const loginSchema = z.object({
   email: z.string().trim().email("Введите корректный email"),
   password: z.string().min(8, "Минимум 8 символов"),
@@ -8,7 +15,7 @@ export const loginSchema = z.object({
 export const registerSchema = z
   .object({
     email: z.string().trim().email("Введите корректный email"),
-    password: z.string().min(10, "Минимум 10 символов"),
+    password: strongPasswordSchema,
     confirmPassword: z.string(),
     termsAccepted: z.boolean().refine(Boolean, "Подтвердите право на загружаемые материалы"),
   })
@@ -23,7 +30,7 @@ export const resetPasswordSchema = z.object({
 
 export const updatePasswordSchema = z
   .object({
-    password: z.string().min(10, "Минимум 10 символов"),
+    password: strongPasswordSchema,
     confirmPassword: z.string(),
   })
   .refine((value) => value.password === value.confirmPassword, {
