@@ -230,6 +230,8 @@ Gate:
 
 ## Этап 9 — analytics
 
+Статус: repository gate выполнен. Privacy-minimized ingestion, salted session deduplication, idempotent milestones, account/project/group/item aggregates, retention cleanup и адаптивный dashboard подтверждены 113 unit/component тестами, 11 E2E и 262 pgTAP-проверками. Hosted Edge/cron delivery остаётся infrastructure gate. Подробности: `STAGE_9_REPORT.md`.
+
 Цель: privacy-conscious статистика от account до item.
 
 Deliverables:

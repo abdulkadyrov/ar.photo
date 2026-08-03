@@ -2,9 +2,9 @@
 
 ## 1. Текущий security posture
 
-Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этапы 2–8 добавили Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, granular permissions, protected team lifecycle, private Storage policies, audit logs, quota-aware mutations, resumable upload lifecycle, service-only media processing, минимальный публичный AR boundary и trusted publication/QR lifecycle.
+Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этапы 2–9 добавили Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, granular permissions, protected team lifecycle, private Storage policies, audit logs, quota-aware mutations, resumable upload lifecycle, service-only media processing, минимальный публичный AR boundary, trusted publication/QR lifecycle и privacy-minimized analytics.
 
-Это ещё не разрешение на работу с реальными клиентами: analytics abuse controls, MFA администратора, hosted advisors, deployed-function/worker observability, physical-device QR/AR matrix и production environment verification закрываются последующими этапами.
+Это ещё не разрешение на работу с реальными клиентами: MFA администратора, hosted advisors, deployed-function/worker observability, physical-device QR/AR matrix и production environment verification закрываются последующими этапами.
 
 ## 2. Findings
 
@@ -100,7 +100,7 @@ Public viewer/analytics endpoints пока нет, но без ограниче�
 
 Мера: per-IP coarse rate limit без долгого хранения raw IP, per-slug/session budgets, WAF/platform controls, idempotency и anomaly alerts.
 
-Статус этапа 6: manifest abuse boundary закрыт на уровне репозитория. Edge Function применяет атомарные 60/IP/minute и 240/slug/minute buckets, где network identifier и slug salted SHA-256 до записи; raw значения не логируются. Analytics session budgets, WAF и anomaly alerts относятся к этапам 9/11.
+Статус этапа 9: manifest и analytics abuse boundaries закрыты на уровне репозитория. Manifest применяет атомарные 60/IP/minute и 240/slug/minute buckets. Analytics применяет 120/IP/minute и 60/session/minute, строгий payload, salted SHA-256 identifiers и идемпотентные milestones. Raw network/session identifiers не сохраняются; platform WAF и anomaly alerts относятся к production gate этапа 11.
 
 ### P2 — hardening
 
@@ -110,7 +110,6 @@ Public viewer/analytics endpoints пока нет, но без ограниче�
 - нет automatic secret scan/dependency review в CI;
 - unused `public/vendor` copies попадают в build и увеличивают supply-chain surface;
 - произвольные user strings пока безопасно экранируются React, но будущие rich text/SVG требуют отдельной sanitization policy;
-- аналитика не имеет retention/privacy specification;
 - нет session revocation plan для suspended users.
 
 ## 3. Trust boundaries
@@ -180,7 +179,9 @@ Data API GRANT и RLS тестируются отдельно: отсутств�
 - содержимое marker;
 - signed URLs.
 
-Допустимы coarse device/browser/os, allowlisted referrer domain, timestamps, playback milestones и технический error code. Retention и legal notice утверждаются до production analytics.
+Допустимы только coarse device/browser/OS, hostname referrer, timestamps, bounded playback milestones и технический error code. Stage 9 schema и Edge validation отклоняют неизвестные/чувствительные поля, raw session/event rows закрыты forced RLS, а кабинет читает только permission-scoped агрегаты.
+
+Retention настраивается server-side в диапазоне 30–730 дней и выполняется service-only bounded batches; удаление session каскадно удаляет milestones. Конкретный production срок и финальная legal/privacy copy всё ещё требуют письменного business/legal approval до запуска.
 
 ## 8. Security verification gates
 
@@ -201,6 +202,14 @@ Data API GRANT и RLS тестируются отдельно: отсутств�
 - explicit Data API grants review;
 - quota race tests;
 - admin function authorization tests.
+
+### Этап 9
+
+- строгий allowlist analytics payload и coarse dimensions;
+- salted network/session hashes без raw IP/full UA/full URL;
+- rate-limit и milestone idempotency tests;
+- cross-tenant aggregate scope/permission tests;
+- bounded retention cleanup и non-blocking playback tests.
 
 ### Перед MVP
 

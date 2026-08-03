@@ -223,6 +223,14 @@ stateDiagram-v2
 
 Team lifecycle проходит через trusted RPC: приглашение создаётся под advisory lock и учитывает active members вместе с pending invitations; accept атомарно проверяет email получателя, срок и quota; revoke/update/deactivate/reactivate защищают owner, текущего пользователя и manager hierarchy. Таблица `team_invitations` использует forced RLS без прямых Data API grants. Edge Function `team-invite` вызывает RPC от user JWT, отправляет Supabase Auth invitation через server-only Admin API и отзывает запись при ошибке доставки. Платёжный boundary типизирован, но намеренно остаётся `not_configured` до выбора провайдера.
 
+### 8.2. Privacy-safe analytics boundary
+
+Public viewer формирует короткоживущий случайный session token только в памяти и отправляет телеметрию fire-and-forget. Payload содержит public slug, одно allowlisted событие, coarse device/browser/OS, hostname referrer, bounded playback value и безопасный error code; raw IP, полный user-agent, camera frames, полный URL и signed media URL в контракт не входят.
+
+Edge Function `public-ar-analytics` ограничивает размер и поля запроса, проверяет origin, хеширует transient network/session identifiers отдельной солью и применяет атомарные бюджеты 120/IP/minute и 60/session/minute. Service-only RPC повторно разрешает item по действующему published manifest boundary, записывает одну session и идемпотентные milestones. Raw session/event tables используют forced RLS и не имеют browser grants.
+
+Кабинет вызывает только `get_analytics_summary`: функция требует active membership и permission `analytics`, валидирует account/project/group/item scope и возвращает агрегаты максимум за 366 дней. `cleanup-analytics` запускает service-only batch purge с настраиваемым retention 30–730 дней; удаление session каскадно удаляет events и старые rate buckets. Ошибка ingestion никогда не блокирует camera, tracking или playback.
+
 ## 9. AR viewer state machine
 
 ```mermaid

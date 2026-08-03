@@ -146,13 +146,13 @@ Fields: `id`, `account_id`, `ar_item_id` unique, `public_url`, `svg_path`, `png_
 
 Fields: `id`, `ar_item_id`, `account_id`, `session_token_hash`, `started_at`, `ended_at`, `marker_detected_at`, `playback_started_at`, `completed`, `duration_watched_seconds`, `device_type`, `browser_family`, `os_family`, optional `country_code`, `referrer_domain`, `error_code`.
 
-No raw IP, fingerprint or full user-agent is stored by default. Retention and country derivation require a legal/product decision.
+`session_token_hash` — salted 64-hex SHA-256, уникальный в пределах AR item. Coarse dimensions ограничены закрытыми allowlist, referrer хранится только как hostname, error — как bounded code. Таблица использует forced RLS, а прямой browser `SELECT` отозван. Raw IP, fingerprint, полный user-agent, полный URL и signed URL не сохраняются.
 
 ### `ar_view_events`
 
-Fields: `id`, `session_id`, `ar_item_id`, `account_id`, `event_type`, `occurred_at`, `value_numeric`, `error_code`, `metadata_safe jsonb`.
+Fields: `id`, `session_id`, `ar_item_id`, `account_id`, `event_type`, `occurred_at`, `value_numeric`, `error_code`.
 
-This table supports 25/50/75% metrics without overloading the session row. Ingestion validates an allowlist and limits events per session.
+Закрытый enum поддерживает page/camera/marker/playback, 25/50/75%, completed и error milestones. Unique `(session_id, event_type)` делает повторную доставку идемпотентной; composite foreign key подтверждает совпадение session/item/account. Таблица использует forced RLS без browser grants, а account/item/time indexes покрывают агрегаты и retention cleanup.
 
 ### `audit_logs`
 
@@ -197,6 +197,8 @@ Create project/group/AR item, add member, upload finalize и publish выпол�
 Повторный request использует idempotency key, чтобы двойной клик не создавал дубликат.
 
 `get_account_entitlements` возвращает нормализованный JSON contract с plan/subscription/limits/usage/permissions. Team invite и reactivate используют account-scoped advisory lock, поэтому одновременные запросы не могут превысить `team_limit`. `admin_update_subscription` повторно проверяет superadmin и нормализует custom limits; UI этого admin flow относится к этапу 10.
+
+Analytics ingestion доступен только service role: `record_public_ar_event` сам разрешает опубликованный item, upsert-ит session и идемпотентно записывает milestone; `consume_public_analytics_rate_limit` атомарно считает только salted hash buckets. Authenticated dashboard получает исключительно aggregate JSON через `get_analytics_summary` после permission/scope проверки. `purge_analytics_before` — service-only bounded batch delete с запретом удалять данные моложе 30 дней.
 
 ## 7. RLS matrix
 
@@ -281,6 +283,8 @@ Authenticated clients используют четыре audited RPC вместо
 - AR processing: idempotent draft, media attachment/revision, four-job DAG, worker lease/heartbeat, retry, marker override и immutable generated-asset accounting.
 - public AR manifest: service-only filtered source и durable privacy-preserving rate buckets.
 - publication/QR: trusted readiness gate, reversible unpublish, slug rotation, strict style normalization и audit coverage.
+- subscriptions/team: effective entitlements, permission ceilings, invitation lifecycle и concurrency-safe team quota.
+- analytics: private idempotent events, salted session identity, scoped aggregate RPC, rate budgets и bounded retention cleanup.
 
 `supabase/seed.sql` содержит только синтетические данные: superadmin, два изолированных аккаунта, active/expired subscription и role fixtures. `supabase/tests` проверяет schema/grants и RLS/Storage matrix. Тип `Database` генерируется Supabase CLI из реально поднятой схемы и хранится в `src/shared/api/database.types.ts`.
 
