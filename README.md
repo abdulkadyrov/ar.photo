@@ -38,6 +38,6 @@ supabase test db --local supabase/tests
 
 ## Текущий статус
 
-Этапы 0–2 завершены на уровне репозитория. Production CRUD, media pipeline, AR-item wizard, public viewer, QR publication, subscriptions/team, analytics и admin реализуются в этапах 3–10. Старый IndexedDB flow сохранён как regression prototype и не считается multi-device production storage.
+Этапы 0–3 завершены на уровне репозитория. Production CRUD проектов и групп использует Supabase/RLS, атомарную сортировку/перенос и private Storage covers. Media pipeline, AR-item wizard, public viewer, QR publication, subscriptions/team, analytics и admin реализуются в этапах 4–10. Старый IndexedDB flow сохранён как regression prototype и не считается multi-device production storage.
 
-См. `ARCHITECTURE.md`, `DATABASE.md`, `SECURITY.md`, `STAGE_1_REPORT.md` и `STAGE_2_REPORT.md`.
+См. `ARCHITECTURE.md`, `DATABASE.md`, `SECURITY.md`, `STAGE_1_REPORT.md`, `STAGE_2_REPORT.md` и `STAGE_3_REPORT.md`.

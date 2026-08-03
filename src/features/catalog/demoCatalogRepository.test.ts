@@ -44,6 +44,13 @@ describe("demo catalog repository", () => {
       "request-2",
     );
 
+    const updated = await repository.updateProject(workspace.accountId, project.id, {
+      name: "Свадьба Анны и Максима",
+      description: "Обновлённое описание",
+      category: "wedding",
+    });
+    expect(updated.description).toBe("Обновлённое описание");
+
     await repository.archiveProject(workspace.accountId, project.id);
     const archived = await repository.listProjects(workspace.accountId, {
       search: "анны",
@@ -82,6 +89,13 @@ describe("demo catalog repository", () => {
     const repeated = await repository.createGroup(workspace.accountId, project.id, input, "request-group");
 
     expect(repeated.id).toBe(first.id);
+    const updated = await repository.updateGroup(workspace.accountId, first.id, {
+      name: "11А класс",
+      description: "Обновлённый класс",
+    });
+    expect(updated.description).toBe("Обновлённый класс");
+    expect((await repository.archiveGroup(workspace.accountId, first.id)).archived_at).not.toBeNull();
+    expect((await repository.restoreGroup(workspace.accountId, first.id)).archived_at).toBeNull();
     await repository.softDeleteGroup(workspace.accountId, first.id);
     expect(await repository.listGroups(workspace.accountId, project.id)).toEqual([]);
     expect(await repository.listGroups(workspace.accountId, project.id, true)).toHaveLength(1);

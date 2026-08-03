@@ -80,6 +80,8 @@ Gate:
 
 ## Этап 3 — проекты и группы
 
+Статус: repository gate выполнен. Production repository, CRUD, atomic reorder/move, private covers, 29 unit-тестов, 6 E2E и 38 pgTAP-проверок подтверждены GitHub Actions. Hosted Storage smoke ожидает development Supabase project. Подробности: `STAGE_3_REPORT.md`.
+
 Цель: production CRUD для первых двух уровней каталога.
 
 Deliverables:
