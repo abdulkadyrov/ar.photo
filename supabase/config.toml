@@ -80,3 +80,11 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/admin-create-user/deno.json"
 entrypoint = "./functions/admin-create-user/index.ts"
+
+[functions.cleanup-stale-uploads]
+enabled = true
+# This endpoint is invoked by a scheduler with a dedicated 32+ byte secret.
+# It never accepts a browser JWT and keeps the service role inside Edge runtime secrets.
+verify_jwt = false
+import_map = "./functions/cleanup-stale-uploads/deno.json"
+entrypoint = "./functions/cleanup-stale-uploads/index.ts"

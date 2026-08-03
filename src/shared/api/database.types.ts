@@ -940,6 +940,10 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      complete_upload_cleanup: {
+        Args: { p_session_ids: string[]; p_succeeded: boolean };
+        Returns: number;
+      };
       create_ar_item: {
         Args: {
           item_description: string;

@@ -134,7 +134,7 @@ select is(
         'has_storage_access', 'handle_new_user', 'write_audit_log', 'admin_create_account',
         'create_project', 'create_group', 'create_ar_item', 'reorder_groups', 'move_group',
         'begin_media_upload', 'start_media_upload', 'fail_media_upload', 'finalize_media_upload',
-        'abort_media_upload', 'expire_stale_uploads'
+        'abort_media_upload', 'expire_stale_uploads', 'complete_upload_cleanup'
       )
       and not exists (
         select 1

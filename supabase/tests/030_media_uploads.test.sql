@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(18);
+select plan(28);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000010', true);
@@ -138,6 +138,71 @@ select is(
   'repeated finalization does not double-account or duplicate assets'
 );
 
+select lives_ok(
+  $$
+    select public.begin_media_upload(
+      '20000000-0000-4000-8000-000000000001',
+      '50000000-0000-4000-8000-000000000001',
+      '60000000-0000-4000-8000-000000000001',
+      'video',
+      'stage-four.mp4',
+      'video/mp4',
+      4096,
+      '82000000-0000-4000-8000-000000000006'
+    )
+  $$,
+  'owner reserves an allowlisted MP4 upload'
+);
+
+select lives_ok(
+  $$
+    select public.start_media_upload(
+      (select id from public.upload_sessions where idempotency_key = '82000000-0000-4000-8000-000000000006')
+    )
+  $$,
+  'owner starts the MP4 upload'
+);
+
+select lives_ok(
+  $$
+    insert into storage.objects (bucket_id, name, metadata)
+    select storage_bucket, storage_path, '{"mimetype":"video/mp4","size":4096}'::jsonb
+    from public.upload_sessions
+    where idempotency_key = '82000000-0000-4000-8000-000000000006'
+  $$,
+  'owner writes the MP4 object to private Storage'
+);
+
+select throws_ok(
+  $$
+    select public.finalize_media_upload(
+      (select id from public.upload_sessions where idempotency_key = '82000000-0000-4000-8000-000000000006'),
+      repeat('b', 64),
+      '{"width":1920,"height":1080,"durationSeconds":121,"videoCodec":"h264","audioCodec":"aac"}'::jsonb
+    )
+  $$,
+  '23514',
+  'Video duration limit reached',
+  'server rejects video beyond the effective plan duration'
+);
+
+select lives_ok(
+  $$
+    select public.finalize_media_upload(
+      (select id from public.upload_sessions where idempotency_key = '82000000-0000-4000-8000-000000000006'),
+      repeat('b', 64),
+      '{"width":1920,"height":1080,"durationSeconds":120,"videoCodec":"h264","audioCodec":"aac"}'::jsonb
+    )
+  $$,
+  'server accepts verified H.264 metadata within the plan duration'
+);
+
+select is(
+  (select metadata ->> 'videoCodec' from public.media_assets where sha256 = repeat('b', 64)),
+  'h264',
+  'finalized video keeps inspected codec metadata'
+);
+
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000012', true);
 select throws_ok(
   $$
@@ -209,6 +274,38 @@ select is(
   (select status from public.upload_sessions where idempotency_key = '82000000-0000-4000-8000-000000000005'),
   'expired'::public.media_upload_status,
   'stale upload no longer reserves quota'
+);
+
+select is(
+  (select error_code from public.upload_sessions where idempotency_key = '82000000-0000-4000-8000-000000000005'),
+  'cleanup_in_progress',
+  'stale object is leased to one cleanup worker'
+);
+
+select lives_ok(
+  $$
+    select public.complete_upload_cleanup(
+      array[(select id from public.upload_sessions where idempotency_key = '82000000-0000-4000-8000-000000000005')],
+      true
+    )
+  $$,
+  'service worker acknowledges successful Storage cleanup'
+);
+
+reset role;
+select is(
+  (select error_code from public.upload_sessions where idempotency_key = '82000000-0000-4000-8000-000000000005'),
+  'upload_expired_cleaned',
+  'completed cleanup is not leased again'
+);
+
+select ok(
+  not pg_catalog.has_function_privilege(
+    'authenticated',
+    'public.complete_upload_cleanup(uuid[],boolean)',
+    'EXECUTE'
+  ),
+  'browser clients cannot acknowledge cleanup jobs'
 );
 
 select * from finish();
