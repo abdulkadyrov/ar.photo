@@ -1,0 +1,27 @@
+import type { Database, Tables } from "../../shared/api/database.types";
+
+export type ArItem = Tables<"ar_items">;
+export type ProcessingJob = Tables<"processing_jobs">;
+export type MediaAsset = Tables<"media_assets">;
+export type MarkerLostBehavior = Database["public"]["Enums"]["marker_lost_behavior"];
+
+export type ArItemSettings = {
+  autoplay: boolean;
+  loopVideo: boolean;
+  markerLostBehavior: MarkerLostBehavior;
+  audioDefault: "muted" | "sound_on";
+  fallbackEnabled: boolean;
+};
+
+export type CreateArItemInput = {
+  projectId: string;
+  groupId: string;
+  title: string;
+  description: string;
+  requestId: string;
+};
+
+export type PrepareArItemInput = ArItemSettings & {
+  markerAssetId: string;
+  videoAssetId: string;
+};
