@@ -1229,6 +1229,21 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      publish_ar_item: {
+        Args: {
+          p_expires_at?: string;
+          p_item_id: string;
+          p_public_base_url: string;
+          p_target_account_id: string;
+        };
+        Returns: Database["public"]["Tables"]["qr_codes"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "qr_codes";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       reorder_groups: {
         Args: {
           p_ordered_group_ids: string[];
@@ -1277,12 +1292,46 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      rotate_ar_item_public_slug: {
+        Args: {
+          p_item_id: string;
+          p_public_base_url: string;
+          p_target_account_id: string;
+        };
+        Returns: Database["public"]["Tables"]["qr_codes"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "qr_codes";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       start_media_upload: {
         Args: { p_session_id: string };
         Returns: UploadSessionRow;
         SetofOptions: {
           from: "*";
           to: "upload_sessions";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      unpublish_ar_item: {
+        Args: { p_item_id: string; p_target_account_id: string };
+        Returns: Database["public"]["Tables"]["ar_items"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "ar_items";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      update_ar_item_qr_style: {
+        Args: { p_item_id: string; p_style: Json; p_target_account_id: string };
+        Returns: Database["public"]["Tables"]["qr_codes"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "qr_codes";
           isOneToOne: true;
           isSetofReturn: false;
         };
