@@ -1,31 +1,5 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
-type UploadSessionRow = {
-  account_id: string;
-  ar_item_id: string | null;
-  asset_id: string | null;
-  bytes_uploaded: number;
-  completed_at: string | null;
-  created_at: string;
-  created_by: string;
-  error_code: string | null;
-  expires_at: string;
-  group_id: string;
-  id: string;
-  idempotency_key: string;
-  kind: string;
-  metadata: Json;
-  mime_type: string;
-  original_file_name: string;
-  project_id: string;
-  size_bytes: number;
-  status: Database["public"]["Enums"]["media_upload_status"];
-  storage_bucket: string;
-  storage_path: string;
-  updated_at: string;
-  version: number;
-};
-
 export type Database = {
   public: {
     Tables: {
@@ -266,6 +240,47 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "media_assets";
             referencedColumns: ["id", "account_id"];
+          },
+        ];
+      };
+      ar_view_events: {
+        Row: {
+          account_id: string;
+          ar_item_id: string;
+          error_code: string | null;
+          event_type: Database["public"]["Enums"]["ar_event_type"];
+          id: number;
+          occurred_at: string;
+          session_id: number;
+          value_numeric: number | null;
+        };
+        Insert: {
+          account_id: string;
+          ar_item_id: string;
+          error_code?: string | null;
+          event_type: Database["public"]["Enums"]["ar_event_type"];
+          id?: never;
+          occurred_at?: string;
+          session_id: number;
+          value_numeric?: number | null;
+        };
+        Update: {
+          account_id?: string;
+          ar_item_id?: string;
+          error_code?: string | null;
+          event_type?: Database["public"]["Enums"]["ar_event_type"];
+          id?: never;
+          occurred_at?: string;
+          session_id?: number;
+          value_numeric?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ar_view_events_session_scope_fkey";
+            columns: ["session_id", "ar_item_id", "account_id"];
+            isOneToOne: false;
+            referencedRelation: "ar_view_sessions";
+            referencedColumns: ["id", "ar_item_id", "account_id"];
           },
         ];
       };
@@ -909,7 +924,31 @@ export type Database = {
         ];
       };
       upload_sessions: {
-        Row: UploadSessionRow;
+        Row: {
+          account_id: string;
+          ar_item_id: string | null;
+          asset_id: string | null;
+          bytes_uploaded: number;
+          completed_at: string | null;
+          created_at: string;
+          created_by: string;
+          error_code: string | null;
+          expires_at: string;
+          group_id: string;
+          id: string;
+          idempotency_key: string;
+          kind: string;
+          metadata: Json;
+          mime_type: string;
+          original_file_name: string;
+          project_id: string;
+          size_bytes: number;
+          status: Database["public"]["Enums"]["media_upload_status"];
+          storage_bucket: string;
+          storage_path: string;
+          updated_at: string;
+          version: number;
+        };
         Insert: {
           account_id: string;
           ar_item_id?: string | null;
@@ -935,7 +974,31 @@ export type Database = {
           updated_at?: string;
           version: number;
         };
-        Update: Partial<UploadSessionRow>;
+        Update: {
+          account_id?: string;
+          ar_item_id?: string | null;
+          asset_id?: string | null;
+          bytes_uploaded?: number;
+          completed_at?: string | null;
+          created_at?: string;
+          created_by?: string;
+          error_code?: string | null;
+          expires_at?: string;
+          group_id?: string;
+          id?: string;
+          idempotency_key?: string;
+          kind?: string;
+          metadata?: Json;
+          mime_type?: string;
+          original_file_name?: string;
+          project_id?: string;
+          size_bytes?: number;
+          status?: Database["public"]["Enums"]["media_upload_status"];
+          storage_bucket?: string;
+          storage_path?: string;
+          updated_at?: string;
+          version?: number;
+        };
         Relationships: [
           {
             foreignKeyName: "upload_sessions_account_id_fkey";
@@ -972,22 +1035,58 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      accept_team_invitation: {
-        Args: { p_invitation_id: string };
-        Returns: Database["public"]["Tables"]["account_members"]["Row"];
+      abort_media_upload: {
+        Args: { p_session_id: string };
+        Returns: {
+          account_id: string;
+          ar_item_id: string | null;
+          asset_id: string | null;
+          bytes_uploaded: number;
+          completed_at: string | null;
+          created_at: string;
+          created_by: string;
+          error_code: string | null;
+          expires_at: string;
+          group_id: string;
+          id: string;
+          idempotency_key: string;
+          kind: string;
+          metadata: Json;
+          mime_type: string;
+          original_file_name: string;
+          project_id: string;
+          size_bytes: number;
+          status: Database["public"]["Enums"]["media_upload_status"];
+          storage_bucket: string;
+          storage_path: string;
+          updated_at: string;
+          version: number;
+        };
         SetofOptions: {
           from: "*";
-          to: "account_members";
+          to: "upload_sessions";
           isOneToOne: true;
           isSetofReturn: false;
         };
       };
-      abort_media_upload: {
-        Args: { p_session_id: string };
-        Returns: UploadSessionRow;
+      accept_team_invitation: {
+        Args: { p_invitation_id: string };
+        Returns: {
+          accepted_at: string | null;
+          account_id: string;
+          created_at: string;
+          id: string;
+          invited_at: string;
+          invited_by: string | null;
+          is_active: boolean;
+          permissions: Json;
+          role: Database["public"]["Enums"]["member_role"];
+          updated_at: string;
+          user_id: string;
+        };
         SetofOptions: {
           from: "*";
-          to: "upload_sessions";
+          to: "account_members";
           isOneToOne: true;
           isSetofReturn: false;
         };
@@ -1035,7 +1134,18 @@ export type Database = {
           p_status: Database["public"]["Enums"]["subscription_status"];
           p_target_account_id: string;
         };
-        Returns: Database["public"]["Tables"]["subscriptions"]["Row"];
+        Returns: {
+          account_id: string;
+          created_at: string;
+          custom_limits: Json;
+          expires_at: string | null;
+          grace_period_ends_at: string | null;
+          id: string;
+          plan_id: string;
+          starts_at: string;
+          status: Database["public"]["Enums"]["subscription_status"];
+          updated_at: string;
+        };
         SetofOptions: {
           from: "*";
           to: "subscriptions";
@@ -1054,7 +1164,31 @@ export type Database = {
           p_target_group_id: string;
           p_target_project_id: string;
         };
-        Returns: UploadSessionRow;
+        Returns: {
+          account_id: string;
+          ar_item_id: string | null;
+          asset_id: string | null;
+          bytes_uploaded: number;
+          completed_at: string | null;
+          created_at: string;
+          created_by: string;
+          error_code: string | null;
+          expires_at: string;
+          group_id: string;
+          id: string;
+          idempotency_key: string;
+          kind: string;
+          metadata: Json;
+          mime_type: string;
+          original_file_name: string;
+          project_id: string;
+          size_bytes: number;
+          status: Database["public"]["Enums"]["media_upload_status"];
+          storage_bucket: string;
+          storage_path: string;
+          updated_at: string;
+          version: number;
+        };
         SetofOptions: {
           from: "*";
           to: "upload_sessions";
@@ -1064,7 +1198,27 @@ export type Database = {
       };
       claim_processing_jobs: {
         Args: { p_limit?: number; p_worker_id: string };
-        Returns: Database["public"]["Tables"]["processing_jobs"]["Row"][];
+        Returns: {
+          account_id: string;
+          ar_item_id: string;
+          attempt_count: number;
+          completed_at: string | null;
+          created_at: string;
+          dedupe_key: string;
+          error_code: string | null;
+          error_message: string | null;
+          id: number;
+          input_metadata: Json;
+          locked_at: string | null;
+          locked_by: string | null;
+          max_attempts: number;
+          output_metadata: Json;
+          progress: number;
+          started_at: string | null;
+          status: Database["public"]["Enums"]["job_status"];
+          type: Database["public"]["Enums"]["job_type"];
+          updated_at: string;
+        }[];
         SetofOptions: {
           from: "*";
           to: "processing_jobs";
@@ -1073,12 +1227,28 @@ export type Database = {
         };
       };
       complete_processing_job: {
-        Args: {
-          p_job_id: number;
-          p_output_metadata: Json;
-          p_worker_id: string;
+        Args: { p_job_id: number; p_output_metadata: Json; p_worker_id: string };
+        Returns: {
+          account_id: string;
+          ar_item_id: string;
+          attempt_count: number;
+          completed_at: string | null;
+          created_at: string;
+          dedupe_key: string;
+          error_code: string | null;
+          error_message: string | null;
+          id: number;
+          input_metadata: Json;
+          locked_at: string | null;
+          locked_by: string | null;
+          max_attempts: number;
+          output_metadata: Json;
+          progress: number;
+          started_at: string | null;
+          status: Database["public"]["Enums"]["job_status"];
+          type: Database["public"]["Enums"]["job_type"];
+          updated_at: string;
         };
-        Returns: Database["public"]["Tables"]["processing_jobs"]["Row"];
         SetofOptions: {
           from: "*";
           to: "processing_jobs";
@@ -1089,6 +1259,14 @@ export type Database = {
       complete_upload_cleanup: {
         Args: { p_session_ids: string[]; p_succeeded: boolean };
         Returns: number;
+      };
+      consume_public_analytics_rate_limit: {
+        Args: {
+          p_bucket_key: string;
+          p_max_requests: number;
+          p_window_seconds: number;
+        };
+        Returns: boolean;
       };
       consume_public_manifest_rate_limit: {
         Args: {
@@ -1106,7 +1284,46 @@ export type Database = {
           target_group_id: string;
           target_project_id: string;
         };
-        Returns: Database["public"]["Tables"]["ar_items"]["Row"];
+        Returns: {
+          account_id: string;
+          audio_default: string;
+          autoplay: boolean;
+          created_at: string;
+          created_by: string;
+          deleted_at: string | null;
+          description: string | null;
+          expires_at: string | null;
+          fallback_enabled: boolean;
+          group_id: string;
+          id: string;
+          idempotency_key: string;
+          loop_video: boolean;
+          marker_asset_id: string | null;
+          marker_height: number | null;
+          marker_image_path: string | null;
+          marker_lost_behavior: Database["public"]["Enums"]["marker_lost_behavior"];
+          marker_preview_path: string | null;
+          marker_quality_details: Json;
+          marker_quality_overridden_at: string | null;
+          marker_quality_overridden_by: string | null;
+          marker_quality_override_reason: string | null;
+          marker_quality_score: number | null;
+          marker_width: number | null;
+          project_id: string;
+          public_slug: string;
+          published_at: string | null;
+          status: Database["public"]["Enums"]["ar_item_status"];
+          title: string;
+          tracking_dataset_path: string | null;
+          tracking_status: Database["public"]["Enums"]["tracking_status"] | null;
+          updated_at: string;
+          version: number;
+          video_asset_id: string | null;
+          video_duration_seconds: number | null;
+          video_path: string | null;
+          video_thumbnail_path: string | null;
+          visibility: Database["public"]["Enums"]["content_visibility"];
+        };
         SetofOptions: {
           from: "*";
           to: "ar_items";
@@ -1123,7 +1340,46 @@ export type Database = {
           p_target_project_id: string;
           p_title: string;
         };
-        Returns: Database["public"]["Tables"]["ar_items"]["Row"];
+        Returns: {
+          account_id: string;
+          audio_default: string;
+          autoplay: boolean;
+          created_at: string;
+          created_by: string;
+          deleted_at: string | null;
+          description: string | null;
+          expires_at: string | null;
+          fallback_enabled: boolean;
+          group_id: string;
+          id: string;
+          idempotency_key: string;
+          loop_video: boolean;
+          marker_asset_id: string | null;
+          marker_height: number | null;
+          marker_image_path: string | null;
+          marker_lost_behavior: Database["public"]["Enums"]["marker_lost_behavior"];
+          marker_preview_path: string | null;
+          marker_quality_details: Json;
+          marker_quality_overridden_at: string | null;
+          marker_quality_overridden_by: string | null;
+          marker_quality_override_reason: string | null;
+          marker_quality_score: number | null;
+          marker_width: number | null;
+          project_id: string;
+          public_slug: string;
+          published_at: string | null;
+          status: Database["public"]["Enums"]["ar_item_status"];
+          title: string;
+          tracking_dataset_path: string | null;
+          tracking_status: Database["public"]["Enums"]["tracking_status"] | null;
+          updated_at: string;
+          version: number;
+          video_asset_id: string | null;
+          video_duration_seconds: number | null;
+          video_path: string | null;
+          video_thumbnail_path: string | null;
+          visibility: Database["public"]["Enums"]["content_visibility"];
+        };
         SetofOptions: {
           from: "*";
           to: "ar_items";
@@ -1200,7 +1456,21 @@ export type Database = {
           p_role: Database["public"]["Enums"]["member_role"];
           p_target_account_id: string;
         };
-        Returns: Database["public"]["Tables"]["team_invitations"]["Row"];
+        Returns: {
+          accepted_at: string | null;
+          accepted_by: string | null;
+          account_id: string;
+          created_at: string;
+          email: string;
+          expires_at: string;
+          id: string;
+          invited_by: string;
+          permissions: Json;
+          revoked_at: string | null;
+          role: Database["public"]["Enums"]["member_role"];
+          status: string;
+          updated_at: string;
+        };
         SetofOptions: {
           from: "*";
           to: "team_invitations";
@@ -1210,7 +1480,31 @@ export type Database = {
       };
       expire_stale_uploads: {
         Args: { p_limit?: number };
-        Returns: UploadSessionRow[];
+        Returns: {
+          account_id: string;
+          ar_item_id: string | null;
+          asset_id: string | null;
+          bytes_uploaded: number;
+          completed_at: string | null;
+          created_at: string;
+          created_by: string;
+          error_code: string | null;
+          expires_at: string;
+          group_id: string;
+          id: string;
+          idempotency_key: string;
+          kind: string;
+          metadata: Json;
+          mime_type: string;
+          original_file_name: string;
+          project_id: string;
+          size_bytes: number;
+          status: Database["public"]["Enums"]["media_upload_status"];
+          storage_bucket: string;
+          storage_path: string;
+          updated_at: string;
+          version: number;
+        }[];
         SetofOptions: {
           from: "*";
           to: "upload_sessions";
@@ -1220,7 +1514,31 @@ export type Database = {
       };
       fail_media_upload: {
         Args: { p_error_code: string; p_session_id: string };
-        Returns: UploadSessionRow;
+        Returns: {
+          account_id: string;
+          ar_item_id: string | null;
+          asset_id: string | null;
+          bytes_uploaded: number;
+          completed_at: string | null;
+          created_at: string;
+          created_by: string;
+          error_code: string | null;
+          expires_at: string;
+          group_id: string;
+          id: string;
+          idempotency_key: string;
+          kind: string;
+          metadata: Json;
+          mime_type: string;
+          original_file_name: string;
+          project_id: string;
+          size_bytes: number;
+          status: Database["public"]["Enums"]["media_upload_status"];
+          storage_bucket: string;
+          storage_path: string;
+          updated_at: string;
+          version: number;
+        };
         SetofOptions: {
           from: "*";
           to: "upload_sessions";
@@ -1230,7 +1548,27 @@ export type Database = {
       };
       fail_processing_job: {
         Args: { p_error_code: string; p_job_id: number; p_worker_id: string };
-        Returns: Database["public"]["Tables"]["processing_jobs"]["Row"];
+        Returns: {
+          account_id: string;
+          ar_item_id: string;
+          attempt_count: number;
+          completed_at: string | null;
+          created_at: string;
+          dedupe_key: string;
+          error_code: string | null;
+          error_message: string | null;
+          id: number;
+          input_metadata: Json;
+          locked_at: string | null;
+          locked_by: string | null;
+          max_attempts: number;
+          output_metadata: Json;
+          progress: number;
+          started_at: string | null;
+          status: Database["public"]["Enums"]["job_status"];
+          type: Database["public"]["Enums"]["job_type"];
+          updated_at: string;
+        };
         SetofOptions: {
           from: "*";
           to: "processing_jobs";
@@ -1240,7 +1578,25 @@ export type Database = {
       };
       finalize_media_upload: {
         Args: { p_metadata: Json; p_session_id: string; p_sha256: string };
-        Returns: Database["public"]["Tables"]["media_assets"]["Row"];
+        Returns: {
+          account_id: string;
+          ar_item_id: string | null;
+          created_at: string;
+          created_by: string;
+          deleted_at: string | null;
+          group_id: string | null;
+          id: string;
+          kind: string;
+          metadata: Json;
+          mime_type: string;
+          original_file_name: string | null;
+          project_id: string | null;
+          sha256: string | null;
+          size_bytes: number;
+          storage_bucket: string;
+          storage_path: string;
+          version: number;
+        };
         SetofOptions: {
           from: "*";
           to: "media_assets";
@@ -1252,10 +1608,17 @@ export type Database = {
         Args: { p_target_account_id: string };
         Returns: Json;
       };
-      get_my_pending_team_invitations: {
-        Args: never;
+      get_analytics_summary: {
+        Args: {
+          p_from: string;
+          p_scope_id: string;
+          p_scope_type: string;
+          p_target_account_id: string;
+          p_to: string;
+        };
         Returns: Json;
       };
+      get_my_pending_team_invitations: { Args: never; Returns: Json };
       get_public_ar_manifest_source: {
         Args: { p_public_slug: string };
         Returns: {
@@ -1275,10 +1638,7 @@ export type Database = {
           video_path: string;
         }[];
       };
-      get_team_roster: {
-        Args: { p_target_account_id: string };
-        Returns: Json;
-      };
+      get_team_roster: { Args: { p_target_account_id: string }; Returns: Json };
       move_group: {
         Args: {
           p_destination_project_id: string;
@@ -1313,7 +1673,46 @@ export type Database = {
           p_reason: string;
           p_target_account_id: string;
         };
-        Returns: Database["public"]["Tables"]["ar_items"]["Row"];
+        Returns: {
+          account_id: string;
+          audio_default: string;
+          autoplay: boolean;
+          created_at: string;
+          created_by: string;
+          deleted_at: string | null;
+          description: string | null;
+          expires_at: string | null;
+          fallback_enabled: boolean;
+          group_id: string;
+          id: string;
+          idempotency_key: string;
+          loop_video: boolean;
+          marker_asset_id: string | null;
+          marker_height: number | null;
+          marker_image_path: string | null;
+          marker_lost_behavior: Database["public"]["Enums"]["marker_lost_behavior"];
+          marker_preview_path: string | null;
+          marker_quality_details: Json;
+          marker_quality_overridden_at: string | null;
+          marker_quality_overridden_by: string | null;
+          marker_quality_override_reason: string | null;
+          marker_quality_score: number | null;
+          marker_width: number | null;
+          project_id: string;
+          public_slug: string;
+          published_at: string | null;
+          status: Database["public"]["Enums"]["ar_item_status"];
+          title: string;
+          tracking_dataset_path: string | null;
+          tracking_status: Database["public"]["Enums"]["tracking_status"] | null;
+          updated_at: string;
+          version: number;
+          video_asset_id: string | null;
+          video_duration_seconds: number | null;
+          video_path: string | null;
+          video_thumbnail_path: string | null;
+          visibility: Database["public"]["Enums"]["content_visibility"];
+        };
         SetofOptions: {
           from: "*";
           to: "ar_items";
@@ -1333,7 +1732,46 @@ export type Database = {
           p_target_account_id: string;
           p_video_asset_id: string;
         };
-        Returns: Database["public"]["Tables"]["ar_items"]["Row"];
+        Returns: {
+          account_id: string;
+          audio_default: string;
+          autoplay: boolean;
+          created_at: string;
+          created_by: string;
+          deleted_at: string | null;
+          description: string | null;
+          expires_at: string | null;
+          fallback_enabled: boolean;
+          group_id: string;
+          id: string;
+          idempotency_key: string;
+          loop_video: boolean;
+          marker_asset_id: string | null;
+          marker_height: number | null;
+          marker_image_path: string | null;
+          marker_lost_behavior: Database["public"]["Enums"]["marker_lost_behavior"];
+          marker_preview_path: string | null;
+          marker_quality_details: Json;
+          marker_quality_overridden_at: string | null;
+          marker_quality_overridden_by: string | null;
+          marker_quality_override_reason: string | null;
+          marker_quality_score: number | null;
+          marker_width: number | null;
+          project_id: string;
+          public_slug: string;
+          published_at: string | null;
+          status: Database["public"]["Enums"]["ar_item_status"];
+          title: string;
+          tracking_dataset_path: string | null;
+          tracking_status: Database["public"]["Enums"]["tracking_status"] | null;
+          updated_at: string;
+          version: number;
+          video_asset_id: string | null;
+          video_duration_seconds: number | null;
+          video_path: string | null;
+          video_thumbnail_path: string | null;
+          visibility: Database["public"]["Enums"]["content_visibility"];
+        };
         SetofOptions: {
           from: "*";
           to: "ar_items";
@@ -1348,13 +1786,42 @@ export type Database = {
           p_public_base_url: string;
           p_target_account_id: string;
         };
-        Returns: Database["public"]["Tables"]["qr_codes"]["Row"];
+        Returns: {
+          account_id: string;
+          ar_item_id: string;
+          created_at: string;
+          id: string;
+          png_path: string | null;
+          public_url: string;
+          style: Json;
+          svg_path: string | null;
+          updated_at: string;
+          version: number;
+        };
         SetofOptions: {
           from: "*";
           to: "qr_codes";
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      purge_analytics_before: {
+        Args: { p_batch_limit?: number; p_cutoff: string };
+        Returns: number;
+      };
+      record_public_ar_event: {
+        Args: {
+          p_browser_family?: string;
+          p_device_type?: string;
+          p_error_code?: string;
+          p_event_type: Database["public"]["Enums"]["ar_event_type"];
+          p_os_family?: string;
+          p_public_slug: string;
+          p_referrer_domain?: string;
+          p_session_token_hash: string;
+          p_value_numeric?: number;
+        };
+        Returns: Json;
       };
       reorder_groups: {
         Args: {
@@ -1386,7 +1853,27 @@ export type Database = {
       };
       report_processing_progress: {
         Args: { p_job_id: number; p_progress: number; p_worker_id: string };
-        Returns: Database["public"]["Tables"]["processing_jobs"]["Row"];
+        Returns: {
+          account_id: string;
+          ar_item_id: string;
+          attempt_count: number;
+          completed_at: string | null;
+          created_at: string;
+          dedupe_key: string;
+          error_code: string | null;
+          error_message: string | null;
+          id: number;
+          input_metadata: Json;
+          locked_at: string | null;
+          locked_by: string | null;
+          max_attempts: number;
+          output_metadata: Json;
+          progress: number;
+          started_at: string | null;
+          status: Database["public"]["Enums"]["job_status"];
+          type: Database["public"]["Enums"]["job_type"];
+          updated_at: string;
+        };
         SetofOptions: {
           from: "*";
           to: "processing_jobs";
@@ -1396,7 +1883,27 @@ export type Database = {
       };
       retry_ar_item_processing: {
         Args: { p_item_id: string; p_target_account_id: string };
-        Returns: Database["public"]["Tables"]["processing_jobs"]["Row"][];
+        Returns: {
+          account_id: string;
+          ar_item_id: string;
+          attempt_count: number;
+          completed_at: string | null;
+          created_at: string;
+          dedupe_key: string;
+          error_code: string | null;
+          error_message: string | null;
+          id: number;
+          input_metadata: Json;
+          locked_at: string | null;
+          locked_by: string | null;
+          max_attempts: number;
+          output_metadata: Json;
+          progress: number;
+          started_at: string | null;
+          status: Database["public"]["Enums"]["job_status"];
+          type: Database["public"]["Enums"]["job_type"];
+          updated_at: string;
+        }[];
         SetofOptions: {
           from: "*";
           to: "processing_jobs";
@@ -1406,7 +1913,21 @@ export type Database = {
       };
       revoke_team_invitation: {
         Args: { p_invitation_id: string; p_target_account_id: string };
-        Returns: Database["public"]["Tables"]["team_invitations"]["Row"];
+        Returns: {
+          accepted_at: string | null;
+          accepted_by: string | null;
+          account_id: string;
+          created_at: string;
+          email: string;
+          expires_at: string;
+          id: string;
+          invited_by: string;
+          permissions: Json;
+          revoked_at: string | null;
+          role: Database["public"]["Enums"]["member_role"];
+          status: string;
+          updated_at: string;
+        };
         SetofOptions: {
           from: "*";
           to: "team_invitations";
@@ -1420,7 +1941,18 @@ export type Database = {
           p_public_base_url: string;
           p_target_account_id: string;
         };
-        Returns: Database["public"]["Tables"]["qr_codes"]["Row"];
+        Returns: {
+          account_id: string;
+          ar_item_id: string;
+          created_at: string;
+          id: string;
+          png_path: string | null;
+          public_url: string;
+          style: Json;
+          svg_path: string | null;
+          updated_at: string;
+          version: number;
+        };
         SetofOptions: {
           from: "*";
           to: "qr_codes";
@@ -1434,7 +1966,19 @@ export type Database = {
           p_member_id: string;
           p_target_account_id: string;
         };
-        Returns: Database["public"]["Tables"]["account_members"]["Row"];
+        Returns: {
+          accepted_at: string | null;
+          account_id: string;
+          created_at: string;
+          id: string;
+          invited_at: string;
+          invited_by: string | null;
+          is_active: boolean;
+          permissions: Json;
+          role: Database["public"]["Enums"]["member_role"];
+          updated_at: string;
+          user_id: string;
+        };
         SetofOptions: {
           from: "*";
           to: "account_members";
@@ -1444,7 +1988,31 @@ export type Database = {
       };
       start_media_upload: {
         Args: { p_session_id: string };
-        Returns: UploadSessionRow;
+        Returns: {
+          account_id: string;
+          ar_item_id: string | null;
+          asset_id: string | null;
+          bytes_uploaded: number;
+          completed_at: string | null;
+          created_at: string;
+          created_by: string;
+          error_code: string | null;
+          expires_at: string;
+          group_id: string;
+          id: string;
+          idempotency_key: string;
+          kind: string;
+          metadata: Json;
+          mime_type: string;
+          original_file_name: string;
+          project_id: string;
+          size_bytes: number;
+          status: Database["public"]["Enums"]["media_upload_status"];
+          storage_bucket: string;
+          storage_path: string;
+          updated_at: string;
+          version: number;
+        };
         SetofOptions: {
           from: "*";
           to: "upload_sessions";
@@ -1454,7 +2022,46 @@ export type Database = {
       };
       unpublish_ar_item: {
         Args: { p_item_id: string; p_target_account_id: string };
-        Returns: Database["public"]["Tables"]["ar_items"]["Row"];
+        Returns: {
+          account_id: string;
+          audio_default: string;
+          autoplay: boolean;
+          created_at: string;
+          created_by: string;
+          deleted_at: string | null;
+          description: string | null;
+          expires_at: string | null;
+          fallback_enabled: boolean;
+          group_id: string;
+          id: string;
+          idempotency_key: string;
+          loop_video: boolean;
+          marker_asset_id: string | null;
+          marker_height: number | null;
+          marker_image_path: string | null;
+          marker_lost_behavior: Database["public"]["Enums"]["marker_lost_behavior"];
+          marker_preview_path: string | null;
+          marker_quality_details: Json;
+          marker_quality_overridden_at: string | null;
+          marker_quality_overridden_by: string | null;
+          marker_quality_override_reason: string | null;
+          marker_quality_score: number | null;
+          marker_width: number | null;
+          project_id: string;
+          public_slug: string;
+          published_at: string | null;
+          status: Database["public"]["Enums"]["ar_item_status"];
+          title: string;
+          tracking_dataset_path: string | null;
+          tracking_status: Database["public"]["Enums"]["tracking_status"] | null;
+          updated_at: string;
+          version: number;
+          video_asset_id: string | null;
+          video_duration_seconds: number | null;
+          video_path: string | null;
+          video_thumbnail_path: string | null;
+          visibility: Database["public"]["Enums"]["content_visibility"];
+        };
         SetofOptions: {
           from: "*";
           to: "ar_items";
@@ -1464,7 +2071,18 @@ export type Database = {
       };
       update_ar_item_qr_style: {
         Args: { p_item_id: string; p_style: Json; p_target_account_id: string };
-        Returns: Database["public"]["Tables"]["qr_codes"]["Row"];
+        Returns: {
+          account_id: string;
+          ar_item_id: string;
+          created_at: string;
+          id: string;
+          png_path: string | null;
+          public_url: string;
+          style: Json;
+          svg_path: string | null;
+          updated_at: string;
+          version: number;
+        };
         SetofOptions: {
           from: "*";
           to: "qr_codes";
@@ -1479,7 +2097,19 @@ export type Database = {
           p_role: Database["public"]["Enums"]["member_role"];
           p_target_account_id: string;
         };
-        Returns: Database["public"]["Tables"]["account_members"]["Row"];
+        Returns: {
+          accepted_at: string | null;
+          account_id: string;
+          created_at: string;
+          id: string;
+          invited_at: string;
+          invited_by: string | null;
+          is_active: boolean;
+          permissions: Json;
+          role: Database["public"]["Enums"]["member_role"];
+          updated_at: string;
+          user_id: string;
+        };
         SetofOptions: {
           from: "*";
           to: "account_members";
