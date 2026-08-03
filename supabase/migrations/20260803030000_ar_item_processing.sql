@@ -322,6 +322,50 @@ begin
     raise exception 'Valid worker claim is required' using errcode = '22023';
   end if;
 
+  update public.processing_jobs
+  set status = 'failed',
+      progress = 0,
+      error_code = 'worker_lease_expired',
+      error_message = 'Обработка не завершена. Повторите попытку позже.',
+      completed_at = statement_timestamp(),
+      locked_at = null,
+      locked_by = null
+  where status = 'running'
+    and locked_at < statement_timestamp() - interval '20 minutes'
+    and attempt_count >= max_attempts;
+
+  update public.ar_items i
+  set status = 'failed',
+      tracking_status = case
+        when exists (
+          select 1 from public.processing_jobs failed_job
+          where failed_job.ar_item_id = i.id
+            and failed_job.status = 'failed'
+            and failed_job.error_code = 'worker_lease_expired'
+            and failed_job.type in ('marker_analysis', 'marker_compilation')
+            and (failed_job.input_metadata ->> 'revision')::integer = i.version
+        ) then 'failed'::public.tracking_status
+        else i.tracking_status
+      end
+  where exists (
+    select 1 from public.processing_jobs failed_job
+    where failed_job.ar_item_id = i.id
+      and failed_job.status = 'failed'
+      and failed_job.error_code = 'worker_lease_expired'
+      and (failed_job.input_metadata ->> 'revision')::integer = i.version
+  );
+
+  update public.processing_jobs
+  set status = 'queued',
+      progress = 0,
+      error_code = 'worker_lease_expired',
+      error_message = null,
+      locked_at = null,
+      locked_by = null
+  where status = 'running'
+    and locked_at < statement_timestamp() - interval '20 minutes'
+    and attempt_count < max_attempts;
+
   return query
   with candidates as (
     select j.id
@@ -330,6 +374,7 @@ begin
     where j.status = 'queued'
       and j.attempt_count < j.max_attempts
       and i.deleted_at is null
+      and i.status = 'processing'
       and (j.input_metadata ->> 'revision')::integer = i.version
       and (
         j.type in ('marker_analysis', 'video_inspection')
@@ -394,7 +439,8 @@ begin
     raise exception 'Progress must be between 0 and 99' using errcode = '22023';
   end if;
   update public.processing_jobs
-  set progress = greatest(progress, p_progress)
+  set progress = greatest(progress, p_progress),
+      locked_at = statement_timestamp()
   where id = p_job_id and status = 'running' and locked_by = p_worker_id
   returning * into target_job;
   if not found then

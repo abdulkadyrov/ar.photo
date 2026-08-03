@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(40);
+select plan(42);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000010', true);
@@ -479,6 +479,28 @@ select ok(
     'EXECUTE'
   ),
   'browser clients cannot forge processing completion'
+);
+
+update public.processing_jobs
+set locked_at = statement_timestamp() - interval '21 minutes'
+where type = 'video_inspection'
+  and status = 'running'
+  and input_metadata ->> 'revision' = '2';
+
+set local role service_role;
+select lives_ok(
+  $$ select public.claim_processing_jobs('worker-stage-five-recovered', 2) $$,
+  'worker reclaims an expired processing lease'
+);
+
+reset role;
+select is(
+  (
+    select locked_by from public.processing_jobs
+    where type = 'video_inspection' and input_metadata ->> 'revision' = '2'
+  ),
+  'worker-stage-five-recovered',
+  'reclaimed jobs are locked by the replacement worker'
 );
 
 select * from finish();

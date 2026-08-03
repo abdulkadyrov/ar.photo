@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "typecheck": "tsc -b --pretty false",
+    "typecheck": "tsc -b --pretty false && tsc -p tsconfig.worker.json --noEmit --pretty false",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -21,6 +21,7 @@
     "check:secrets": "node scripts/check-secrets.mjs",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run check:bundle && npm run check:secrets",
     "build": "tsc -b && vite build",
+    "build:worker": "tsc -p tsconfig.worker.json --pretty false",
     "generate:test-mind": "node scripts/generate-test-mind.mjs",
     "preview": "vite preview --host 0.0.0.0"
   },
@@ -28,6 +29,7 @@
     "@hookform/resolvers": "5.7.1",
     "@supabase/supabase-js": "2.111.0",
     "@tanstack/react-query": "5.101.4",
+    "canvas": "3.2.3",
     "jszip": "3.10.1",
     "lucide-react": "0.475.0",
     "mind-ar": "1.2.5",

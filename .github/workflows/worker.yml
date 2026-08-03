@@ -1,0 +1,41 @@
+name: Processing worker
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/worker.yml"
+      - ".dockerignore"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.worker.json"
+      - "workers/**"
+      - "src/features/ar-items/markerQuality.ts"
+      - "src/shared/api/database.types.ts"
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/worker.yml"
+      - ".dockerignore"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.worker.json"
+      - "workers/**"
+      - "src/features/ar-items/markerQuality.ts"
+      - "src/shared/api/database.types.ts"
+
+permissions:
+  contents: read
+
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build worker image
+        run: docker build --file workers/processing/Dockerfile --tag ar-photo-processing-worker:test .
+      - name: Verify worker runtime
+        run: >-
+          docker run --rm --entrypoint sh ar-photo-processing-worker:test -c
+          'node --check dist-worker/workers/processing/index.js &&
+          ffmpeg -version >/dev/null && ffprobe -version >/dev/null && cwebp -version >/dev/null'
