@@ -7,6 +7,7 @@
 - React 19, TypeScript, Vite 8 и React Router;
 - TanStack Query, React Hook Form и Zod;
 - Supabase Auth, PostgreSQL 17, forced RLS и private Storage;
+- resumable TUS uploads с browser preflight и server-side finalization;
 - Vitest, Testing Library, Playwright и pgTAP;
 - MindAR + Three.js как lazy-loaded WebAR provider;
 - GitHub Actions для quality, E2E и clean-database gates.
@@ -38,6 +39,6 @@ supabase test db --local supabase/tests
 
 ## Текущий статус
 
-Этапы 0–3 завершены на уровне репозитория. Production CRUD проектов и групп использует Supabase/RLS, атомарную сортировку/перенос и private Storage covers. Media pipeline, AR-item wizard, public viewer, QR publication, subscriptions/team, analytics и admin реализуются в этапах 4–10. Старый IndexedDB flow сохранён как regression prototype и не считается multi-device production storage.
+Этапы 0–4 завершены на уровне репозитория. Production CRUD проектов/групп и защищённый media upload используют Supabase/RLS, private Storage, TUS, immutable versions и atomic quota accounting. AR-item wizard/processing, public viewer, QR publication, subscriptions/team, analytics и admin реализуются в этапах 5–10. Старый IndexedDB flow сохранён как regression prototype и не считается multi-device production storage.
 
-См. `ARCHITECTURE.md`, `DATABASE.md`, `SECURITY.md`, `STAGE_1_REPORT.md`, `STAGE_2_REPORT.md` и `STAGE_3_REPORT.md`.
+См. `ARCHITECTURE.md`, `DATABASE.md`, `SECURITY.md` и отчёты `STAGE_1_REPORT.md`–`STAGE_4_REPORT.md`.

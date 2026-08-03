@@ -227,17 +227,28 @@ accounts/{accountId}/projects/{projectId}/groups/{groupId}/items/{itemId}/tracki
 generated/qr/{itemId}/{version}.svg
 ```
 
+До привязки upload к AR Item этап 4 использует reservation path:
+
+```text
+accounts/{accountId}/projects/{projectId}/groups/{groupId}/uploads/{sessionId}/v{version}/marker.jpg
+accounts/{accountId}/projects/{projectId}/groups/{groupId}/uploads/{sessionId}/v{version}/video.mp4
+```
+
+`upload_sessions` резервирует quota и версию на 24 часа. `finalize_media_upload` под блокировкой сверяет private Storage object и создаёт `media_assets`; незавершённые sessions lease-ятся service-only cleanup worker и получают retryable acknowledgement.
+
 Имена пользователя и ФИО не входят в paths. Replace создаёт новую immutable asset version. Upsert используется только с policies на INSERT + SELECT + UPDATE; предпочтительнее versioned write без upsert.
 
 ## 9. Миграции и seed
 
-Этап 2 реализован пятью reviewable миграциями:
+Основа этапа 2 реализована reviewable миграциями, а этапы 3–4 добавляют только последующие migrations:
 
 - foundation: extensions, enums, timestamps и 144-bit public slug;
 - core schema: 13 таблиц, constraints, foreign keys и supporting indexes;
 - security: explicit grants, forced RLS, membership/subscription helpers и audit triggers;
 - trusted mutations: account bootstrap и idempotent quota-aware project/group/item creation;
 - Storage: пять private buckets и явные object policies.
+- catalog mutations: atomic group reorder/move и cover constraints;
+- media uploads: reservation lifecycle, private versions, accounting, metadata limits и cleanup lease/ack.
 
 `supabase/seed.sql` содержит только синтетические данные: superadmin, два изолированных аккаунта, active/expired subscription и role fixtures. `supabase/tests` проверяет schema/grants и RLS/Storage matrix. Тип `Database` генерируется Supabase CLI из реально поднятой схемы и хранится в `src/shared/api/database.types.ts`.
 

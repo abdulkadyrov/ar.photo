@@ -113,6 +113,7 @@ src/
 - `/projects`
 - `/projects/:projectId`
 - `/projects/:projectId/groups/:groupId`
+- `/media`
 - `/items/new`
 - `/items/:itemId/edit`
 - `/items/:itemId/qr`
@@ -140,7 +141,7 @@ Public AR получает отдельный lazy bundle. Internal dashboard н
 - административные операции;
 - orchestration/retry processing jobs.
 
-`service_role` существует только внутри защищённой server environment. Каждая function проверяет JWT, membership, account status и subscription status.
+`service_role` существует только внутри защищённой server environment. User-facing functions проверяют JWT, membership, account status и subscription status. Scheduler-only cleanup не принимает browser JWT: он использует отдельный secret header, service-only RPC и не возвращает Storage paths.
 
 ### Processing worker
 

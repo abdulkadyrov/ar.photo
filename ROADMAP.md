@@ -105,6 +105,8 @@ Gate:
 
 ## Этап 4 — безопасная загрузка media
 
+Статус: repository gate выполнен. Private immutable uploads, browser validation/inspection, resumable TUS queue, atomic accounting, retryable cleanup Edge Function, 39 unit-тестов, 7 E2E и 66 pgTAP-проверок подтверждены. Hosted TUS/cron и physical-device checks ожидают development Supabase project/device lab. Подробности: `STAGE_4_REPORT.md`.
+
 Цель: private marker/video upload с реальными ограничениями.
 
 Deliverables:

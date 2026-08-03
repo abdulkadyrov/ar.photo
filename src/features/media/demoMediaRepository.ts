@@ -33,6 +33,14 @@ export class DemoMediaRepository implements MediaRepository {
 
     const id = crypto.randomUUID();
     const timestamp = new Date().toISOString();
+    const currentAssets = this.store.read();
+    const version =
+      Math.max(
+        0,
+        ...currentAssets
+          .filter((asset) => asset.group_id === input.groupId && asset.kind === input.kind)
+          .map((asset) => asset.version),
+      ) + 1;
     const asset: MediaAsset = {
       id,
       account_id: input.accountId,
@@ -46,13 +54,13 @@ export class DemoMediaRepository implements MediaRepository {
       mime_type: prepared.file.type,
       size_bytes: prepared.file.size,
       sha256: prepared.sha256,
-      version: 1,
+      version,
       metadata: { ...prepared.metadata, requestId: input.requestId },
       created_by: "10000000-0000-4000-8000-000000000010",
       created_at: timestamp,
       deleted_at: null,
     };
-    const assets = [asset, ...this.store.read()];
+    const assets = [asset, ...currentAssets];
     this.store.write(assets);
     demoAssetUrls.set(id, URL.createObjectURL(prepared.file));
     return asset;

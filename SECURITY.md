@@ -2,7 +2,7 @@
 
 ## 1. Текущий security posture
 
-Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этап 2 добавил Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, private Storage policies, audit logs и доверенные quota-aware mutations.
+Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этапы 2–4 добавили Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, private Storage policies, audit logs, quota-aware mutations и resumable upload lifecycle.
 
 Это ещё не разрешение на работу с реальными клиентами: upload inspection, public manifest/signed URLs, rate limiting, MFA администратора, hosted advisors и production environment verification закрываются последующими этапами.
 
@@ -31,6 +31,8 @@ Blob остаются в IndexedDB, а QR содержит внутренний 
 Picker accepts не являются защитой. Нет magic-byte inspection, size/duration limits, codec validation, decode test, SVG sanitization или malware/quarantine boundary.
 
 Мера: client preflight + bucket constraints + trusted post-upload inspection; publication запрещена до успешной проверки.
+
+Статус этапа 4: browser preflight проверяет magic bytes, decode, image dimensions/EXIF strip и MP4 H.264/AAC metadata; server независимо проверяет private object MIME/size, quota и metadata contract. Browser metadata остаются недоверенными, поэтому authoritative worker inspection и запрет публикации до успешного processing job обязательны в этапе 5.
 
 #### SEC-004: публичный test asset содержит metadata
 
@@ -135,6 +137,8 @@ Data API GRANT и RLS тестируются отдельно: отсутств�
 ## 5. Storage checklist
 
 - originals private;
+- resumable upload использует immutable path и не включает пользовательское имя;
+- upload reservation имеет server-side TTL/quota и idempotency key;
 - path начинается с account/project/group/item UUID, но policy перепроверяет membership;
 - bucket size/MIME restrictions включены, где поддерживаются;
 - magic bytes и decode проверяются worker'ом;
@@ -144,6 +148,7 @@ Data API GRANT и RLS тестируются отдельно: отсутств�
 - signed URL lifetime минимален и обновляется manifest endpoint;
 - service worker не кэширует signed response;
 - deletion lifecycle идемпотентен и оставляет безопасный audit log;
+- stale cleanup вызывается только scheduler secret, а service role остаётся в Edge runtime;
 - SVG обрабатывается как потенциально активный content; inline rendering запрещён без sanitization.
 
 ## 6. Auth и admin

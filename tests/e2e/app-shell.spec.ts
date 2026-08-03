@@ -134,7 +134,7 @@ test("validates and uploads a marker through the resumable media queue", async (
 
   await expect(page.getByRole("heading", { name: "Медиа", exact: true })).toBeVisible();
   await expect(page.getByText("Демо-режим", { exact: false })).toBeVisible();
-  const markerBase64 = await page.evaluate(async () => {
+  const markerFixtures = await page.evaluate(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 640;
     canvas.height = 480;
@@ -144,20 +144,38 @@ test("validates and uploads a marker through the resumable media queue", async (
     context.fillStyle = "#ffffff";
     context.font = "bold 48px sans-serif";
     context.fillText("AR Photo", 190, 250);
-    return canvas.toDataURL("image/png").split(",")[1];
+    return ["image/png", "image/jpeg", "image/webp"].map((mimeType) => ({
+      mimeType,
+      base64: canvas.toDataURL(mimeType, 0.9).split(",")[1],
+    }));
   });
-  await page.locator('input[type="file"]').setInputFiles({
-    name: "marker-stage-4.png",
-    mimeType: "image/png",
-    buffer: Buffer.from(markerBase64, "base64"),
-  });
+  const fileInput = page.locator('input[type="file"]');
+  await fileInput.setInputFiles(
+    markerFixtures.map((fixture) => ({
+      name: `marker-stage-4.${fixture.mimeType.split("/")[1]}`,
+      mimeType: fixture.mimeType,
+      buffer: Buffer.from(fixture.base64, "base64"),
+    })),
+  );
 
-  const queue = page.getByRole("article").filter({ hasText: "marker-stage-4.png" });
-  await expect(queue.getByText("готов к загрузке", { exact: false })).toBeVisible();
-  await queue.getByRole("button", { name: "Загрузить" }).click();
-  await expect(queue.getByText("загружено", { exact: false })).toBeVisible();
+  for (const extension of ["png", "jpeg", "webp"]) {
+    const queue = page.getByRole("article").filter({ hasText: `marker-stage-4.${extension}` });
+    await expect(queue.getByText("готов к загрузке", { exact: false })).toBeVisible();
+  }
+  await page.getByRole("button", { name: "Загрузить готовые · 3" }).click();
+  await expect(page.getByText("загружено", { exact: false })).toHaveCount(3);
   await expect(page.getByText("Файл загружен", { exact: true })).toBeVisible();
   await expect(page.getByText("v1", { exact: false }).first()).toBeVisible();
+
+  await fileInput.setInputFiles("test-assets/fixtures/h264-aac.mp4");
+  const h264Queue = page.getByRole("article").filter({ hasText: "h264-aac.mp4" });
+  await expect(h264Queue.getByText("H.264/AAC", { exact: false })).toBeVisible();
+  await h264Queue.getByRole("button", { name: "Загрузить" }).click();
+  await expect(h264Queue.getByText("загружено", { exact: false })).toBeVisible();
+
+  await fileInput.setInputFiles("public/test-assets/test.mp4");
+  const hevcQueue = page.getByRole("article").filter({ hasText: "test.mp4" });
+  await expect(hevcQueue.getByText("Видео должно использовать кодек H.264", { exact: true })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
