@@ -86,4 +86,39 @@ describe("demo catalog repository", () => {
     expect(await repository.listGroups(workspace.accountId, project.id)).toEqual([]);
     expect(await repository.listGroups(workspace.accountId, project.id, true)).toHaveLength(1);
   });
+
+  it("reorders and moves groups without losing their catalog data", async () => {
+    const repository = createDemoCatalogRepository(store);
+    const workspace = await repository.getWorkspace("demo-user");
+    const source = await repository.createProject(
+      workspace.accountId,
+      { name: "Источник", description: "", category: "other" },
+      "source-project",
+    );
+    const destination = await repository.createProject(
+      workspace.accountId,
+      { name: "Назначение", description: "", category: "other" },
+      "destination-project",
+    );
+    const first = await repository.createGroup(
+      workspace.accountId,
+      source.id,
+      { name: "Первая", description: "" },
+      "first-group",
+    );
+    const second = await repository.createGroup(
+      workspace.accountId,
+      source.id,
+      { name: "Вторая", description: "" },
+      "second-group",
+    );
+
+    const reordered = await repository.reorderGroups(workspace.accountId, source.id, [second.id, first.id]);
+    expect(reordered.map((group) => group.id)).toEqual([second.id, first.id]);
+
+    const moved = await repository.moveGroup(workspace.accountId, first.id, destination.id);
+    expect(moved.project_id).toBe(destination.id);
+    expect(await repository.listGroups(workspace.accountId, source.id)).toHaveLength(1);
+    expect(await repository.listGroups(workspace.accountId, destination.id)).toHaveLength(1);
+  });
 });

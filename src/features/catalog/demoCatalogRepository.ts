@@ -10,6 +10,7 @@ import type {
 import { groupFormSchema, projectFormSchema, projectListParamsSchema } from "../../entities/catalog/catalogSchemas";
 import type { CatalogRepository } from "./catalogRepository";
 import { CatalogError } from "./catalogRepository";
+import { validateCoverFile } from "./coverFile";
 
 type DemoState = {
   workspace: Workspace;
@@ -26,6 +27,7 @@ export interface DemoCatalogStore {
 const DEMO_CATALOG_KEY = "ar-photo-demo-catalog-v2";
 const demoAccountId = "20000000-0000-4000-8000-000000000001";
 const demoUserId = "10000000-0000-4000-8000-000000000010";
+const demoCoverUrls = new Map<string, string>();
 
 export function createDemoCatalogRepository(store: DemoCatalogStore = browserStore()): CatalogRepository {
   return new DemoCatalogRepository(store);
@@ -117,6 +119,17 @@ export class DemoCatalogRepository implements CatalogRepository {
     return this.updateProjectRecord(projectId, { deleted_at: null });
   }
 
+  async listProjectOptions() {
+    return this.state()
+      .projects.filter((project) => !project.deleted_at && project.status !== "archived")
+      .map(({ id, name }) => ({ id, name }))
+      .sort((left, right) => left.name.localeCompare(right.name, "ru"));
+  }
+
+  async uploadProjectCover(_accountId: string, projectId: string, file: File) {
+    return this.setDemoCover("project", projectId, file) as Promise<Project>;
+  }
+
   async listGroups(_accountId: string, projectId: string, includeDeleted = false) {
     return this.state()
       .groups.filter((group) => group.project_id === projectId && (includeDeleted || !group.deleted_at))
@@ -176,6 +189,58 @@ export class DemoCatalogRepository implements CatalogRepository {
     return this.updateGroupRecord(groupId, { deleted_at: null });
   }
 
+  async reorderGroups(_accountId: string, projectId: string, orderedGroupIds: string[]) {
+    const state = this.state();
+    const active = state.groups.filter((group) => group.project_id === projectId && !group.deleted_at);
+    if (
+      orderedGroupIds.length !== active.length ||
+      new Set(orderedGroupIds).size !== active.length ||
+      active.some((group) => !orderedGroupIds.includes(group.id))
+    ) {
+      throw new CatalogError("conflict", "Список сортировки не совпадает с группами проекта");
+    }
+    const timestamp = new Date().toISOString();
+    state.groups = state.groups.map((group) => {
+      const sortOrder = orderedGroupIds.indexOf(group.id);
+      return sortOrder < 0 ? group : { ...group, sort_order: sortOrder, updated_at: timestamp };
+    });
+    this.store.write(state);
+    return state.groups
+      .filter((group) => group.project_id === projectId && !group.deleted_at)
+      .sort((left, right) => left.sort_order - right.sort_order);
+  }
+
+  async moveGroup(_accountId: string, groupId: string, destinationProjectId: string) {
+    const state = this.state();
+    const destination = state.projects.find(
+      (project) => project.id === destinationProjectId && !project.deleted_at && project.status !== "archived",
+    );
+    if (!destination) throw new CatalogError("not_found", "Активный проект назначения не найден");
+    const group = state.groups.find((item) => item.id === groupId && !item.deleted_at);
+    if (!group) throw new CatalogError("not_found", "Группа не найдена");
+    if (group.project_id === destinationProjectId) return group;
+    const nextOrder = state.groups.filter(
+      (item) => item.project_id === destinationProjectId && !item.deleted_at,
+    ).length;
+    const moved = {
+      ...group,
+      project_id: destinationProjectId,
+      sort_order: nextOrder,
+      updated_at: new Date().toISOString(),
+    };
+    state.groups[state.groups.findIndex((item) => item.id === groupId)] = moved;
+    this.store.write(state);
+    return moved;
+  }
+
+  async uploadGroupCover(_accountId: string, groupId: string, file: File) {
+    return this.setDemoCover("group", groupId, file) as Promise<Group>;
+  }
+
+  async getCoverUrl(path: string | null) {
+    return path ? (demoCoverUrls.get(path) ?? null) : null;
+  }
+
   private async updateProjectRecord(projectId: string, values: Partial<Project>) {
     const state = this.state();
     const index = state.projects.findIndex((project) => project.id === projectId);
@@ -194,6 +259,28 @@ export class DemoCatalogRepository implements CatalogRepository {
     state.groups[index] = group;
     this.store.write(state);
     return group;
+  }
+
+  private async setDemoCover(ownerType: "project" | "group", ownerId: string, file: File) {
+    const format = await validateCoverFile(file);
+    const path = `demo-cover://${ownerType}/${ownerId}/${crypto.randomUUID()}.${format.extension}`;
+    const state = this.state();
+    const records = ownerType === "project" ? state.projects : state.groups;
+    const index = records.findIndex((record) => record.id === ownerId);
+    if (index < 0)
+      throw new CatalogError("not_found", ownerType === "project" ? "Проект не найден" : "Группа не найдена");
+    const previousPath = records[index].cover_path;
+    if (previousPath) {
+      const previousUrl = demoCoverUrls.get(previousPath);
+      if (previousUrl) URL.revokeObjectURL(previousUrl);
+      demoCoverUrls.delete(previousPath);
+    }
+    demoCoverUrls.set(path, URL.createObjectURL(file));
+    const record = { ...records[index], cover_path: path, updated_at: new Date().toISOString() };
+    if (ownerType === "project") state.projects[index] = record as Project;
+    else state.groups[index] = record as Group;
+    this.store.write(state);
+    return record;
   }
 
   private state() {

@@ -3,19 +3,24 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
   ArchiveRestore,
+  ArrowDown,
   ArrowLeft,
+  ArrowUp,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   FolderKanban,
   FolderPlus,
+  GripVertical,
   Image,
   Layers3,
+  MoveRight,
   Pencil,
   Plus,
   RotateCcw,
   Search,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -28,13 +33,15 @@ import type {
   ProjectInput,
   ProjectListFilter,
   ProjectListSort,
+  ProjectOption,
   Workspace,
 } from "../../entities/catalog/model";
 import { groupFormSchema, projectCategories, projectFormSchema } from "../../entities/catalog/catalogSchemas";
 import { useAuth } from "../auth/authContext";
 import { AppShell } from "../../app/layout/AppShell";
-import { Button, ErrorState, Input, Modal, Panel, Select, Skeleton, Toast } from "../../shared/ui";
+import { Button, ErrorState, FileButton, Input, Modal, Panel, Select, Skeleton, Toast } from "../../shared/ui";
 import { CatalogError, getCatalogRepository } from "./catalogRepository";
+import { CoverFileError, coverFileAccept } from "./coverFile";
 
 const catalogRepository = getCatalogRepository();
 const projectPageSize = 8;
@@ -227,6 +234,122 @@ export function ProjectsRoute() {
   );
 }
 
+export function GroupsRoute() {
+  const auth = useAuth();
+  const [search, setSearch] = useState("");
+  const workspaceQuery = useWorkspaceQuery(auth.session!.user.id);
+  const accountId = workspaceQuery.data?.accountId;
+  const catalogQuery = useQuery({
+    queryKey: ["catalog", "group-directory", accountId],
+    queryFn: async () => {
+      const projects = await catalogRepository.listProjectOptions(accountId!);
+      return Promise.all(
+        projects.map(async (project) => ({
+          ...project,
+          groups: await catalogRepository.listGroups(accountId!, project.id),
+        })),
+      );
+    },
+    enabled: Boolean(accountId),
+  });
+
+  if (workspaceQuery.isPending) return <CatalogLoading title="Группы" />;
+  if (workspaceQuery.error) return <WorkspaceError error={workspaceQuery.error} />;
+
+  const normalizedSearch = search.trim().toLocaleLowerCase("ru");
+  const projects = (catalogQuery.data ?? [])
+    .map((project) => ({
+      ...project,
+      groups: project.groups.filter(
+        (group) =>
+          !normalizedSearch ||
+          group.name.toLocaleLowerCase("ru").includes(normalizedSearch) ||
+          project.name.toLocaleLowerCase("ru").includes(normalizedSearch),
+      ),
+    }))
+    .filter((project) => project.groups.length || (!normalizedSearch && project.name));
+
+  return (
+    <AppShell
+      eyebrow={workspaceQuery.data.accountName}
+      title="Группы"
+      description="Все активные проекты и группы в одном каталоге. Порядок и перенос управляются внутри проекта."
+      actions={
+        <Link className="btn btn-primary" to="/projects">
+          <FolderKanban size={17} />
+          Проекты
+        </Link>
+      }
+    >
+      <Panel className="mt-6">
+        <div className="relative max-w-xl">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" size={17} />
+          <Input
+            aria-label="Поиск групп"
+            className="pl-10"
+            placeholder="Поиск по группе или проекту"
+            value={search}
+            onValueChange={setSearch}
+          />
+        </div>
+      </Panel>
+
+      {catalogQuery.isPending ? (
+        <ProjectGridSkeleton />
+      ) : catalogQuery.error ? (
+        <div className="mt-6">
+          <ErrorState
+            text={readableCatalogError(catalogQuery.error)}
+            action={<Button onClick={() => void catalogQuery.refetch()}>Повторить</Button>}
+          />
+        </div>
+      ) : projects.length ? (
+        <div className="mt-6 grid gap-4 xl:grid-cols-2">
+          {projects.map((project) => (
+            <Panel key={project.id}>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary">Проект</p>
+                  <h2 className="mt-1 text-xl font-semibold">{project.name}</h2>
+                </div>
+                <Link className="font-semibold text-primary hover:text-violet-300" to={`/projects/${project.id}`}>
+                  Открыть
+                </Link>
+              </div>
+              <div className="mt-4 grid gap-2">
+                {project.groups.length ? (
+                  project.groups.map((group) => (
+                    <div
+                      key={group.id}
+                      className="flex items-center gap-3 rounded-2xl border border-line bg-white/[0.025] px-3 py-3"
+                    >
+                      <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
+                        <Layers3 size={17} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold">{group.name}</p>
+                        <p className="text-xs text-muted">Позиция {group.sort_order + 1}</p>
+                      </div>
+                      {group.archived_at ? <StatusPill tone="muted">Архив</StatusPill> : null}
+                    </div>
+                  ))
+                ) : (
+                  <p className="rounded-2xl border border-dashed border-line p-4 text-sm text-muted">Групп пока нет</p>
+                )}
+              </div>
+            </Panel>
+          ))}
+        </div>
+      ) : (
+        <Panel className="mt-6 py-12 text-center">
+          <h2 className="text-2xl font-semibold">Группы не найдены</h2>
+          <p className="mt-2 text-sm text-muted">Измените поисковый запрос или создайте группу внутри проекта.</p>
+        </Panel>
+      )}
+    </AppShell>
+  );
+}
+
 export function ProjectDetailsRoute() {
   const { projectId = "" } = useParams<{ projectId: string }>();
   const auth = useAuth();
@@ -235,6 +358,8 @@ export function ProjectDetailsRoute() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [groupModal, setGroupModal] = useState<{ open: boolean; group: Group | null }>({ open: false, group: null });
   const [groupAction, setGroupAction] = useState<GroupAction | null>(null);
+  const [movingGroup, setMovingGroup] = useState<Group | null>(null);
+  const [draggingGroupId, setDraggingGroupId] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const workspaceQuery = useWorkspaceQuery(auth.session!.user.id);
   const accountId = workspaceQuery.data?.accountId;
@@ -249,6 +374,11 @@ export function ProjectDetailsRoute() {
     queryKey: ["catalog", "groups", accountId, projectId],
     queryFn: () => catalogRepository.listGroups(accountId!, projectId),
     enabled: Boolean(accountId && projectId),
+  });
+  const projectOptionsQuery = useQuery({
+    queryKey: ["catalog", "project-options", accountId],
+    queryFn: () => catalogRepository.listProjectOptions(accountId!),
+    enabled: Boolean(accountId && movingGroup),
   });
 
   const refreshGroups = async () => {
@@ -272,6 +402,45 @@ export function ProjectDetailsRoute() {
     },
     onError: (error) => setNotice({ tone: "error", title: readableCatalogError(error) }),
   });
+
+  const reorderMutation = useMutation({
+    mutationFn: (orderedGroupIds: string[]) => catalogRepository.reorderGroups(accountId!, projectId, orderedGroupIds),
+    onSuccess: async () => {
+      setNotice({ tone: "success", title: "Порядок групп сохранён" });
+      await refreshGroups();
+    },
+    onError: (error) => setNotice({ tone: "error", title: readableCatalogError(error) }),
+  });
+
+  const moveMutation = useMutation({
+    mutationFn: ({ groupId, destinationProjectId }: { groupId: string; destinationProjectId: string }) =>
+      catalogRepository.moveGroup(accountId!, groupId, destinationProjectId),
+    onSuccess: async () => {
+      setMovingGroup(null);
+      setNotice({ tone: "success", title: "Группа перенесена" });
+      await refreshGroups();
+    },
+    onError: (error) => setNotice({ tone: "error", title: readableCatalogError(error) }),
+  });
+
+  const reorderRelativeTo = (movingId: string, targetId: string) => {
+    const groups = groupsQuery.data ?? [];
+    const from = groups.findIndex((group) => group.id === movingId);
+    const to = groups.findIndex((group) => group.id === targetId);
+    if (from < 0 || to < 0 || from === to || reorderMutation.isPending) return;
+    const ordered = groups.map((group) => group.id);
+    const [moved] = ordered.splice(from, 1);
+    ordered.splice(to, 0, moved);
+    reorderMutation.mutate(ordered);
+  };
+
+  const nudgeGroup = (groupId: string, direction: -1 | 1) => {
+    const groups = groupsQuery.data ?? [];
+    const index = groups.findIndex((group) => group.id === groupId);
+    const target = groups[index + direction];
+    if (index < 0 || !target) return;
+    reorderRelativeTo(groupId, target.id);
+  };
 
   if (workspaceQuery.isPending || projectQuery.isPending) return <CatalogLoading title="Проект" />;
   if (workspaceQuery.error) return <WorkspaceError error={workspaceQuery.error} />;
@@ -339,14 +508,33 @@ export function ProjectDetailsRoute() {
           </div>
         ) : groupsQuery.data.length ? (
           <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Группы проекта">
-            {groupsQuery.data.map((group) => (
-              <GroupCard
+            {groupsQuery.data.map((group, index) => (
+              <div
                 key={group.id}
-                group={group}
-                canWrite={workspace.canWrite}
-                onEdit={() => setGroupModal({ open: true, group })}
-                onAction={(type) => setGroupAction({ type, group })}
-              />
+                draggable={workspace.canWrite && !reorderMutation.isPending}
+                onDragEnd={() => setDraggingGroupId(null)}
+                onDragOver={(event) => {
+                  if (draggingGroupId && draggingGroupId !== group.id) event.preventDefault();
+                }}
+                onDragStart={() => setDraggingGroupId(group.id)}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  if (draggingGroupId) reorderRelativeTo(draggingGroupId, group.id);
+                  setDraggingGroupId(null);
+                }}
+              >
+                <GroupCard
+                  group={group}
+                  canWrite={workspace.canWrite}
+                  first={index === 0}
+                  last={index === groupsQuery.data.length - 1}
+                  orderPending={reorderMutation.isPending}
+                  onEdit={() => setGroupModal({ open: true, group })}
+                  onAction={(type) => setGroupAction({ type, group })}
+                  onMove={() => setMovingGroup(group)}
+                  onNudge={(direction) => nudgeGroup(group.id, direction)}
+                />
+              </div>
             ))}
           </section>
         ) : (
@@ -382,6 +570,17 @@ export function ProjectDetailsRoute() {
         onClose={() => setGroupAction(null)}
         onConfirm={() => groupAction && groupActionMutation.mutate(groupAction)}
       />
+      <GroupMoveModal
+        currentProjectId={project.id}
+        group={movingGroup}
+        pending={moveMutation.isPending}
+        projects={projectOptionsQuery.data ?? []}
+        projectsPending={projectOptionsQuery.isPending}
+        onClose={() => setMovingGroup(null)}
+        onConfirm={(destinationProjectId) =>
+          movingGroup && moveMutation.mutate({ groupId: movingGroup.id, destinationProjectId })
+        }
+      />
       {notice ? (
         <div className="fixed bottom-24 right-5 z-50 lg:bottom-6">
           <Toast {...notice} onDismiss={() => setNotice(null)} />
@@ -413,6 +612,8 @@ function ProjectFormModal({
   onSaved: (title: string) => Promise<void>;
 }) {
   const requestId = useRef(crypto.randomUUID());
+  const submissionLocked = useRef(false);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const {
     control,
     register,
@@ -424,12 +625,28 @@ function ProjectFormModal({
     defaultValues: { name: "", description: "", category: "graduation" },
   });
   const mutation = useMutation({
-    mutationFn: (input: ProjectInput) =>
-      project
+    mutationFn: async (input: ProjectInput) => {
+      const saved = project
         ? catalogRepository.updateProject(accountId, project.id, input)
-        : catalogRepository.createProject(accountId, input, requestId.current),
-    onSuccess: () => onSaved(project ? "Проект обновлён" : "Проект создан"),
+        : catalogRepository.createProject(accountId, input, requestId.current);
+      const record = await saved;
+      return coverFile ? catalogRepository.uploadProjectCover(accountId, record.id, coverFile) : record;
+    },
+    onSuccess: () => {
+      setCoverFile(null);
+      return onSaved(project ? "Проект обновлён" : "Проект создан");
+    },
+    onSettled: () => {
+      submissionLocked.current = false;
+    },
   });
+  const submit = () => {
+    void handleSubmit((input) => {
+      if (submissionLocked.current) return;
+      submissionLocked.current = true;
+      mutation.mutate(input);
+    })();
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -443,6 +660,8 @@ function ProjectFormModal({
 
   const closeModal = () => {
     mutation.reset();
+    submissionLocked.current = false;
+    setCoverFile(null);
     onClose();
   };
 
@@ -453,12 +672,18 @@ function ProjectFormModal({
       description="Название обязательно. Категория помогает организовать каталог и будущую аналитику."
       onClose={closeModal}
       actions={
-        <Button disabled={mutation.isPending} onClick={() => void handleSubmit((input) => mutation.mutate(input))()}>
+        <Button disabled={mutation.isPending} onClick={submit}>
           {mutation.isPending ? "Сохраняем…" : project ? "Сохранить" : "Создать проект"}
         </Button>
       }
     >
-      <form className="space-y-4" onSubmit={(event) => void handleSubmit((input) => mutation.mutate(input))(event)}>
+      <form
+        className="space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
+      >
         <FormField label="Название" error={errors.name?.message}>
           <Controller
             control={control}
@@ -489,6 +714,7 @@ function ProjectFormModal({
             ))}
           </select>
         </FormField>
+        <CoverFileField file={coverFile} onPick={(file) => setCoverFile(file ?? null)} />
         {mutation.error ? <InlineError>{readableCatalogError(mutation.error)}</InlineError> : null}
         <button className="sr-only" type="submit">
           Сохранить
@@ -514,6 +740,8 @@ function GroupFormModal({
   onSaved: (title: string) => Promise<void>;
 }) {
   const requestId = useRef(crypto.randomUUID());
+  const submissionLocked = useRef(false);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const {
     control,
     register,
@@ -522,12 +750,28 @@ function GroupFormModal({
     formState: { errors },
   } = useForm<GroupInput>({ resolver: zodResolver(groupFormSchema), defaultValues: { name: "", description: "" } });
   const mutation = useMutation({
-    mutationFn: (input: GroupInput) =>
-      group
+    mutationFn: async (input: GroupInput) => {
+      const saved = group
         ? catalogRepository.updateGroup(accountId, group.id, input)
-        : catalogRepository.createGroup(accountId, projectId, input, requestId.current),
-    onSuccess: () => onSaved(group ? "Группа обновлена" : "Группа создана"),
+        : catalogRepository.createGroup(accountId, projectId, input, requestId.current);
+      const record = await saved;
+      return coverFile ? catalogRepository.uploadGroupCover(accountId, record.id, coverFile) : record;
+    },
+    onSuccess: () => {
+      setCoverFile(null);
+      return onSaved(group ? "Группа обновлена" : "Группа создана");
+    },
+    onSettled: () => {
+      submissionLocked.current = false;
+    },
   });
+  const submit = () => {
+    void handleSubmit((input) => {
+      if (submissionLocked.current) return;
+      submissionLocked.current = true;
+      mutation.mutate(input);
+    })();
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -537,6 +781,8 @@ function GroupFormModal({
 
   const closeModal = () => {
     mutation.reset();
+    submissionLocked.current = false;
+    setCoverFile(null);
     onClose();
   };
 
@@ -547,12 +793,18 @@ function GroupFormModal({
       description="Например: 11А класс, Учителя или Общие фотографии."
       onClose={closeModal}
       actions={
-        <Button disabled={mutation.isPending} onClick={() => void handleSubmit((input) => mutation.mutate(input))()}>
+        <Button disabled={mutation.isPending} onClick={submit}>
           {mutation.isPending ? "Сохраняем…" : group ? "Сохранить" : "Создать группу"}
         </Button>
       }
     >
-      <form className="space-y-4" onSubmit={(event) => void handleSubmit((input) => mutation.mutate(input))(event)}>
+      <form
+        className="space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
+      >
         <FormField label="Название" error={errors.name?.message}>
           <Controller
             control={control}
@@ -569,6 +821,7 @@ function GroupFormModal({
             {...register("description")}
           />
         </FormField>
+        <CoverFileField file={coverFile} onPick={(file) => setCoverFile(file ?? null)} />
         {mutation.error ? <InlineError>{readableCatalogError(mutation.error)}</InlineError> : null}
         <button className="sr-only" type="submit">
           Сохранить
@@ -593,10 +846,11 @@ function ProjectCard({
   return (
     <article className="surface-card overflow-hidden rounded-card border border-line shadow-soft">
       <Link
-        className="group block aspect-[16/7] bg-[radial-gradient(circle_at_25%_20%,rgba(139,92,246,.34),transparent_35%),linear-gradient(145deg,#151e2d,#0b1018)] p-5"
+        className="group relative block aspect-[16/7] overflow-hidden bg-[radial-gradient(circle_at_25%_20%,rgba(139,92,246,.34),transparent_35%),linear-gradient(145deg,#151e2d,#0b1018)] p-5"
         to={`/projects/${project.id}`}
       >
-        <span className="grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-black/20 text-primary transition group-hover:scale-105">
+        <CoverImage className="absolute inset-0 h-full w-full object-cover" path={project.cover_path} alt="" />
+        <span className="relative grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-black/40 text-primary shadow-soft backdrop-blur-sm transition group-hover:scale-105">
           <FolderKanban size={22} />
         </span>
       </Link>
@@ -658,19 +912,34 @@ function ProjectCard({
 function GroupCard({
   group,
   canWrite,
+  first,
+  last,
+  orderPending,
   onEdit,
   onAction,
+  onMove,
+  onNudge,
 }: {
   group: Group;
   canWrite: boolean;
+  first: boolean;
+  last: boolean;
+  orderPending: boolean;
   onEdit: () => void;
   onAction: (type: GroupAction["type"]) => void;
+  onMove: () => void;
+  onNudge: (direction: -1 | 1) => void;
 }) {
   return (
-    <Panel>
+    <Panel className="h-full">
+      {group.cover_path ? (
+        <div className="-mx-4 -mt-4 mb-4 aspect-[16/6] overflow-hidden rounded-t-card bg-white/[0.03]">
+          <CoverImage className="h-full w-full object-cover" path={group.cover_path} alt="" />
+        </div>
+      ) : null}
       <div className="flex items-start gap-3">
         <span className="grid h-11 w-11 flex-none place-items-center rounded-2xl bg-primary/10 text-primary">
-          <Layers3 size={20} />
+          {canWrite ? <GripVertical aria-label="Перетащите для сортировки" size={20} /> : <Layers3 size={20} />}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -685,8 +954,27 @@ function GroupCard({
       <div className="mt-4 border-t border-line pt-4 text-xs text-muted">Позиция {group.sort_order + 1}</div>
       {canWrite ? (
         <div className="mt-4 flex flex-wrap gap-2">
+          <Button
+            aria-label={`Поднять группу «${group.name}»`}
+            disabled={first || orderPending}
+            variant="quiet"
+            onClick={() => onNudge(-1)}
+          >
+            <ArrowUp size={15} />
+          </Button>
+          <Button
+            aria-label={`Опустить группу «${group.name}»`}
+            disabled={last || orderPending}
+            variant="quiet"
+            onClick={() => onNudge(1)}
+          >
+            <ArrowDown size={15} />
+          </Button>
           <Button variant="quiet" onClick={onEdit} icon={<Pencil size={15} />}>
             Изменить
+          </Button>
+          <Button variant="quiet" onClick={onMove} icon={<MoveRight size={15} />}>
+            Перенести
           </Button>
           <Button
             variant="quiet"
@@ -784,6 +1072,98 @@ function GroupActionModal({
       }
     />
   );
+}
+
+function GroupMoveModal({
+  currentProjectId,
+  group,
+  projects,
+  projectsPending,
+  pending,
+  onClose,
+  onConfirm,
+}: {
+  currentProjectId: string;
+  group: Group | null;
+  projects: ProjectOption[];
+  projectsPending: boolean;
+  pending: boolean;
+  onClose: () => void;
+  onConfirm: (destinationProjectId: string) => void;
+}) {
+  const availableProjects = projects.filter((project) => project.id !== currentProjectId);
+  const [destinationProjectId, setDestinationProjectId] = useState("");
+  const selectedProjectId = availableProjects.some((project) => project.id === destinationProjectId)
+    ? destinationProjectId
+    : (availableProjects[0]?.id ?? "");
+
+  return (
+    <Modal
+      open={Boolean(group)}
+      title="Перенести группу"
+      description={
+        group
+          ? `Выберите активный проект для группы «${group.name}». AR-работы останутся связаны с группой.`
+          : undefined
+      }
+      onClose={onClose}
+      actions={
+        <Button
+          disabled={pending || projectsPending || !selectedProjectId}
+          onClick={() => onConfirm(selectedProjectId)}
+        >
+          {pending ? "Переносим…" : "Перенести"}
+        </Button>
+      }
+    >
+      {projectsPending ? (
+        <Skeleton className="h-12" />
+      ) : availableProjects.length ? (
+        <Select
+          label="Проект назначения"
+          options={availableProjects.map((project) => ({ value: project.id, label: project.name }))}
+          value={selectedProjectId}
+          onChange={(event) => setDestinationProjectId(event.target.value)}
+        />
+      ) : (
+        <InlineError>Создайте ещё один активный проект, чтобы перенести группу.</InlineError>
+      )}
+    </Modal>
+  );
+}
+
+function CoverFileField({ file, onPick }: { file: File | null; onPick: (file?: File) => void }) {
+  return (
+    <div className="rounded-2xl border border-line bg-white/[0.02] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">Обложка</p>
+          <p className="mt-1 text-xs text-muted">JPEG, PNG или WebP, до 10 МБ</p>
+        </div>
+        <FileButton accept={coverFileAccept} icon={<Upload size={16} />} onPick={onPick}>
+          Выбрать файл
+        </FileButton>
+      </div>
+      {file ? (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-white/[0.04] px-3 py-2 text-sm">
+          <span className="min-w-0 truncate">{file.name}</span>
+          <button className="font-semibold text-muted hover:text-ink" type="button" onClick={() => onPick()}>
+            Убрать
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CoverImage({ path, alt, className }: { path: string | null; alt: string; className: string }) {
+  const coverQuery = useQuery({
+    queryKey: ["catalog", "cover", path],
+    queryFn: () => catalogRepository.getCoverUrl(path),
+    enabled: Boolean(path),
+    staleTime: 8 * 60_000,
+  });
+  return coverQuery.data ? <img alt={alt} className={className} src={coverQuery.data} /> : null;
 }
 
 const projectActionTitles: Record<ProjectAction["type"], string> = {
@@ -1015,6 +1395,7 @@ function parsePositiveInteger(value: string | null) {
 }
 
 function readableCatalogError(error: unknown) {
+  if (error instanceof CoverFileError) return error.message;
   if (error instanceof CatalogError) {
     if (error.code === "limit_reached") return "Лимит тарифа исчерпан. Проверьте подписку и доступный остаток.";
     if (error.code === "forbidden") return "Недостаточно прав или подписка не разрешает изменения.";

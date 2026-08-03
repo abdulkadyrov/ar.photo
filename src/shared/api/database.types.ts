@@ -924,6 +924,62 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      move_group: {
+        Args: {
+          p_destination_project_id: string;
+          p_target_account_id: string;
+          p_target_group_id: string;
+        };
+        Returns: {
+          account_id: string;
+          archived_at: string | null;
+          cover_path: string | null;
+          created_at: string;
+          created_by: string;
+          deleted_at: string | null;
+          description: string | null;
+          id: string;
+          idempotency_key: string;
+          name: string;
+          project_id: string;
+          sort_order: number;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "groups";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      reorder_groups: {
+        Args: {
+          p_ordered_group_ids: string[];
+          p_target_account_id: string;
+          p_target_project_id: string;
+        };
+        Returns: {
+          account_id: string;
+          archived_at: string | null;
+          cover_path: string | null;
+          created_at: string;
+          created_by: string;
+          deleted_at: string | null;
+          description: string | null;
+          id: string;
+          idempotency_key: string;
+          name: string;
+          project_id: string;
+          sort_order: number;
+          updated_at: string;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "groups";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
     };
     Enums: {
       account_status: "active" | "suspended" | "closed";

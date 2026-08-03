@@ -7,6 +7,7 @@ export type MemberRole = Database["public"]["Enums"]["member_role"];
 
 export type Project = Tables<"projects">;
 export type Group = Tables<"groups">;
+export type ProjectOption = Pick<Project, "id" | "name">;
 
 export type Workspace = {
   accountId: string;

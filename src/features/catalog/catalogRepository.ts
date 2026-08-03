@@ -5,11 +5,13 @@ import type {
   Project,
   ProjectInput,
   ProjectListParams,
+  ProjectOption,
   Workspace,
 } from "../../entities/catalog/model";
 import { groupFormSchema, projectFormSchema, projectListParamsSchema } from "../../entities/catalog/catalogSchemas";
 import { getSupabaseBrowserClient } from "../../shared/api/supabase";
 import type { Database } from "../../shared/api/database.types";
+import { validateCoverFile } from "./coverFile";
 
 type SupabaseBrowserClient = NonNullable<ReturnType<typeof getSupabaseBrowserClient>>;
 
@@ -43,6 +45,8 @@ export interface CatalogRepository {
   restoreProject(accountId: string, projectId: string): Promise<Project>;
   softDeleteProject(accountId: string, projectId: string): Promise<Project>;
   restoreDeletedProject(accountId: string, projectId: string): Promise<Project>;
+  uploadProjectCover(accountId: string, projectId: string, file: File): Promise<Project>;
+  listProjectOptions(accountId: string): Promise<ProjectOption[]>;
   listGroups(accountId: string, projectId: string, includeDeleted?: boolean): Promise<Group[]>;
   createGroup(accountId: string, projectId: string, input: GroupInput, requestId: string): Promise<Group>;
   updateGroup(accountId: string, groupId: string, input: GroupInput): Promise<Group>;
@@ -50,6 +54,10 @@ export interface CatalogRepository {
   restoreGroup(accountId: string, groupId: string): Promise<Group>;
   softDeleteGroup(accountId: string, groupId: string): Promise<Group>;
   restoreDeletedGroup(accountId: string, groupId: string): Promise<Group>;
+  reorderGroups(accountId: string, projectId: string, orderedGroupIds: string[]): Promise<Group[]>;
+  moveGroup(accountId: string, groupId: string, destinationProjectId: string): Promise<Group>;
+  uploadGroupCover(accountId: string, groupId: string, file: File): Promise<Group>;
+  getCoverUrl(path: string | null): Promise<string | null>;
 }
 
 export class SupabaseCatalogRepository implements CatalogRepository {
@@ -197,6 +205,32 @@ export class SupabaseCatalogRepository implements CatalogRepository {
     return this.updateProjectFields(accountId, projectId, { deleted_at: null });
   }
 
+  async uploadProjectCover(accountId: string, projectId: string, file: File) {
+    const { data: current, error } = await this.client
+      .from("projects")
+      .select("cover_path")
+      .eq("account_id", accountId)
+      .eq("id", projectId)
+      .maybeSingle();
+    if (error) throw mapCatalogError(error);
+    if (!current) throw new CatalogError("not_found", "Проект не найден");
+    return this.uploadCover(accountId, projectId, "projects", projectId, current.cover_path, file, (path) =>
+      this.updateProjectFields(accountId, projectId, { cover_path: path }),
+    );
+  }
+
+  async listProjectOptions(accountId: string) {
+    const { data, error } = await this.client
+      .from("projects")
+      .select("id,name")
+      .eq("account_id", accountId)
+      .is("deleted_at", null)
+      .neq("status", "archived")
+      .order("name", { ascending: true });
+    if (error) throw mapCatalogError(error);
+    return data;
+  }
+
   async listGroups(accountId: string, projectId: string, includeDeleted = false) {
     let query = this.client
       .from("groups")
@@ -245,6 +279,47 @@ export class SupabaseCatalogRepository implements CatalogRepository {
     return this.updateGroupFields(accountId, groupId, { deleted_at: null });
   }
 
+  async reorderGroups(accountId: string, projectId: string, orderedGroupIds: string[]) {
+    const { data, error } = await this.client.rpc("reorder_groups", {
+      p_target_account_id: accountId,
+      p_target_project_id: projectId,
+      p_ordered_group_ids: orderedGroupIds,
+    });
+    if (error) throw mapCatalogError(error);
+    return data;
+  }
+
+  async moveGroup(accountId: string, groupId: string, destinationProjectId: string) {
+    const { data, error } = await this.client.rpc("move_group", {
+      p_target_account_id: accountId,
+      p_target_group_id: groupId,
+      p_destination_project_id: destinationProjectId,
+    });
+    if (error) throw mapCatalogError(error);
+    return data;
+  }
+
+  async uploadGroupCover(accountId: string, groupId: string, file: File) {
+    const { data: current, error } = await this.client
+      .from("groups")
+      .select("project_id,cover_path")
+      .eq("account_id", accountId)
+      .eq("id", groupId)
+      .maybeSingle();
+    if (error) throw mapCatalogError(error);
+    if (!current) throw new CatalogError("not_found", "Группа не найдена");
+    return this.uploadCover(accountId, current.project_id, "groups", groupId, current.cover_path, file, (path) =>
+      this.updateGroupFields(accountId, groupId, { cover_path: path }),
+    );
+  }
+
+  async getCoverUrl(path: string | null) {
+    if (!path) return null;
+    const { data, error } = await this.client.storage.from("project-covers-private").createSignedUrl(path, 600);
+    if (error) throw mapCatalogError(error);
+    return data.signedUrl;
+  }
+
   private async updateProjectFields(
     accountId: string,
     projectId: string,
@@ -277,6 +352,31 @@ export class SupabaseCatalogRepository implements CatalogRepository {
     if (error) throw mapCatalogError(error);
     if (!data) throw new CatalogError("not_found", "Группа не найдена или недоступна");
     return data;
+  }
+
+  private async uploadCover<T>(
+    accountId: string,
+    projectId: string,
+    ownerType: "projects" | "groups",
+    ownerId: string,
+    previousPath: string | null,
+    file: File,
+    updateRecord: (path: string) => Promise<T>,
+  ): Promise<T> {
+    const format = await validateCoverFile(file);
+    const path = `accounts/${accountId}/projects/${projectId}/${ownerType}/${ownerId}/covers/${crypto.randomUUID()}.${format.extension}`;
+    const bucket = this.client.storage.from("project-covers-private");
+    const upload = await bucket.upload(path, file, { contentType: format.mime, upsert: false, cacheControl: "3600" });
+    if (upload.error) throw mapCatalogError(upload.error);
+
+    try {
+      const updated = await updateRecord(path);
+      if (previousPath && previousPath !== path) await bucket.remove([previousPath]);
+      return updated;
+    } catch (error) {
+      await bucket.remove([path]);
+      throw error;
+    }
   }
 }
 

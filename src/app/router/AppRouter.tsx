@@ -21,6 +21,9 @@ const ProjectsRoute = lazy(() =>
 const ProjectDetailsRoute = lazy(() =>
   import("../../features/catalog/CatalogPages").then((module) => ({ default: module.ProjectDetailsRoute })),
 );
+const GroupsRoute = lazy(() =>
+  import("../../features/catalog/CatalogPages").then((module) => ({ default: module.GroupsRoute })),
+);
 const PrototypeViewerRoute = lazy(() =>
   import("../../features/prototype/PrototypeApp").then((module) => ({ default: module.PrototypeViewerRoute })),
 );
@@ -58,7 +61,7 @@ function RoutedContent() {
           <Route path="/dashboard" element={<Protected element={<PrototypeDashboardRoute />} />} />
           <Route path="/projects" element={<Protected element={<ProjectsRoute />} />} />
           <Route path="/projects/:projectId" element={<Protected element={<ProjectDetailsRoute />} />} />
-          <Route path="/groups" element={<Protected element={<FoundationPlaceholder title="Группы" />} />} />
+          <Route path="/groups" element={<Protected element={<GroupsRoute />} />} />
           <Route path="/qr-codes" element={<Protected element={<FoundationPlaceholder title="QR-коды" />} />} />
           <Route path="/settings" element={<Protected element={<FoundationPlaceholder title="Настройки" />} />} />
           <Route path="/project/:projectId" element={<Protected element={<PrototypeProjectRoute />} />} />
