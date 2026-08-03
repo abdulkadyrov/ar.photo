@@ -20,6 +20,7 @@ describe("processing worker configuration", () => {
       concurrency: 1,
       pollIntervalMs: 2000,
       runOnce: false,
+      idlePollsBeforeExit: 0,
     });
   });
 
@@ -28,8 +29,9 @@ describe("processing worker configuration", () => {
     vi.stubEnv("SUPABASE_URL", "http://127.0.0.1:54321");
     vi.stubEnv("PROCESSING_CONCURRENCY", "4");
     vi.stubEnv("PROCESSING_RUN_ONCE", "1");
+    vi.stubEnv("PROCESSING_IDLE_POLLS_BEFORE_EXIT", "3");
 
-    expect(getWorkerConfig()).toMatchObject({ concurrency: 4, runOnce: true });
+    expect(getWorkerConfig()).toMatchObject({ concurrency: 4, runOnce: true, idlePollsBeforeExit: 3 });
   });
 
   it("rejects insecure remote endpoints and unbounded concurrency", () => {
@@ -40,5 +42,9 @@ describe("processing worker configuration", () => {
     vi.stubEnv("SUPABASE_URL", "https://project.example.com");
     vi.stubEnv("PROCESSING_CONCURRENCY", "20");
     expect(() => getWorkerConfig()).toThrow(/PROCESSING_CONCURRENCY/);
+
+    vi.stubEnv("PROCESSING_CONCURRENCY", "1");
+    vi.stubEnv("PROCESSING_IDLE_POLLS_BEFORE_EXIT", "61");
+    expect(() => getWorkerConfig()).toThrow(/PROCESSING_IDLE_POLLS_BEFORE_EXIT/);
   });
 });

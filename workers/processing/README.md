@@ -8,7 +8,7 @@ The worker is the only runtime allowed to claim and complete AR processing jobs.
 - `SUPABASE_SERVICE_ROLE_KEY`: server-only service credential. Never expose it through a `VITE_` variable.
 - `PROCESSING_WORKER_ID`: stable identifier for one worker instance.
 
-Optional controls are `PROCESSING_CONCURRENCY` (1–4, default 1), `PROCESSING_POLL_INTERVAL_MS` (250–60000, default 2000), and `PROCESSING_RUN_ONCE=1` for a single polling cycle.
+Optional controls are `PROCESSING_CONCURRENCY` (1–4, default 1), `PROCESSING_POLL_INTERVAL_MS` (250–60000, default 2000), `PROCESSING_RUN_ONCE=1` for a single polling cycle, and `PROCESSING_IDLE_POLLS_BEFORE_EXIT` (0–60, default 0) for a queue-draining batch that exits cleanly after the configured number of empty polls.
 
 ## Build and run
 
@@ -18,3 +18,5 @@ node dist-worker/workers/processing/index.js
 ```
 
 Production should build `workers/processing/Dockerfile`. The image pins Node 22.22.2 and installs FFmpeg plus the native libraries required by MindAR and Canvas. Long jobs refresh a database lease every 30 seconds; expired leases are reclaimed after 20 minutes, up to the configured attempt limit.
+
+The production GitHub Actions workflow drains the hosted Supabase queue every five minutes and can also be started manually. It uses repository secrets named `PROCESSING_SUPABASE_URL` and `PROCESSING_SUPABASE_SERVICE_ROLE_KEY`; the service credential is passed only to the isolated worker container.

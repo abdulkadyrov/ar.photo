@@ -1,6 +1,9 @@
 name: Processing worker
 
 on:
+  workflow_dispatch:
+  schedule:
+    - cron: "2-57/5 * * * *"
   pull_request:
     paths:
       - ".github/workflows/worker.yml"
@@ -26,9 +29,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: processing-worker-${{ github.event_name == 'pull_request' && github.ref || 'production' }}
+  cancel-in-progress: false
+
 jobs:
   container:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -39,3 +47,23 @@ jobs:
           docker run --rm --entrypoint sh ar-photo-processing-worker:test -c
           'node --check dist-worker/workers/processing/index.js &&
           ffmpeg -version >/dev/null && ffprobe -version >/dev/null && cwebp -version >/dev/null'
+      - name: Drain production processing queue
+        if: github.event_name != 'pull_request'
+        env:
+          SUPABASE_URL: ${{ secrets.PROCESSING_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROCESSING_SUPABASE_SERVICE_ROLE_KEY }}
+          PROCESSING_WORKER_ID: github-actions-${{ github.run_id }}-${{ github.run_attempt }}
+          PROCESSING_CONCURRENCY: "4"
+          PROCESSING_POLL_INTERVAL_MS: "2000"
+          PROCESSING_IDLE_POLLS_BEFORE_EXIT: "3"
+        run: |
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_SERVICE_ROLE_KEY"
+          docker run --rm \
+            -e SUPABASE_URL \
+            -e SUPABASE_SERVICE_ROLE_KEY \
+            -e PROCESSING_WORKER_ID \
+            -e PROCESSING_CONCURRENCY \
+            -e PROCESSING_POLL_INTERVAL_MS \
+            -e PROCESSING_IDLE_POLLS_BEFORE_EXIT \
+            ar-photo-processing-worker:test

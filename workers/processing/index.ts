@@ -11,6 +11,7 @@ type WorkerConfig = {
   concurrency: number;
   pollIntervalMs: number;
   runOnce: boolean;
+  idlePollsBeforeExit: number;
 };
 
 const required = (name: string) => {
@@ -41,6 +42,7 @@ export function getWorkerConfig(): WorkerConfig {
     concurrency: boundedInteger("PROCESSING_CONCURRENCY", 1, 1, 4),
     pollIntervalMs: boundedInteger("PROCESSING_POLL_INTERVAL_MS", 2000, 250, 60_000),
     runOnce: process.env.PROCESSING_RUN_ONCE === "1",
+    idlePollsBeforeExit: boundedInteger("PROCESSING_IDLE_POLLS_BEFORE_EXIT", 0, 0, 60),
   };
 }
 
@@ -55,6 +57,7 @@ export async function runProcessingWorker(config = getWorkerConfig()) {
     auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
   });
   let stopping = false;
+  let consecutiveIdlePolls = 0;
   const stop = () => {
     stopping = true;
   };
@@ -77,11 +80,15 @@ export async function runProcessingWorker(config = getWorkerConfig()) {
 
     const jobs = (claim.data ?? []) as ProcessingJob[];
     if (jobs.length === 0) {
-      if (config.runOnce) break;
+      consecutiveIdlePolls += 1;
+      if (config.runOnce || (config.idlePollsBeforeExit > 0 && consecutiveIdlePolls >= config.idlePollsBeforeExit)) {
+        break;
+      }
       await delay(config.pollIntervalMs);
       continue;
     }
 
+    consecutiveIdlePolls = 0;
     const results = await Promise.all(jobs.map((job) => processClaimedJob(client, job, config.workerId)));
     results.forEach((result, index) => {
       logEvent("job_finished", {
