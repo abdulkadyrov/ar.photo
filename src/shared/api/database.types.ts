@@ -1091,6 +1091,14 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      admin_authorize_password_reset: {
+        Args: {
+          p_reason: string;
+          p_target_account_id: string;
+          p_target_user_id: string;
+        };
+        Returns: Json;
+      };
       admin_create_account: {
         Args: {
           p_account_name: string;
@@ -1124,6 +1132,186 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      admin_create_account_with_reason: {
+        Args: {
+          p_account_name: string;
+          p_account_slug: string;
+          p_custom_limits: Json;
+          p_owner_user_id: string;
+          p_reason: string;
+          p_subscription_expires_at: string;
+          p_subscription_grace_ends_at: string;
+          p_subscription_plan_id: string;
+          p_subscription_starts_at: string;
+          p_subscription_status: Database["public"]["Enums"]["subscription_status"];
+        };
+        Returns: {
+          closed_at: string | null;
+          created_at: string;
+          id: string;
+          logo_path: string | null;
+          name: string;
+          owner_user_id: string;
+          settings: Json;
+          slug: string;
+          status: Database["public"]["Enums"]["account_status"];
+          storage_used_bytes: number;
+          timezone: string;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "accounts";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      admin_get_account_detail: {
+        Args: { p_reason: string; p_target_account_id: string };
+        Returns: Json;
+      };
+      admin_get_audit_logs: {
+        Args: {
+          p_limit?: number;
+          p_offset?: number;
+          p_target_account_id?: string;
+        };
+        Returns: Json;
+      };
+      admin_get_overview: { Args: never; Returns: Json };
+      admin_get_processing_errors: {
+        Args: {
+          p_limit?: number;
+          p_offset?: number;
+          p_target_account_id?: string;
+        };
+        Returns: Json;
+      };
+      admin_get_system_settings: { Args: never; Returns: Json };
+      admin_list_accounts: {
+        Args: { p_limit?: number; p_offset?: number; p_search?: string };
+        Returns: Json;
+      };
+      admin_list_plans: { Args: never; Returns: Json };
+      admin_retry_processing_job: {
+        Args: {
+          p_job_id: number;
+          p_reason: string;
+          p_target_account_id: string;
+        };
+        Returns: {
+          account_id: string;
+          ar_item_id: string;
+          attempt_count: number;
+          completed_at: string | null;
+          created_at: string;
+          dedupe_key: string;
+          error_code: string | null;
+          error_message: string | null;
+          id: number;
+          input_metadata: Json;
+          locked_at: string | null;
+          locked_by: string | null;
+          max_attempts: number;
+          output_metadata: Json;
+          progress: number;
+          started_at: string | null;
+          status: Database["public"]["Enums"]["job_status"];
+          type: Database["public"]["Enums"]["job_type"];
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "processing_jobs";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      admin_search_content: {
+        Args: { p_limit?: number; p_search: string };
+        Returns: Json;
+      };
+      admin_set_account_status: {
+        Args: {
+          p_reason: string;
+          p_status: Database["public"]["Enums"]["account_status"];
+          p_target_account_id: string;
+        };
+        Returns: {
+          closed_at: string | null;
+          created_at: string;
+          id: string;
+          logo_path: string | null;
+          name: string;
+          owner_user_id: string;
+          settings: Json;
+          slug: string;
+          status: Database["public"]["Enums"]["account_status"];
+          storage_used_bytes: number;
+          timezone: string;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "accounts";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      admin_set_ar_item_suspended: {
+        Args: {
+          p_ar_item_id: string;
+          p_reason: string;
+          p_suspended: boolean;
+          p_target_account_id: string;
+        };
+        Returns: {
+          account_id: string;
+          audio_default: string;
+          autoplay: boolean;
+          created_at: string;
+          created_by: string;
+          deleted_at: string | null;
+          description: string | null;
+          expires_at: string | null;
+          fallback_enabled: boolean;
+          group_id: string;
+          id: string;
+          idempotency_key: string;
+          loop_video: boolean;
+          marker_asset_id: string | null;
+          marker_height: number | null;
+          marker_image_path: string | null;
+          marker_lost_behavior: Database["public"]["Enums"]["marker_lost_behavior"];
+          marker_preview_path: string | null;
+          marker_quality_details: Json;
+          marker_quality_overridden_at: string | null;
+          marker_quality_overridden_by: string | null;
+          marker_quality_override_reason: string | null;
+          marker_quality_score: number | null;
+          marker_width: number | null;
+          project_id: string;
+          public_slug: string;
+          published_at: string | null;
+          status: Database["public"]["Enums"]["ar_item_status"];
+          title: string;
+          tracking_dataset_path: string | null;
+          tracking_status: Database["public"]["Enums"]["tracking_status"] | null;
+          updated_at: string;
+          version: number;
+          video_asset_id: string | null;
+          video_duration_seconds: number | null;
+          video_path: string | null;
+          video_thumbnail_path: string | null;
+          visibility: Database["public"]["Enums"]["content_visibility"];
+        };
+        SetofOptions: {
+          from: "*";
+          to: "ar_items";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       admin_update_subscription: {
         Args: {
           p_custom_limits?: Json;
@@ -1149,6 +1337,79 @@ export type Database = {
         SetofOptions: {
           from: "*";
           to: "subscriptions";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      admin_update_subscription_with_reason: {
+        Args: {
+          p_custom_limits: Json;
+          p_expires_at: string;
+          p_grace_period_ends_at: string;
+          p_plan_id: string;
+          p_reason: string;
+          p_starts_at: string;
+          p_status: Database["public"]["Enums"]["subscription_status"];
+          p_target_account_id: string;
+        };
+        Returns: {
+          account_id: string;
+          created_at: string;
+          custom_limits: Json;
+          expires_at: string | null;
+          grace_period_ends_at: string | null;
+          id: string;
+          plan_id: string;
+          starts_at: string;
+          status: Database["public"]["Enums"]["subscription_status"];
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "subscriptions";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      admin_update_system_setting: {
+        Args: { p_key: string; p_reason: string; p_value: Json };
+        Returns: Json;
+      };
+      admin_upsert_plan: {
+        Args: {
+          p_ar_item_limit: number;
+          p_code: string;
+          p_description: string;
+          p_group_limit: number;
+          p_is_active: boolean;
+          p_max_video_size_bytes: number;
+          p_name: string;
+          p_plan_id: string;
+          p_project_limit: number;
+          p_reason: string;
+          p_storage_limit_bytes: number;
+          p_team_limit: number;
+          p_video_duration_limit_seconds: number;
+        };
+        Returns: {
+          ar_item_limit: number | null;
+          code: string;
+          created_at: string;
+          description: string | null;
+          group_limit: number | null;
+          id: string;
+          is_active: boolean;
+          max_video_size_bytes: number | null;
+          name: string;
+          project_limit: number | null;
+          storage_limit_bytes: number | null;
+          team_limit: number | null;
+          updated_at: string;
+          video_duration_limit_seconds: number | null;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "subscription_plans";
           isOneToOne: true;
           isSetofReturn: false;
         };
@@ -1608,6 +1869,7 @@ export type Database = {
         Args: { p_target_account_id: string };
         Returns: Json;
       };
+      get_admin_access: { Args: never; Returns: Json };
       get_analytics_summary: {
         Args: {
           p_from: string;
