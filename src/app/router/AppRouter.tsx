@@ -27,6 +27,15 @@ const GroupsRoute = lazy(() =>
 const MediaUploadRoute = lazy(() =>
   import("../../features/media/MediaUploadPage").then((module) => ({ default: module.MediaUploadRoute })),
 );
+const ArItemsRoute = lazy(() =>
+  import("../../features/ar-items/ArItemPages").then((module) => ({ default: module.ArItemsRoute })),
+);
+const NewArItemRoute = lazy(() =>
+  import("../../features/ar-items/ArItemPages").then((module) => ({ default: module.NewArItemRoute })),
+);
+const EditArItemRoute = lazy(() =>
+  import("../../features/ar-items/ArItemPages").then((module) => ({ default: module.EditArItemRoute })),
+);
 const PrototypeViewerRoute = lazy(() =>
   import("../../features/prototype/PrototypeApp").then((module) => ({ default: module.PrototypeViewerRoute })),
 );
@@ -66,6 +75,9 @@ function RoutedContent() {
           <Route path="/projects/:projectId" element={<Protected element={<ProjectDetailsRoute />} />} />
           <Route path="/groups" element={<Protected element={<GroupsRoute />} />} />
           <Route path="/media" element={<Protected element={<MediaUploadRoute />} />} />
+          <Route path="/items" element={<Protected element={<ArItemsRoute />} />} />
+          <Route path="/items/new" element={<Protected element={<NewArItemRoute />} />} />
+          <Route path="/items/:itemId/edit" element={<Protected element={<EditArItemRoute />} />} />
           <Route path="/qr-codes" element={<Protected element={<FoundationPlaceholder title="QR-коды" />} />} />
           <Route path="/settings" element={<Protected element={<FoundationPlaceholder title="Настройки" />} />} />
           <Route path="/project/:projectId" element={<Protected element={<PrototypeProjectRoute />} />} />

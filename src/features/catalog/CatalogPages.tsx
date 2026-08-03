@@ -19,6 +19,7 @@ import {
   Plus,
   RotateCcw,
   Search,
+  Sparkles,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -42,8 +43,10 @@ import { AppShell } from "../../app/layout/AppShell";
 import { Button, ErrorState, FileButton, Input, Modal, Panel, Select, Skeleton, Toast } from "../../shared/ui";
 import { CatalogError, getCatalogRepository } from "./catalogRepository";
 import { CoverFileError, coverFileAccept } from "./coverFile";
+import { getArItemRepository } from "../ar-items/arItemRepository";
 
 const catalogRepository = getCatalogRepository();
+const arItemRepository = getArItemRepository();
 const projectPageSize = 8;
 
 const projectCategoryLabels: Record<ProjectCategory, string> = {
@@ -375,6 +378,11 @@ export function ProjectDetailsRoute() {
     queryFn: () => catalogRepository.listGroups(accountId!, projectId),
     enabled: Boolean(accountId && projectId),
   });
+  const arItemsQuery = useQuery({
+    queryKey: ["ar-items", accountId, projectId],
+    queryFn: () => arItemRepository.listItems(accountId!, projectId),
+    enabled: Boolean(accountId && projectId),
+  });
   const projectOptionsQuery = useQuery({
     queryKey: ["catalog", "project-options", accountId],
     queryFn: () => catalogRepository.listProjectOptions(accountId!),
@@ -469,6 +477,9 @@ export function ProjectDetailsRoute() {
           <Button variant="quiet" onClick={() => navigate("/projects")} icon={<ArrowLeft size={17} />}>
             Проекты
           </Button>
+          <Link className="btn btn-ghost" to={`/items/new?projectId=${project.id}`}>
+            <Sparkles size={17} /> Новая AR-работа
+          </Link>
           <Button
             disabled={!workspace.canWrite || project.status === "archived" || Boolean(project.deleted_at)}
             onClick={() => setGroupModal({ open: true, group: null })}
@@ -482,7 +493,7 @@ export function ProjectDetailsRoute() {
       {!workspace.canWrite ? <WorkspaceReadOnlyNotice workspace={workspace} /> : null}
       <section className="mt-6 grid gap-4 sm:grid-cols-3">
         <ProjectMetric icon={<Layers3 size={19} />} label="Группы" value={groupsQuery.data?.length ?? 0} />
-        <ProjectMetric icon={<Image size={19} />} label="AR-работы" value="0" />
+        <ProjectMetric icon={<Image size={19} />} label="AR-работы" value={arItemsQuery.data?.length ?? 0} />
         <ProjectMetric icon={<CalendarDays size={19} />} label="Обновлён" value={formatShortDate(project.updated_at)} />
       </section>
       <div className="mt-6 flex gap-2 border-b border-line" role="tablist" aria-label="Разделы проекта">

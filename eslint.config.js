@@ -42,7 +42,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["src/features/prototype/PrototypeApp.tsx"],
+    files: ["src/features/prototype/PrototypeApp.tsx", "src/features/ar-items/ArItemPages.tsx"],
     rules: {
       "react-hooks/exhaustive-deps": "off",
       "react-hooks/set-state-in-effect": "off",

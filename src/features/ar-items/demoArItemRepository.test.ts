@@ -82,6 +82,18 @@ describe("demo AR item repository", () => {
     await expect(repository.listItems(accountId, projectId, groupId)).resolves.toHaveLength(1);
   });
 
+  it("updates draft copy without creating another item", async () => {
+    const { repository } = createFixture();
+    const draft = await repository.createDraft(accountId, draftInput);
+
+    await expect(repository.updateDraft(accountId, draft.id, "Новый заголовок", "Новое описание")).resolves.toMatchObject({
+      id: draft.id,
+      title: "Новый заголовок",
+      description: "Новое описание",
+    });
+    await expect(repository.listItems(accountId, projectId, groupId)).resolves.toHaveLength(1);
+  });
+
   it("runs one deduplicated four-job processing revision to ready", async () => {
     const { repository, advance } = createFixture();
     const draft = await repository.createDraft(accountId, draftInput);

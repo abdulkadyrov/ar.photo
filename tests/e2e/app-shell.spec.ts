@@ -179,3 +179,77 @@ test("validates and uploads a marker through the resumable media queue", async (
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+
+test("completes the nine-step AR item workflow before publication", async ({ page }) => {
+  await page.goto("./projects");
+  await signInToDemo(page);
+
+  await page.getByRole("button", { name: "Создать проект" }).first().click();
+  const projectDialog = page.getByRole("dialog", { name: "Новый проект" });
+  await projectDialog.getByPlaceholder("Например, Выпускной 2027").fill("AR workflow project");
+  await projectDialog.getByRole("button", { name: "Создать проект" }).click();
+  await page.getByRole("link", { name: "AR workflow project" }).click();
+  await page.getByRole("button", { name: "Добавить группу" }).first().click();
+  const groupDialog = page.getByRole("dialog", { name: "Новая группа" });
+  await groupDialog.getByPlaceholder("Например, 11А класс").fill("AR workflow group");
+  await groupDialog.getByRole("button", { name: "Создать группу" }).click();
+
+  await page.getByRole("link", { name: "AR-работы", exact: true }).click();
+  await page.getByRole("link", { name: "Новая AR-работа" }).click();
+  await page.getByLabel("Проект").selectOption({ label: "AR workflow project" });
+  await page.getByLabel("Группа").selectOption({ label: "AR workflow group" });
+  await page.getByRole("button", { name: "Продолжить" }).click();
+
+  await page.getByPlaceholder("Например, Портрет Алексея").fill("Портрет Алексея");
+  await page.getByPlaceholder("Что происходит в видео и для кого эта работа").fill("Проверка полного workflow");
+  await page.getByRole("button", { name: "Продолжить" }).click();
+
+  const markerBase64 = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 320;
+    canvas.height = 240;
+    const context = canvas.getContext("2d")!;
+    for (let y = 0; y < canvas.height; y += 4) {
+      for (let x = 0; x < canvas.width; x += 4) {
+        const value = ((x / 4) ^ (y / 4)) % 2 === 0 ? 24 : 232;
+        context.fillStyle = `rgb(${value}, ${255 - value}, ${(x * 7 + y * 11) % 255})`;
+        context.fillRect(x, y, 4, 4);
+      }
+    }
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "workflow-marker.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(markerBase64, "base64"),
+  });
+  await expect(page.getByText("Маркер загружен", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Продолжить" }).click();
+
+  await page.getByRole("button", { name: "Анализировать маркер" }).click();
+  await expect(page.getByText(/\/100$/).first()).toBeVisible();
+  const riskConfirmation = page.getByText("Я понимаю риск потери распознавания", { exact: false });
+  if (await riskConfirmation.isVisible()) await riskConfirmation.click();
+  await page.getByRole("button", { name: "Продолжить" }).click();
+
+  await page.locator('input[type="file"]').setInputFiles("test-assets/fixtures/h264-aac.mp4");
+  await expect(page.getByText("Видео загружено", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Продолжить" }).click();
+  await page.getByRole("button", { name: "Запустить обработку" }).click();
+
+  await expect(page.getByRole("heading", { name: "Все артефакты готовы" })).toBeVisible();
+  await page.getByRole("button", { name: "Продолжить" }).click();
+  for (const label of [
+    "Выбрана правильная печатная фотография",
+    "Видео и звук соответствуют фотографии",
+    "Поведение при потере маркера подтверждено",
+  ]) {
+    await page.getByText(label, { exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Проверка завершена" }).click();
+
+  await expect(page.getByRole("heading", { name: "AR-работа готова к публикации" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Опубликовать и создать QR" })).toBeDisabled();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});

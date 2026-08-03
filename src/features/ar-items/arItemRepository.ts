@@ -19,6 +19,7 @@ export interface ArItemRepository {
   listItems(accountId: string, projectId?: string, groupId?: string): Promise<ArItem[]>;
   getItem(accountId: string, itemId: string): Promise<ArItem>;
   createDraft(accountId: string, input: CreateArItemInput): Promise<ArItem>;
+  updateDraft(accountId: string, itemId: string, title: string, description: string): Promise<ArItem>;
   prepare(accountId: string, itemId: string, input: PrepareArItemInput): Promise<ArItem>;
   listJobs(accountId: string, itemId: string): Promise<ProcessingJob[]>;
   overrideMarkerQuality(accountId: string, itemId: string, reason: string): Promise<ArItem>;
@@ -65,6 +66,20 @@ export class SupabaseArItemRepository implements ArItemRepository {
       p_request_id: input.requestId,
     });
     if (error) throw mapArItemError(error);
+    return data;
+  }
+
+  async updateDraft(accountId: string, itemId: string, title: string, description: string) {
+    const { data, error } = await this.client
+      .from("ar_items")
+      .update({ title: title.trim(), description: description.trim() || null })
+      .eq("account_id", accountId)
+      .eq("id", itemId)
+      .is("deleted_at", null)
+      .select("*")
+      .maybeSingle();
+    if (error) throw mapArItemError(error);
+    if (!data) throw new ArItemRepositoryError("not_found", "AR-работа не найдена");
     return data;
   }
 

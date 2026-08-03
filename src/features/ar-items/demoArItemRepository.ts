@@ -108,6 +108,20 @@ export class DemoArItemRepository implements ArItemRepository {
     return item;
   }
 
+  async updateDraft(accountId: string, itemId: string, title: string, description: string) {
+    const state = this.reconcile();
+    const index = state.items.findIndex((item) => item.account_id === accountId && item.id === itemId);
+    if (index < 0) throw new ArItemRepositoryError("not_found", "AR-работа не найдена");
+    state.items[index] = {
+      ...state.items[index],
+      title: title.trim(),
+      description: description.trim() || null,
+      updated_at: new Date(this.now()).toISOString(),
+    };
+    this.store.write(state);
+    return state.items[index];
+  }
+
   async prepare(accountId: string, itemId: string, input: PrepareArItemInput) {
     const state = this.reconcile();
     const itemIndex = state.items.findIndex((item) => item.account_id === accountId && item.id === itemId);

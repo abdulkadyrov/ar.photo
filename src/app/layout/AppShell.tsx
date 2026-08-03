@@ -1,5 +1,16 @@
 import type { ReactNode } from "react";
-import { FolderKanban, House, Images, Layers3, LogOut, QrCode, ScanLine, Settings, Sparkles } from "lucide-react";
+import {
+  FolderKanban,
+  House,
+  Images,
+  Layers3,
+  LogOut,
+  QrCode,
+  ScanLine,
+  Settings,
+  Sparkles,
+  WandSparkles,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../../features/auth/authContext";
 
@@ -8,6 +19,7 @@ const navigation = [
   { to: "/projects", label: "Проекты", icon: FolderKanban },
   { to: "/groups", label: "Группы", icon: Layers3 },
   { to: "/media", label: "Медиа", icon: Images },
+  { to: "/items", label: "AR-работы", icon: WandSparkles },
   { to: "/viewer/test", label: "AR-проверка", icon: ScanLine },
   { to: "/qr-codes", label: "QR-коды", icon: QrCode },
   { to: "/settings", label: "Настройки", icon: Settings },
