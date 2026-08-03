@@ -178,7 +178,7 @@ select throws_ok(
     select public.finalize_media_upload(
       (select id from public.upload_sessions where idempotency_key = '82000000-0000-4000-8000-000000000006'),
       repeat('b', 64),
-      '{"width":1920,"height":1080,"durationSeconds":121,"videoCodec":"h264","audioCodec":"aac"}'::jsonb
+      '{"width":1920,"height":1080,"durationSeconds":601,"videoCodec":"h264","audioCodec":"aac"}'::jsonb
     )
   $$,
   '23514',
@@ -191,7 +191,7 @@ select lives_ok(
     select public.finalize_media_upload(
       (select id from public.upload_sessions where idempotency_key = '82000000-0000-4000-8000-000000000006'),
       repeat('b', 64),
-      '{"width":1920,"height":1080,"durationSeconds":120,"videoCodec":"h264","audioCodec":"aac"}'::jsonb
+      '{"width":1920,"height":1080,"durationSeconds":600,"videoCodec":"h264","audioCodec":"aac"}'::jsonb
     )
   $$,
   'server accepts verified H.264 metadata within the plan duration'
