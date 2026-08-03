@@ -41,6 +41,7 @@
     "canvas": "3.2.3",
     "jszip": "3.10.1",
     "lucide-react": "0.475.0",
+    "mediabunny": "1.52.2",
     "mind-ar": "1.2.5",
     "qrcode": "1.5.4",
     "qrcode.react": "4.2.0",
@@ -54,8 +55,8 @@
     "zustand": "5.0.14"
   },
   "devDependencies": {
-    "@eslint/js": "10.0.1",
     "@axe-core/playwright": "4.12.1",
+    "@eslint/js": "10.0.1",
     "@playwright/test": "1.62.1",
     "@testing-library/dom": "10.4.1",
     "@testing-library/jest-dom": "7.0.0",
@@ -70,6 +71,7 @@
     "eslint": "10.8.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-refresh": "0.5.3",
+    "fake-indexeddb": "6.2.4",
     "globals": "17.9.0",
     "jsdom": "30.0.1",
     "postcss": "8.5.25",

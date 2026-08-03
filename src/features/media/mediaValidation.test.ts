@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { classifyMediaFile, hasMp4Signature, inspectMp4CodecTokens, prepareMediaFile } from "./mediaValidation";
+import {
+  classifyMediaFile,
+  containedDimensions,
+  hasMp4Signature,
+  inspectMp4CodecTokens,
+  prepareMediaFile,
+} from "./mediaValidation";
 
 describe("media validation", () => {
   it("classifies MP4 separately from marker images", () => {
@@ -26,5 +32,10 @@ describe("media validation", () => {
     await expect(prepareMediaFile(file)).rejects.toMatchObject({
       code: "spoofed_type",
     });
+  });
+
+  it("downscales marker dimensions without changing their aspect ratio", () => {
+    expect(containedDimensions(6000, 4000, 2560)).toEqual({ width: 2560, height: 1707 });
+    expect(containedDimensions(640, 480, 2560)).toEqual({ width: 640, height: 480 });
   });
 });

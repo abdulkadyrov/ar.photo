@@ -8,6 +8,11 @@ export type MarkerMetadata = {
   width: number;
   height: number;
   exifStripped: true;
+  optimization: MediaOptimizationMetadata & {
+    strategy: "adaptive-image";
+    originalWidth: number;
+    originalHeight: number;
+  };
 };
 
 export type VideoMetadata = {
@@ -16,6 +21,17 @@ export type VideoMetadata = {
   durationSeconds: number;
   videoCodec: "h264";
   audioCodec: "aac" | "none";
+  optimization: MediaOptimizationMetadata & {
+    strategy: "source-kept" | "webcodecs-h264";
+  };
+};
+
+export type MediaOptimizationMetadata = {
+  originalBytes: number;
+  uploadBytes: number;
+  savedBytes: number;
+  reductionPercent: number;
+  optimized: boolean;
 };
 
 export type PreparedMedia =

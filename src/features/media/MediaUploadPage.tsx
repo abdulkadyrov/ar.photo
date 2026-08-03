@@ -8,16 +8,29 @@ import { getCatalogRepository } from "../catalog/catalogRepository";
 import { Button, ErrorState, FileDropzone, Panel, Select, Skeleton, Toast } from "../../shared/ui";
 import { getMediaRepository, MediaRepositoryError } from "./mediaRepository";
 import { classifyMediaFile, mediaAccept, prepareMediaFile } from "./mediaValidation";
+import {
+  listPreparedUploads,
+  persistPreparedUpload,
+  removePreparedUpload,
+  type PreparedUploadQueueItem,
+} from "./uploadQueueDb";
 
 type QueueStatus = "validating" | "ready" | "uploading" | "failed" | "cancelled" | "completed";
 type QueueItem = {
   id: string;
   requestId: string;
+  ownerId: string;
+  accountId: string;
+  projectId: string;
+  groupId: string;
+  createdAt: number;
   sourceFile: File;
   prepared?: PreparedMedia;
   previewUrl?: string;
   status: QueueStatus;
   progress: number;
+  persistence: "saving" | "saved" | "memory-only";
+  persistenceError?: string;
   error?: string;
   asset?: MediaAsset;
 };
@@ -34,6 +47,7 @@ export function MediaUploadRoute() {
   const [notice, setNotice] = useState<{ title: string; message?: string; tone: "success" | "error" }>();
   const queueRef = useRef(queue);
   const controllers = useRef(new Map<string, AbortController>());
+  const restoredOwnerRef = useRef<string | undefined>(undefined);
 
   const workspaceQuery = useQuery({
     queryKey: ["catalog", "workspace", auth.session!.user.id],
@@ -74,44 +88,122 @@ export function MediaUploadRoute() {
     [],
   );
 
+  useEffect(() => {
+    const ownerId = auth.session!.user.id;
+    if (!accountId || restoredOwnerRef.current === ownerId) return;
+    restoredOwnerRef.current = ownerId;
+    let active = true;
+    void listPreparedUploads(ownerId)
+      .then((items) => {
+        if (!active) return;
+        const restored = items
+          .filter((item) => item.accountId === accountId)
+          .map<QueueItem>((item) => ({
+            id: item.id,
+            requestId: item.requestId,
+            ownerId: item.ownerId,
+            accountId: item.accountId,
+            projectId: item.projectId,
+            groupId: item.groupId,
+            createdAt: item.createdAt,
+            sourceFile: item.prepared.file,
+            prepared: item.prepared,
+            previewUrl: URL.createObjectURL(item.prepared.file),
+            status: "ready",
+            progress: 0,
+            persistence: "saved",
+          }));
+        setQueue((current) => {
+          const knownIds = new Set(current.map((item) => item.id));
+          const additions = restored.filter((item) => !knownIds.has(item.id));
+          queueRef.current = [...current, ...additions];
+          return queueRef.current;
+        });
+        if (restored.length) {
+          setNotice({
+            title: "Локальная очередь восстановлена",
+            message: `${restored.length} ${pluralFiles(restored.length)} готовы к продолжению`,
+            tone: "success",
+          });
+        }
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setNotice({ title: "IndexedDB недоступен", message: readableError(error), tone: "error" });
+      });
+    return () => {
+      active = false;
+    };
+  }, [accountId, auth.session]);
+
   const addFiles = (files: File[]) => {
-    const additions = files.map<QueueItem>((file) => ({
+    const ownerId = auth.session!.user.id;
+    if (!accountId || !projectId || !groupId) return;
+    const additions = files.map<QueueItem>((file, index) => ({
       id: crypto.randomUUID(),
       requestId: crypto.randomUUID(),
+      ownerId,
+      accountId,
+      projectId,
+      groupId,
+      createdAt: Date.now() + index,
       sourceFile: file,
       status: "validating",
       progress: 0,
+      persistence: "saving",
     }));
-    setQueue((current) => [...current, ...additions]);
+    setQueue((current) => {
+      queueRef.current = [...current, ...additions];
+      return queueRef.current;
+    });
     additions.forEach((item) => void validateItem(item));
   };
 
   const validateItem = async (item: QueueItem) => {
     try {
-      const prepared = await prepareMediaFile(item.sourceFile, classifyMediaFile(item.sourceFile));
+      const prepared = await prepareMediaFile(item.sourceFile, classifyMediaFile(item.sourceFile), {
+        onProgress: (progress) => patchQueue(item.id, { progress: Math.round(progress * 100) }),
+      });
       const previewUrl = URL.createObjectURL(prepared.file);
       if (!queueRef.current.some((candidate) => candidate.id === item.id)) {
         URL.revokeObjectURL(previewUrl);
         return;
       }
-      patchQueue(item.id, { prepared, previewUrl, status: "ready", error: undefined });
+      const preparedItem = { ...item, prepared };
+      let persistence: QueueItem["persistence"] = "saved";
+      let persistenceError: string | undefined;
+      try {
+        await persistPreparedUpload(toPersistedItem(preparedItem));
+      } catch (error) {
+        persistence = "memory-only";
+        persistenceError = readableError(error);
+      }
+      patchQueue(item.id, {
+        prepared,
+        previewUrl,
+        status: "ready",
+        progress: 0,
+        persistence,
+        persistenceError,
+        error: undefined,
+      });
     } catch (error) {
-      patchQueue(item.id, { status: "failed", error: readableError(error) });
+      patchQueue(item.id, { status: "failed", persistence: "memory-only", error: readableError(error) });
     }
   };
 
   const uploadItem = async (item: QueueItem) => {
     const workspace = workspaceQuery.data;
-    if (!workspace || !item.prepared || !projectId || !groupId) return;
+    if (!workspace || !item.prepared) return;
     const controller = new AbortController();
     controllers.current.set(item.id, controller);
     patchQueue(item.id, { status: "uploading", progress: 0, error: undefined });
     try {
       const asset = await mediaRepository.upload(
         {
-          accountId: workspace.accountId,
-          projectId,
-          groupId,
+          accountId: item.accountId,
+          projectId: item.projectId,
+          groupId: item.groupId,
           kind: item.prepared.kind,
           file: item.prepared.file,
           requestId: item.requestId,
@@ -122,6 +214,7 @@ export function MediaUploadRoute() {
         controller.signal,
       );
       patchQueue(item.id, { status: "completed", progress: 100, asset });
+      await removePreparedUpload(item.id).catch(() => undefined);
       await queryClient.invalidateQueries({ queryKey: ["media", "assets"] });
       setNotice({ title: "Файл загружен", message: item.prepared.file.name, tone: "success" });
     } catch (error) {
@@ -152,14 +245,28 @@ export function MediaUploadRoute() {
       return;
     }
     const next = item.status === "cancelled" ? { ...item, requestId: crypto.randomUUID() } : item;
-    if (next !== item) patchQueue(item.id, { requestId: next.requestId });
+    if (next !== item) {
+      patchQueue(item.id, { requestId: next.requestId });
+      if (next.prepared && next.persistence === "saved") {
+        void persistPreparedUpload(toPersistedItem({ ...next, prepared: next.prepared })).catch(() =>
+          patchQueue(item.id, {
+            persistence: "memory-only",
+            persistenceError: "Не удалось обновить локальную очередь",
+          }),
+        );
+      }
+    }
     void uploadItem(next);
   };
 
   const removeItem = (item: QueueItem) => {
     controllers.current.get(item.id)?.abort();
     if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
-    setQueue((current) => current.filter((candidate) => candidate.id !== item.id));
+    setQueue((current) => {
+      queueRef.current = current.filter((candidate) => candidate.id !== item.id);
+      return queueRef.current;
+    });
+    void removePreparedUpload(item.id).catch(() => undefined);
   };
 
   if (workspaceQuery.isPending) return <MediaLoading />;
@@ -235,7 +342,7 @@ export function MediaUploadRoute() {
             <FileDropzone
               accept={mediaAccept}
               disabled={uploadDisabled}
-              hint="Маркер: JPEG, PNG или WebP до 25 МБ. Видео: MP4/H.264 до 500 МБ. Можно выбрать несколько файлов."
+              hint="Фото уменьшаются до 2560 px и очищаются от EXIF. Большие MP4/H.264 сжимаются локально до загрузки."
               onPick={addFiles}
             />
           </div>
@@ -258,6 +365,10 @@ export function MediaUploadRoute() {
               Очередь пуста. Файлы не покидают браузер до успешной проверки.
             </div>
           )}
+          <p className="mt-4 text-xs leading-5 text-muted">
+            Подготовленные файлы сохраняются в IndexedDB этого устройства. После перезагрузки очередь можно продолжить;
+            после успешной загрузки локальная копия удаляется.
+          </p>
         </Panel>
 
         <Panel>
@@ -300,7 +411,10 @@ export function MediaUploadRoute() {
   );
 
   function patchQueue(id: string, patch: Partial<QueueItem>) {
-    setQueue((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+    setQueue((current) => {
+      queueRef.current = current.map((item) => (item.id === id ? { ...item, ...patch } : item));
+      return queueRef.current;
+    });
   }
 }
 
@@ -337,18 +451,32 @@ function UploadQueueCard({
                 {item.sourceFile.name}
               </p>
               <p className="mt-1 text-xs text-muted">
-                {formatBytes(item.prepared?.file.size ?? item.sourceFile.size)} · {queueStatusLabel[item.status]}
+                {item.prepared && item.prepared.file.size !== item.sourceFile.size
+                  ? `${formatBytes(item.sourceFile.size)} → ${formatBytes(item.prepared.file.size)}`
+                  : formatBytes(item.prepared?.file.size ?? item.sourceFile.size)}{" "}
+                · {queueStatusLabel[item.status]}
               </p>
             </div>
             <StatusIcon status={item.status} />
           </div>
           {item.prepared ? <MetadataLine prepared={item.prepared} /> : null}
-          {item.status === "uploading" ? (
+          {item.persistence === "saved" && item.status !== "completed" ? (
+            <p className="mt-1 text-[11px] text-emerald-300">Сохранено локально · очередь переживёт перезагрузку</p>
+          ) : null}
+          {item.persistenceError ? (
+            <p className="mt-1 text-[11px] leading-5 text-amber-200">
+              Только в памяти до закрытия вкладки: {item.persistenceError}
+            </p>
+          ) : null}
+          {item.status === "uploading" || (item.status === "validating" && item.progress > 0) ? (
             <div className="mt-3">
               <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
                 <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${item.progress}%` }} />
               </div>
-              <p className="mt-1 text-right text-[11px] text-muted">{item.progress}%</p>
+              <p className="mt-1 text-right text-[11px] text-muted">
+                {item.status === "validating" ? "Локальная оптимизация · " : ""}
+                {item.progress}%
+              </p>
             </div>
           ) : null}
           {item.error ? <p className="mt-2 text-xs leading-5 text-rose-300">{item.error}</p> : null}
@@ -407,10 +535,12 @@ function StatusIcon({ status }: { status: QueueStatus }) {
 
 function MetadataLine({ prepared }: { prepared: PreparedMedia }) {
   const dimensions = `${prepared.metadata.width}×${prepared.metadata.height}`;
+  const optimization = prepared.metadata.optimization;
+  const savings = optimization.optimized ? ` · меньше на ${optimization.reductionPercent}%` : " · уже оптимально";
   const details =
     prepared.kind === "video"
-      ? `${dimensions} · ${prepared.metadata.durationSeconds.toFixed(1)} сек · H.264/${prepared.metadata.audioCodec === "aac" ? "AAC" : "без аудио"}`
-      : `${dimensions} · метаданные удалены`;
+      ? `${dimensions} · ${prepared.metadata.durationSeconds.toFixed(1)} сек · H.264/${prepared.metadata.audioCodec === "aac" ? "AAC" : "без аудио"}${savings}`
+      : `${dimensions} · EXIF удалён${savings}`;
   return <p className="mt-2 text-[11px] leading-5 text-muted">{details}</p>;
 }
 
@@ -444,7 +574,7 @@ function MediaLoading() {
 }
 
 const queueStatusLabel: Record<QueueStatus, string> = {
-  validating: "проверяем",
+  validating: "проверяем и оптимизируем",
   ready: "готов к загрузке",
   uploading: "загружается",
   failed: "нужна проверка",
@@ -461,4 +591,26 @@ function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} Б`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+}
+
+function toPersistedItem(item: QueueItem & { prepared: PreparedMedia }): PreparedUploadQueueItem {
+  return {
+    id: item.id,
+    ownerId: item.ownerId,
+    accountId: item.accountId,
+    projectId: item.projectId,
+    groupId: item.groupId,
+    requestId: item.requestId,
+    prepared: item.prepared,
+    createdAt: item.createdAt,
+  };
+}
+
+function pluralFiles(count: number) {
+  const lastTwo = count % 100;
+  const last = count % 10;
+  if (lastTwo >= 11 && lastTwo <= 14) return "файлов";
+  if (last === 1) return "файл";
+  if (last >= 2 && last <= 4) return "файла";
+  return "файлов";
 }

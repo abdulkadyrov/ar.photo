@@ -209,7 +209,12 @@ test("validates and uploads a marker through the resumable media queue", async (
   for (const extension of ["png", "jpeg", "webp"]) {
     const queue = page.getByRole("article").filter({ hasText: `marker-stage-4.${extension}` });
     await expect(queue.getByText("готов к загрузке", { exact: false })).toBeVisible();
+    await expect(queue.getByText("Сохранено локально", { exact: false })).toBeVisible();
   }
+
+  await page.reload();
+  await expect(page.getByText("Локальная очередь восстановлена", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Загрузить готовые · 3" })).toBeVisible();
   await page.getByRole("button", { name: "Загрузить готовые · 3" }).click();
   await expect(page.getByText("загружено", { exact: false })).toHaveCount(3);
   await expect(page.getByText("Файл загружен", { exact: true })).toBeVisible();

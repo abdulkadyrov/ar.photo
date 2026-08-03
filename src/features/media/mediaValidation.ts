@@ -1,22 +1,37 @@
 import type { MarkerMetadata, MediaKind, PreparedMedia, VideoMetadata } from "../../entities/media/model";
 import { detectCoverFormat } from "../catalog/coverFile";
+import { clientVideoHardLimitBytes, optimizeVideoFile, VideoOptimizationUnavailableError } from "./videoOptimization";
 
 export const markerAccept = "image/jpeg,image/png,image/webp";
 export const mediaAccept = `${markerAccept},video/mp4`;
 export const markerMaxBytes = 25 * 1024 * 1024;
 export const videoMaxBytes = 500 * 1024 * 1024;
+export const markerTargetBytes = 4 * 1024 * 1024;
+export const markerMaxDimension = 2560;
 
 type ImageFormat = NonNullable<ReturnType<typeof detectCoverFormat>>;
 type DecodedImage = {
   width: number;
   height: number;
-  draw(sourceContext: CanvasRenderingContext2D): void;
+  draw(sourceContext: CanvasRenderingContext2D, width: number, height: number): void;
   close(): void;
+};
+type DecodedVideoMetadata = Omit<VideoMetadata, "optimization">;
+
+export type PrepareMediaOptions = {
+  onProgress?: (progress: number) => void;
 };
 
 export class MediaValidationError extends Error {
   constructor(
-    readonly code: "empty" | "too_large" | "unsupported_type" | "spoofed_type" | "decode_failed" | "unsupported_codec",
+    readonly code:
+      | "empty"
+      | "too_large"
+      | "unsupported_type"
+      | "spoofed_type"
+      | "decode_failed"
+      | "unsupported_codec"
+      | "optimization_unavailable",
     message: string,
   ) {
     super(message);
@@ -28,8 +43,12 @@ export function classifyMediaFile(file: File): MediaKind {
   return file.type === "video/mp4" ? "video" : "marker";
 }
 
-export async function prepareMediaFile(file: File, kind = classifyMediaFile(file)): Promise<PreparedMedia> {
-  return kind === "marker" ? prepareMarker(file) : prepareVideo(file);
+export async function prepareMediaFile(
+  file: File,
+  kind = classifyMediaFile(file),
+  options: PrepareMediaOptions = {},
+): Promise<PreparedMedia> {
+  return kind === "marker" ? prepareMarker(file) : prepareVideo(file, options);
 }
 
 export async function sha256Hex(blob: Blob): Promise<string> {
@@ -61,15 +80,30 @@ async function prepareMarker(file: File): Promise<PreparedMedia> {
     if (decoded.width < 1 || decoded.height < 1 || decoded.width > 12_000 || decoded.height > 12_000) {
       throw new MediaValidationError("decode_failed", "Размер изображения не поддерживается");
     }
-    const normalized = await stripImageMetadata(decoded, format, file.name);
-    const metadata: MarkerMetadata = { width: decoded.width, height: decoded.height, exifStripped: true };
-    return { file: normalized, kind: "marker", sha256: await sha256Hex(normalized), metadata };
+    const normalized = await optimizeMarkerImage(decoded, format, file);
+    const savedBytes = Math.max(0, file.size - normalized.file.size);
+    const metadata: MarkerMetadata = {
+      width: normalized.width,
+      height: normalized.height,
+      exifStripped: true,
+      optimization: {
+        strategy: "adaptive-image",
+        originalWidth: decoded.width,
+        originalHeight: decoded.height,
+        originalBytes: file.size,
+        uploadBytes: normalized.file.size,
+        savedBytes,
+        reductionPercent: reductionPercent(file.size, normalized.file.size),
+        optimized: savedBytes > 0,
+      },
+    };
+    return { file: normalized.file, kind: "marker", sha256: await sha256Hex(normalized.file), metadata };
   } finally {
     decoded.close();
   }
 }
 
-async function prepareVideo(file: File): Promise<PreparedMedia> {
+async function prepareVideo(file: File, options: PrepareMediaOptions): Promise<PreparedMedia> {
   assertFileSize(file, videoMaxBytes, "Видео должно быть не больше 500 МБ");
   if (file.type !== "video/mp4") {
     throw new MediaValidationError("unsupported_type", "Поддерживается только MP4-видео с H.264");
@@ -86,8 +120,37 @@ async function prepareVideo(file: File): Promise<PreparedMedia> {
   if (!codec) {
     throw new MediaValidationError("unsupported_codec", "Видео должно использовать кодек H.264");
   }
-  const metadata = await decodeVideoMetadata(file, codec);
-  return { file, kind: "video", sha256: await sha256Hex(file), metadata };
+  const sourceMetadata = await decodeVideoMetadata(file, codec);
+  let optimized;
+  try {
+    optimized = await optimizeVideoFile(file, sourceMetadata, options.onProgress);
+  } catch (error) {
+    if (file.size <= clientVideoHardLimitBytes && error instanceof VideoOptimizationUnavailableError) {
+      optimized = { file, strategy: "source-kept" as const };
+    } else {
+      throw new MediaValidationError(
+        "optimization_unavailable",
+        error instanceof Error
+          ? `${error.message}. Откройте AR Photo в актуальном Chrome, Edge или Safari и повторите.`
+          : "Не удалось уменьшить видео до лимита 50 МБ",
+      );
+    }
+  }
+  const optimizedMetadata =
+    optimized.file === file ? sourceMetadata : await validateOptimizedVideo(optimized.file, sourceMetadata.audioCodec);
+  const savedBytes = Math.max(0, file.size - optimized.file.size);
+  const metadata: VideoMetadata = {
+    ...optimizedMetadata,
+    optimization: {
+      strategy: optimized.strategy,
+      originalBytes: file.size,
+      uploadBytes: optimized.file.size,
+      savedBytes,
+      reductionPercent: reductionPercent(file.size, optimized.file.size),
+      optimized: savedBytes > 0,
+    },
+  };
+  return { file: optimized.file, kind: "video", sha256: await sha256Hex(optimized.file), metadata };
 }
 
 function assertFileSize(file: File, maxBytes: number, message: string) {
@@ -102,7 +165,7 @@ async function decodeImage(file: File): Promise<DecodedImage> {
       return {
         width: bitmap.width,
         height: bitmap.height,
-        draw: (context) => context.drawImage(bitmap, 0, 0),
+        draw: (context, width, height) => context.drawImage(bitmap, 0, 0, width, height),
         close: () => bitmap.close(),
       };
     }
@@ -111,7 +174,7 @@ async function decodeImage(file: File): Promise<DecodedImage> {
     return {
       width: image.naturalWidth,
       height: image.naturalHeight,
-      draw: (context) => context.drawImage(image, 0, 0),
+      draw: (context, width, height) => context.drawImage(image, 0, 0, width, height),
       close: () => undefined,
     };
   } catch (error) {
@@ -136,31 +199,46 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   });
 }
 
-async function stripImageMetadata(decoded: DecodedImage, format: ImageFormat, originalName: string): Promise<File> {
+async function optimizeMarkerImage(decoded: DecodedImage, format: ImageFormat, originalFile: File) {
+  const dimensions = containedDimensions(decoded.width, decoded.height, markerMaxDimension);
   const canvas = document.createElement("canvas");
-  canvas.width = decoded.width;
-  canvas.height = decoded.height;
-  const context = canvas.getContext("2d", { alpha: format.mime !== "image/jpeg" });
+  canvas.width = dimensions.width;
+  canvas.height = dimensions.height;
+  const outputMime = format.mime === "image/jpeg" ? "image/jpeg" : "image/webp";
+  const context = canvas.getContext("2d", { alpha: outputMime !== "image/jpeg" });
   if (!context) throw new MediaValidationError("decode_failed", "Браузер не поддерживает обработку изображения");
-  decoded.draw(context);
-  const blob = await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob(
-      (result) => (result ? resolve(result) : reject(new Error("Canvas encoding failed"))),
-      format.mime,
-      format.mime === "image/jpeg" || format.mime === "image/webp" ? 0.95 : undefined,
-    ),
-  ).catch(() => {
-    throw new MediaValidationError("decode_failed", "Не удалось безопасно подготовить изображение");
-  });
-  const baseName = originalName.replace(/\.[^.]+$/, "") || "marker";
-  return new File([blob], `${baseName}.${format.extension}`, { type: format.mime, lastModified: Date.now() });
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  decoded.draw(context, dimensions.width, dimensions.height);
+
+  const qualities = outputMime === "image/jpeg" ? [0.9, 0.84, 0.78, 0.72] : [0.88, 0.82, 0.76, 0.7];
+  let selected: Blob | undefined;
+  for (const quality of qualities) {
+    const candidate = await canvasBlob(canvas, outputMime, quality);
+    if (!selected || candidate.size < selected.size) selected = candidate;
+    if (candidate.size <= markerTargetBytes) {
+      selected = candidate;
+      break;
+    }
+  }
+  if (!selected) throw new MediaValidationError("decode_failed", "Не удалось безопасно подготовить изображение");
+  const actualMime = selected.type || outputMime;
+  const extension = actualMime === "image/jpeg" ? "jpg" : actualMime === "image/webp" ? "webp" : "png";
+  const baseName = originalFile.name.replace(/\.[^.]+$/, "") || "marker";
+  return {
+    file: new File([selected], `${baseName}.optimized.${extension}`, {
+      type: actualMime,
+      lastModified: Date.now(),
+    }),
+    ...dimensions,
+  };
 }
 
 function decodeVideoMetadata(
   file: File,
   codec: Pick<VideoMetadata, "videoCodec" | "audioCodec">,
-): Promise<VideoMetadata> {
-  return new Promise<VideoMetadata>((resolve, reject) => {
+): Promise<DecodedVideoMetadata> {
+  return new Promise<DecodedVideoMetadata>((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const video = document.createElement("video");
     const timeout = window.setTimeout(() => finish(() => reject(new Error("timeout"))), 15_000);
@@ -185,6 +263,39 @@ function decodeVideoMetadata(
   }).catch(() => {
     throw new MediaValidationError("decode_failed", "Видео повреждено или не декодируется браузером");
   });
+}
+
+async function validateOptimizedVideo(file: File, expectedAudioCodec: VideoMetadata["audioCodec"]) {
+  const head = new Uint8Array(await file.slice(0, Math.min(file.size, 2 * 1024 * 1024)).arrayBuffer());
+  const tail = new Uint8Array(await file.slice(Math.max(0, file.size - 2 * 1024 * 1024)).arrayBuffer());
+  const codec = inspectMp4CodecTokens(concatBytes(head, tail));
+  if (!codec) throw new MediaValidationError("unsupported_codec", "После оптимизации не удалось подтвердить H.264");
+  const metadata = await decodeVideoMetadata(file, codec);
+  if (expectedAudioCodec === "aac" && metadata.audioCodec !== "aac") {
+    throw new MediaValidationError("unsupported_codec", "После оптимизации пропала аудиодорожка AAC");
+  }
+  return metadata;
+}
+
+export function containedDimensions(width: number, height: number, maxDimension: number) {
+  const scale = Math.min(1, maxDimension / Math.max(width, height));
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
+
+function canvasBlob(canvas: HTMLCanvasElement, mime: string, quality: number) {
+  return new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob((result) => (result ? resolve(result) : reject(new Error("Canvas encoding failed"))), mime, quality),
+  ).catch(() => {
+    throw new MediaValidationError("decode_failed", "Не удалось безопасно подготовить изображение");
+  });
+}
+
+function reductionPercent(originalBytes: number, uploadBytes: number) {
+  if (originalBytes <= 0 || uploadBytes >= originalBytes) return 0;
+  return Math.round(((originalBytes - uploadBytes) / originalBytes) * 1000) / 10;
 }
 
 function concatBytes(left: Uint8Array, right: Uint8Array) {

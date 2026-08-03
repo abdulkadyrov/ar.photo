@@ -91,9 +91,9 @@ src/
 ## 4. Состояние и получение данных
 
 - TanStack Query хранит server state, invalidation и безопасные retries для чтения.
-- Zustand хранит только короткоживущий UI state: wizard, navigation drawer, upload queue.
+- Zustand/React state хранит короткоживущий UI state; подготовленная upload queue отдельно сохраняется в IndexedDB.
 - React Hook Form + Zod управляют формами и client-side UX validation.
-- Supabase остается источником истины; IndexedDB может кэшировать read-only metadata и незавершённые upload drafts.
+- Supabase остаётся multi-device источником истины; IndexedDB содержит только owner-scoped незавершённые upload drafts и очищается после финализации.
 - Query keys всегда account-scoped.
 - Unsafe mutations не повторяются автоматически.
 - Blob URL создаются на время preview и освобождаются в cleanup.
@@ -284,11 +284,14 @@ sequenceDiagram
   participant D as Database
   U->>A: выбирает файл
   A->>A: MIME/size/dimensions preflight
+  A->>A: strip EXIF + resize/encode
+  A->>A: сохранить draft в owner-scoped IndexedDB
   A->>F: запрос upload authorization
   F->>D: membership + subscription + quota
   F-->>A: upload contract
   A->>S: resumable/private upload
   A->>F: finalize upload
+  A->>A: удалить финализированный draft из IndexedDB
   F->>D: processing_job queued
   W->>S: inspect/compile/transcode
   W->>D: progress + normalized metadata

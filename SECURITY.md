@@ -34,6 +34,8 @@ Picker accepts не являются защитой. Нет magic-byte inspectio
 
 Статус этапа 5: закрыто на уровне репозитория. Worker повторно декодирует marker, вычисляет quality score, компилирует MindAR dataset, проверяет видео через ffprobe как H.264/AAC-or-none и создаёт WebP thumbnail. Browser не может claim/complete jobs; publication UI не выдаёт ложный publish до этапов 6–7.
 
+Client optimization не считается trust boundary: она уменьшает transfer и удаляет EXIF, но server-side magic-byte/codec/decode/quota проверки остаются обязательными. Незавершённые подготовленные Blob хранятся в отдельной owner-scoped IndexedDB, не попадают в service-worker cache и удаляются после успешной финализации или явного удаления пользователем. IndexedDB не используется как источник публичного AR на другом устройстве.
+
 #### SEC-004: публичный test asset содержит metadata
 
 `public/test-assets/test.jpg` содержит EXIF, включая указание на GPS-данные, модель устройства и дату. Файл копируется в public build. Аналогичный metadata найден в локальном `test-assets/test2.jpg`.

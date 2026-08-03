@@ -60,5 +60,19 @@ const prepared: PreparedMedia = {
   kind: "marker",
   file: input.file,
   sha256: "a".repeat(64),
-  metadata: { width: 640, height: 480, exifStripped: true },
+  metadata: {
+    width: 640,
+    height: 480,
+    exifStripped: true,
+    optimization: {
+      strategy: "adaptive-image",
+      originalWidth: 640,
+      originalHeight: 480,
+      originalBytes: 4,
+      uploadBytes: 4,
+      savedBytes: 0,
+      reductionPercent: 0,
+      optimized: false,
+    },
+  },
 };
