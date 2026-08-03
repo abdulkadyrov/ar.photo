@@ -1,8 +1,6 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { ProtectedRoute } from "../../features/auth/AuthProvider";
-import { AppShell } from "../layout/AppShell";
-import { Panel } from "../../shared/ui";
 import { RouteErrorBoundary } from "../../shared/errors/RouteErrorBoundary";
 import { getRouterBasename } from "./routerBase";
 
@@ -55,7 +53,9 @@ const PublicArPrivacyRoute = lazy(() =>
   import("../../features/public-ar/PublicArViewerPage").then((module) => ({ default: module.PublicArPrivacyRoute })),
 );
 const PublicArUnsupportedRoute = lazy(() =>
-  import("../../features/public-ar/PublicArViewerPage").then((module) => ({ default: module.PublicArUnsupportedRoute })),
+  import("../../features/public-ar/PublicArViewerPage").then((module) => ({
+    default: module.PublicArUnsupportedRoute,
+  })),
 );
 const LoginRoute = lazy(() =>
   import("../../features/auth/AuthPages").then((module) => ({ default: module.LoginRoute })),
@@ -65,6 +65,15 @@ const ResetPasswordRoute = lazy(() =>
 );
 const UpdatePasswordRoute = lazy(() =>
   import("../../features/auth/AuthPages").then((module) => ({ default: module.UpdatePasswordRoute })),
+);
+const SettingsRoute = lazy(() =>
+  import("../../features/settings/SettingsPages").then((module) => ({ default: module.SettingsRoute })),
+);
+const SubscriptionRoute = lazy(() =>
+  import("../../features/settings/SettingsPages").then((module) => ({ default: module.SubscriptionRoute })),
+);
+const TeamRoute = lazy(() =>
+  import("../../features/settings/SettingsPages").then((module) => ({ default: module.TeamRoute })),
 );
 
 export function AppRouter() {
@@ -95,7 +104,9 @@ function RoutedContent() {
           <Route path="/items/:itemId/edit" element={<Protected element={<EditArItemRoute />} />} />
           <Route path="/items/:itemId/qr" element={<Protected element={<QrPublicationRoute />} />} />
           <Route path="/qr-codes" element={<Protected element={<QrCodesRoute />} />} />
-          <Route path="/settings" element={<Protected element={<FoundationPlaceholder title="Настройки" />} />} />
+          <Route path="/settings" element={<Protected element={<SettingsRoute />} />} />
+          <Route path="/settings/subscription" element={<Protected element={<SubscriptionRoute />} />} />
+          <Route path="/settings/team" element={<Protected element={<TeamRoute />} />} />
           <Route path="/project/:projectId" element={<Protected element={<PrototypeProjectRoute />} />} />
           <Route path="/viewer/test" element={<PrototypeTestViewerRoute />} />
           <Route path="/viewer/:livePhotoId" element={<PrototypeViewerRoute />} />
@@ -111,23 +122,6 @@ function RoutedContent() {
 
 function Protected({ element }: { element: ReactNode }) {
   return <ProtectedRoute>{element}</ProtectedRoute>;
-}
-
-function FoundationPlaceholder({ title }: { title: string }) {
-  return (
-    <AppShell
-      eyebrow="Этап 1"
-      title={title}
-      description="Раздел подключён к новой навигации и будет наполнен рабочими сценариями на соответствующем продуктовом этапе."
-    >
-      <Panel className="mt-7">
-        <p className="text-sm leading-6 text-muted">
-          Каркас маршрута, адаптивная навигация и состояния интерфейса уже готовы. Здесь нет фиктивных действий —
-          доступные операции появятся вместе с защищённым backend.
-        </p>
-      </Panel>
-    </AppShell>
-  );
 }
 
 function RouteLoading() {

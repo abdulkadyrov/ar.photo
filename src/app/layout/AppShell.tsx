@@ -9,6 +9,7 @@ import {
   ScanLine,
   Settings,
   Sparkles,
+  Users,
   WandSparkles,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
@@ -22,8 +23,13 @@ const navigation = [
   { to: "/items", label: "AR-работы", icon: WandSparkles },
   { to: "/viewer/test", label: "AR-проверка", icon: ScanLine },
   { to: "/qr-codes", label: "QR-коды", icon: QrCode },
+  { to: "/settings/team", label: "Команда", icon: Users },
   { to: "/settings", label: "Настройки", icon: Settings },
 ] as const;
+
+const mobileNavigation = navigation.filter((item) =>
+  ["/dashboard", "/projects", "/items", "/settings"].includes(item.to),
+);
 
 export function AppShell({
   eyebrow,
@@ -124,7 +130,7 @@ export function AppShell({
       </div>
 
       <nav aria-label="Мобильная навигация" className="mobile-nav lg:hidden">
-        {navigation.slice(0, 4).map((item) => {
+        {mobileNavigation.map((item) => {
           const Icon = item.icon;
           return (
             <NavLink

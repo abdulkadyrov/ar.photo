@@ -175,12 +175,12 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-5 backdrop-blur-sm" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-50 grid overflow-y-auto bg-black/70 p-5 backdrop-blur-sm" onMouseDown={onClose}>
       <section
         aria-describedby={description ? descriptionId : undefined}
         aria-labelledby={titleId}
         aria-modal="true"
-        className="surface-card w-full max-w-lg rounded-card border border-line p-5 shadow-soft"
+        className="surface-card my-auto max-h-[calc(100dvh-2.5rem)] w-full max-w-lg overflow-y-auto rounded-card border border-line p-5 shadow-soft"
         onMouseDown={(event) => event.stopPropagation()}
         role="dialog"
         tabIndex={-1}

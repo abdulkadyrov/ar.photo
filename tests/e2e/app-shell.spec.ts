@@ -73,11 +73,15 @@ test("keeps the public AR viewer camera-explicit with a no-camera fallback", asy
 
   await expect(page.getByRole("heading", { name: "Демо AR Photo" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Начать AR" })).toBeVisible();
-  expect(await page.evaluate(() => (window as typeof window & { __arPhotoCameraRequests: number }).__arPhotoCameraRequests)).toBe(0);
+  expect(
+    await page.evaluate(() => (window as typeof window & { __arPhotoCameraRequests: number }).__arPhotoCameraRequests),
+  ).toBe(0);
 
   await page.getByRole("button", { name: "Смотреть обычное видео" }).click();
   await expect(page.getByTestId("public-ar-fallback-video")).toBeVisible();
-  expect(await page.evaluate(() => (window as typeof window & { __arPhotoCameraRequests: number }).__arPhotoCameraRequests)).toBe(0);
+  expect(
+    await page.evaluate(() => (window as typeof window & { __arPhotoCameraRequests: number }).__arPhotoCameraRequests),
+  ).toBe(0);
 
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -310,5 +314,50 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   await expect(page.getByTestId("public-qr-url")).toHaveText(rotatedPublicUrl!);
 
   await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("shows subscription usage and manages team permissions within the tariff", async ({ page }) => {
+  await page.goto("./settings/subscription");
+  await signInToDemo(page);
+
+  await expect(page.getByRole("heading", { name: "Тариф и лимиты" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Студия" })).toBeVisible();
+  await expect(page.getByRole("progressbar", { name: /Хранилище/ })).toBeVisible();
+  await expect(page.getByText("Продление без фиктивной оплаты", { exact: true })).toBeVisible();
+
+  const settingsNavigation = page.getByRole("navigation", { name: "Разделы настроек" });
+  await settingsNavigation.getByRole("link", { name: "Команда" }).click();
+  await expect(page.getByRole("heading", { name: "Команда", exact: true })).toBeVisible();
+  await expect(page.getByText("Алина Магомедова", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Пригласить сотрудника" }).click();
+  const inviteDialog = page.getByRole("dialog", { name: "Пригласить сотрудника" });
+  await inviteDialog.getByPlaceholder("employee@example.com").fill("designer@example.com");
+  await inviteDialog.getByLabel("Роль").selectOption("viewer");
+  await inviteDialog.getByText("Статистика", { exact: true }).click();
+  await inviteDialog.getByRole("button", { name: "Отправить приглашение" }).click();
+  await expect(page.getByText("Приглашение создано", { exact: true })).toBeVisible();
+  await expect(page.getByText("designer@example.com", { exact: true })).toBeVisible();
+
+  const memberCard = page.getByText("Алина Магомедова", { exact: true }).locator("../..");
+  await memberCard.getByRole("button", { name: "Права" }).click();
+  const rightsDialog = page.getByRole("dialog", { name: "Права: Алина Магомедова" });
+  await rightsDialog.getByLabel("Роль").selectOption("viewer");
+  await rightsDialog.getByRole("button", { name: "Сохранить права" }).click();
+  await expect(page.getByText("Права сотрудника сохранены", { exact: true })).toBeVisible();
+
+  await page
+    .getByText("Алина Магомедова", { exact: true })
+    .locator("../..")
+    .getByRole("button", { name: "Отключить" })
+    .click();
+  await page.getByRole("dialog", { name: "Отключить сотрудника?" }).getByRole("button", { name: "Отключить" }).click();
+  await expect(page.getByText("Доступ сотрудника отключён", { exact: true })).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    page.getByRole("navigation", { name: "Мобильная навигация" }).getByRole("link", { name: "Настройки" }),
+  ).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type {
   Group,
   GroupInput,
@@ -76,36 +77,25 @@ export class SupabaseCatalogRepository implements CatalogRepository {
     }
 
     const accountId = profile.account_id;
-    const [accountResult, membershipResult, subscriptionResult] = await Promise.all([
-      this.client.from("accounts").select("id,name,status").eq("id", accountId).maybeSingle(),
-      this.client
-        .from("account_members")
-        .select("role,is_active")
-        .eq("account_id", accountId)
-        .eq("user_id", userId)
-        .maybeSingle(),
-      this.client.from("subscriptions").select("status,expires_at").eq("account_id", accountId).maybeSingle(),
-    ]);
-
-    if (accountResult.error) throw mapCatalogError(accountResult.error);
-    if (membershipResult.error) throw mapCatalogError(membershipResult.error);
-    if (subscriptionResult.error) throw mapCatalogError(subscriptionResult.error);
-    if (!accountResult.data || !membershipResult.data?.is_active || !subscriptionResult.data) {
-      throw new CatalogError("workspace_unavailable", "Рабочее пространство недоступно");
+    const { data, error } = await this.client.rpc("get_account_entitlements", { p_target_account_id: accountId });
+    if (error) throw mapCatalogError(error);
+    const entitlement = workspaceEntitlementSchema.safeParse(data);
+    if (!entitlement.success) {
+      throw new CatalogError(
+        "workspace_unavailable",
+        "Сервер вернул некорректные параметры доступа",
+        entitlement.error,
+      );
     }
-
-    const subscriptionStatus = subscriptionResult.data.status;
-    const canWriteByRole = ["owner", "manager", "editor"].includes(membershipResult.data.role);
-    const canWriteBySubscription = ["trial", "active", "grace_period"].includes(subscriptionStatus);
 
     return {
       accountId,
-      accountName: accountResult.data.name,
-      accountStatus: accountResult.data.status,
-      memberRole: membershipResult.data.role,
-      canWrite: accountResult.data.status === "active" && canWriteByRole && canWriteBySubscription,
-      subscriptionStatus,
-      subscriptionExpiresAt: subscriptionResult.data.expires_at,
+      accountName: entitlement.data.accountName,
+      accountStatus: entitlement.data.accountStatus,
+      memberRole: entitlement.data.memberRole,
+      canWrite: entitlement.data.canWrite,
+      subscriptionStatus: entitlement.data.subscription.status,
+      subscriptionExpiresAt: entitlement.data.subscription.expiresAt,
     };
   }
 
@@ -386,6 +376,17 @@ const projectSort = {
   name_asc: { column: "name", ascending: true },
   name_desc: { column: "name", ascending: false },
 } as const;
+
+const workspaceEntitlementSchema = z.object({
+  accountName: z.string().min(1),
+  accountStatus: z.enum(["active", "suspended", "closed"]),
+  memberRole: z.enum(["owner", "manager", "editor", "viewer"]),
+  canWrite: z.boolean(),
+  subscription: z.object({
+    status: z.enum(["trial", "active", "grace_period", "expired", "suspended", "cancelled"]),
+    expiresAt: z.string().datetime().nullable(),
+  }),
+});
 
 function mapCatalogError(error: { code?: string; message?: string }) {
   const message = error.message ?? "Не удалось выполнить операцию";
