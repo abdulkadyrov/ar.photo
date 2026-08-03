@@ -18,6 +18,8 @@ function getTomlSection(source, name) {
 
 const authConfig = getTomlSection(supabaseConfig, "auth");
 const emailAuthConfig = getTomlSection(supabaseConfig, "auth.email");
+const totpAuthConfig = getTomlSection(supabaseConfig, "auth.mfa.totp");
+const storageConfig = getTomlSection(supabaseConfig, "storage");
 const requiredHeaders = [
   "Content-Security-Policy:",
   "frame-ancestors 'none'",
@@ -44,6 +46,9 @@ const requiredAuthConfigRules = [
   [authConfig, /enable_signup\s*=\s*true/, "self-service Auth signup"],
   [emailAuthConfig, /enable_signup\s*=\s*true/, "email signup provider"],
   [emailAuthConfig, /enable_confirmations\s*=\s*false/, "email autoconfirm"],
+  [totpAuthConfig, /enroll_enabled\s*=\s*true/, "TOTP enrollment"],
+  [totpAuthConfig, /verify_enabled\s*=\s*true/, "TOTP verification"],
+  [storageConfig, /file_size_limit\s*=\s*"50MiB"/, "free-tier Storage upload ceiling"],
 ];
 const failures = [
   ...requiredHeaders.filter((value) => !headers.includes(value)).map((value) => `missing header contract: ${value}`),

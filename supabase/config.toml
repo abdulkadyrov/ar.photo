@@ -34,7 +34,7 @@ port = 54324
 
 [storage]
 enabled = true
-file_size_limit = "500MiB"
+file_size_limit = "50MiB"
 
 [auth]
 enabled = true
@@ -67,6 +67,13 @@ secure_password_change = true
 max_frequency = "30s"
 otp_length = 6
 otp_expiry = 1800
+
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
 
 [analytics]
 enabled = false
