@@ -116,3 +116,48 @@ test("creates a production project and group without duplicate submissions", asy
   await expect(page.getByText("Учителя", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+
+test("validates and uploads a marker through the resumable media queue", async ({ page }) => {
+  await page.goto("./projects");
+  await signInToDemo(page);
+
+  await page.getByRole("button", { name: "Создать проект" }).first().click();
+  const projectDialog = page.getByRole("dialog", { name: "Новый проект" });
+  await projectDialog.getByPlaceholder("Например, Выпускной 2027").fill("Media upload project");
+  await projectDialog.getByRole("button", { name: "Создать проект" }).click();
+  await page.getByRole("link", { name: "Media upload project" }).click();
+  await page.getByRole("button", { name: "Добавить группу" }).first().click();
+  const groupDialog = page.getByRole("dialog", { name: "Новая группа" });
+  await groupDialog.getByPlaceholder("Например, 11А класс").fill("Media upload group");
+  await groupDialog.getByRole("button", { name: "Создать группу" }).click();
+  await page.getByRole("link", { name: "Медиа", exact: true }).click();
+
+  await expect(page.getByRole("heading", { name: "Медиа", exact: true })).toBeVisible();
+  await expect(page.getByText("Демо-режим", { exact: false })).toBeVisible();
+  const markerBase64 = await page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 640;
+    canvas.height = 480;
+    const context = canvas.getContext("2d")!;
+    context.fillStyle = "#5f48ff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = "#ffffff";
+    context.font = "bold 48px sans-serif";
+    context.fillText("AR Photo", 190, 250);
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "marker-stage-4.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(markerBase64, "base64"),
+  });
+
+  const queue = page.getByRole("article").filter({ hasText: "marker-stage-4.png" });
+  await expect(queue.getByText("готов к загрузке", { exact: false })).toBeVisible();
+  await queue.getByRole("button", { name: "Загрузить" }).click();
+  await expect(queue.getByText("загружено", { exact: false })).toBeVisible();
+  await expect(page.getByText("Файл загружен", { exact: true })).toBeVisible();
+  await expect(page.getByText("v1", { exact: false }).first()).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});

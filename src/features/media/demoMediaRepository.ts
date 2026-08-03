@@ -1,7 +1,7 @@
 import type { BeginMediaUploadInput, MediaAsset, PreparedMedia, UploadProgress } from "../../entities/media/model";
 import type { MediaRepository } from "./mediaRepository";
 
-type DemoMediaStore = {
+export type DemoMediaStore = {
   read(): MediaAsset[];
   write(assets: MediaAsset[]): void;
 };

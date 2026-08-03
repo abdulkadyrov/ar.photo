@@ -18,12 +18,9 @@ export type VideoMetadata = {
   audioCodec: "aac" | "none";
 };
 
-export type PreparedMedia = {
-  file: File;
-  kind: MediaKind;
-  sha256: string;
-  metadata: MarkerMetadata | VideoMetadata;
-};
+export type PreparedMedia =
+  | { file: File; kind: "marker"; sha256: string; metadata: MarkerMetadata }
+  | { file: File; kind: "video"; sha256: string; metadata: VideoMetadata };
 
 export type BeginMediaUploadInput = {
   accountId: string;
