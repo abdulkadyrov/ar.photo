@@ -99,6 +99,21 @@ verify_jwt = false
 import_map = "./functions/public-ar-manifest/deno.json"
 entrypoint = "./functions/public-ar-manifest/index.ts"
 
+[functions.public-ar-analytics]
+enabled = true
+# Public viewers send a strict, minimized event payload without a user JWT.
+# The function hashes transient identifiers, rate-limits ingestion and never stores raw IP or User-Agent.
+verify_jwt = false
+import_map = "./functions/public-ar-analytics/deno.json"
+entrypoint = "./functions/public-ar-analytics/index.ts"
+
+[functions.cleanup-analytics]
+enabled = true
+# A scheduler invokes bounded retention batches with a dedicated Edge-only secret.
+verify_jwt = false
+import_map = "./functions/cleanup-analytics/deno.json"
+entrypoint = "./functions/cleanup-analytics/index.ts"
+
 [functions.team-invite]
 enabled = true
 # The user JWT authorizes the account mutation; service-role access is used only

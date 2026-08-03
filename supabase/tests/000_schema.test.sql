@@ -14,10 +14,10 @@ select is(
       and c.relname = any(array[
         'subscription_plans', 'accounts', 'profiles', 'account_members', 'subscriptions',
         'projects', 'groups', 'ar_items', 'media_assets', 'upload_sessions', 'processing_jobs', 'qr_codes',
-        'ar_view_sessions', 'audit_logs', 'team_invitations'
+        'ar_view_sessions', 'ar_view_events', 'audit_logs', 'team_invitations'
       ])
   ),
-  15::bigint,
+  16::bigint,
   'all application tables exist'
 );
 
@@ -31,10 +31,10 @@ select is(
       and c.relname = any(array[
         'subscription_plans', 'accounts', 'profiles', 'account_members', 'subscriptions',
         'projects', 'groups', 'ar_items', 'media_assets', 'upload_sessions', 'processing_jobs', 'qr_codes',
-        'ar_view_sessions', 'audit_logs', 'team_invitations'
+        'ar_view_sessions', 'ar_view_events', 'audit_logs', 'team_invitations'
       ])
   ),
-  15::bigint,
+  16::bigint,
   'RLS is enabled on every application table'
 );
 
@@ -48,10 +48,10 @@ select is(
       and c.relname = any(array[
         'subscription_plans', 'accounts', 'profiles', 'account_members', 'subscriptions',
         'projects', 'groups', 'ar_items', 'media_assets', 'upload_sessions', 'processing_jobs', 'qr_codes',
-        'ar_view_sessions', 'audit_logs', 'team_invitations'
+        'ar_view_sessions', 'ar_view_events', 'audit_logs', 'team_invitations'
       ])
   ),
-  15::bigint,
+  16::bigint,
   'RLS is forced on every application table'
 );
 
@@ -64,7 +64,7 @@ select is(
       and g.table_name = any(array[
         'subscription_plans', 'accounts', 'profiles', 'account_members', 'subscriptions',
         'projects', 'groups', 'ar_items', 'media_assets', 'upload_sessions', 'processing_jobs', 'qr_codes',
-        'ar_view_sessions', 'audit_logs', 'team_invitations'
+        'ar_view_sessions', 'ar_view_events', 'audit_logs', 'team_invitations'
       ])
   ),
   0::bigint,
@@ -81,7 +81,7 @@ select is(
       and g.table_name = any(array[
         'subscription_plans', 'accounts', 'profiles', 'account_members', 'subscriptions',
         'projects', 'groups', 'ar_items', 'media_assets', 'upload_sessions', 'processing_jobs', 'qr_codes',
-        'ar_view_sessions', 'audit_logs', 'team_invitations'
+        'ar_view_sessions', 'ar_view_events', 'audit_logs', 'team_invitations'
       ])
   ),
   0::bigint,
@@ -142,7 +142,9 @@ select is(
         'member_has_permission', 'enforce_stage8_member_permission', 'write_team_invitation_audit',
         'get_account_entitlements', 'get_team_roster', 'get_my_pending_team_invitations',
         'create_team_invitation', 'revoke_team_invitation', 'accept_team_invitation',
-        'update_team_member', 'set_team_member_active', 'admin_update_subscription'
+        'update_team_member', 'set_team_member_active', 'admin_update_subscription',
+        'consume_public_analytics_rate_limit', 'record_public_ar_event',
+        'get_analytics_summary', 'purge_analytics_before'
       )
       and not exists (
         select 1
