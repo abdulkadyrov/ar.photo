@@ -88,3 +88,11 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/cleanup-stale-uploads/deno.json"
 entrypoint = "./functions/cleanup-stale-uploads/index.ts"
+
+[functions.public-ar-manifest]
+enabled = true
+# Public QR viewers have no user JWT. The function exposes only a minimal manifest,
+# applies its own durable rate limit and keeps service credentials in Edge secrets.
+verify_jwt = false
+import_map = "./functions/public-ar-manifest/deno.json"
+entrypoint = "./functions/public-ar-manifest/index.ts"
