@@ -42,6 +42,8 @@ site_url = "http://127.0.0.1:5173/ar.photo/"
 additional_redirect_urls = [
   "http://127.0.0.1:5173/ar.photo/update-password",
   "http://localhost:5173/ar.photo/update-password",
+  "http://127.0.0.1:5173/ar.photo/settings/team",
+  "http://localhost:5173/ar.photo/settings/team",
 ]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
@@ -96,3 +98,11 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/public-ar-manifest/deno.json"
 entrypoint = "./functions/public-ar-manifest/index.ts"
+
+[functions.team-invite]
+enabled = true
+# The user JWT authorizes the account mutation; service-role access is used only
+# for Supabase Auth email delivery inside the Edge runtime.
+verify_jwt = true
+import_map = "./functions/team-invite/deno.json"
+entrypoint = "./functions/team-invite/index.ts"

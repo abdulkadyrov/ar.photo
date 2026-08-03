@@ -14,10 +14,10 @@ select is(
       and c.relname = any(array[
         'subscription_plans', 'accounts', 'profiles', 'account_members', 'subscriptions',
         'projects', 'groups', 'ar_items', 'media_assets', 'upload_sessions', 'processing_jobs', 'qr_codes',
-        'ar_view_sessions', 'audit_logs'
+        'ar_view_sessions', 'audit_logs', 'team_invitations'
       ])
   ),
-  14::bigint,
+  15::bigint,
   'all application tables exist'
 );
 
@@ -31,10 +31,10 @@ select is(
       and c.relname = any(array[
         'subscription_plans', 'accounts', 'profiles', 'account_members', 'subscriptions',
         'projects', 'groups', 'ar_items', 'media_assets', 'upload_sessions', 'processing_jobs', 'qr_codes',
-        'ar_view_sessions', 'audit_logs'
+        'ar_view_sessions', 'audit_logs', 'team_invitations'
       ])
   ),
-  14::bigint,
+  15::bigint,
   'RLS is enabled on every application table'
 );
 
@@ -48,10 +48,10 @@ select is(
       and c.relname = any(array[
         'subscription_plans', 'accounts', 'profiles', 'account_members', 'subscriptions',
         'projects', 'groups', 'ar_items', 'media_assets', 'upload_sessions', 'processing_jobs', 'qr_codes',
-        'ar_view_sessions', 'audit_logs'
+        'ar_view_sessions', 'audit_logs', 'team_invitations'
       ])
   ),
-  14::bigint,
+  15::bigint,
   'RLS is forced on every application table'
 );
 
@@ -64,7 +64,7 @@ select is(
       and g.table_name = any(array[
         'subscription_plans', 'accounts', 'profiles', 'account_members', 'subscriptions',
         'projects', 'groups', 'ar_items', 'media_assets', 'upload_sessions', 'processing_jobs', 'qr_codes',
-        'ar_view_sessions', 'audit_logs'
+        'ar_view_sessions', 'audit_logs', 'team_invitations'
       ])
   ),
   0::bigint,
@@ -81,7 +81,7 @@ select is(
       and g.table_name = any(array[
         'subscription_plans', 'accounts', 'profiles', 'account_members', 'subscriptions',
         'projects', 'groups', 'ar_items', 'media_assets', 'upload_sessions', 'processing_jobs', 'qr_codes',
-        'ar_view_sessions', 'audit_logs'
+        'ar_view_sessions', 'audit_logs', 'team_invitations'
       ])
   ),
   0::bigint,
@@ -138,7 +138,11 @@ select is(
         'create_ar_item_draft', 'prepare_ar_item_processing', 'claim_processing_jobs',
         'report_processing_progress', 'complete_processing_job', 'fail_processing_job',
         'retry_ar_item_processing', 'override_marker_quality', 'publish_ar_item',
-        'unpublish_ar_item', 'rotate_ar_item_public_slug', 'update_ar_item_qr_style'
+        'unpublish_ar_item', 'rotate_ar_item_public_slug', 'update_ar_item_qr_style',
+        'member_has_permission', 'enforce_stage8_member_permission', 'write_team_invitation_audit',
+        'get_account_entitlements', 'get_team_roster', 'get_my_pending_team_invitations',
+        'create_team_invitation', 'revoke_team_invitation', 'accept_team_invitation',
+        'update_team_member', 'set_team_member_active', 'admin_update_subscription'
       )
       and not exists (
         select 1
