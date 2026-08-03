@@ -86,12 +86,12 @@ begin
   );
   account_slug := trim(both '-' from left(
     regexp_replace(lower(account_name), '[^a-z0-9]+', '-', 'g'),
-    48
+    28
   ));
   if char_length(account_slug) < 3 then
     account_slug := 'workspace';
   end if;
-  account_slug := account_slug || '-' || left(replace(caller_id::text, '-', ''), 8);
+  account_slug := account_slug || '-' || replace(caller_id::text, '-', '');
 
   insert into public.accounts (name, slug, owner_user_id)
   values (account_name, account_slug, caller_id)
