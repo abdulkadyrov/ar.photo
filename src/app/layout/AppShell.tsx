@@ -81,7 +81,7 @@ export function AppShell({
 
         <div className="mt-auto rounded-2xl border border-line bg-white/[0.025] p-4">
           <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/15 font-semibold uppercase text-primary">
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/15 font-semibold uppercase text-primary-soft">
               {auth.session?.user.email.slice(0, 2) ?? "AR"}
             </span>
             <div className="min-w-0">
@@ -111,7 +111,7 @@ export function AppShell({
         <header className="app-topbar">
           <div>
             {eyebrow ? (
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">{eyebrow}</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary-soft">{eyebrow}</p>
             ) : null}
             <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">{title}</h1>
             {description ? (

@@ -8,6 +8,7 @@ export default {
         card: "var(--card)",
         surface: "var(--surface)",
         primary: "var(--primary)",
+        "primary-soft": "var(--primary-soft)",
         ink: "var(--ink)",
         muted: "var(--muted)",
         line: "var(--line)",

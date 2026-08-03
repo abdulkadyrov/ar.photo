@@ -17,6 +17,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:cross-browser": "playwright test --config playwright.cross-browser.config.ts",
     "check:bundle": "node scripts/check-bundle.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:metadata": "node scripts/check-public-metadata.mjs",
@@ -49,7 +50,9 @@
     "zustand": "5.0.14"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.12.1",
     "@eslint/js": "10.0.1",
+    "@axe-core/playwright": "4.12.1",
     "@playwright/test": "1.62.1",
     "@testing-library/dom": "10.4.1",
     "@testing-library/jest-dom": "7.0.0",
