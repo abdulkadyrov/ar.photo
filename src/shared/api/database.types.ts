@@ -852,6 +852,62 @@ export type Database = {
           },
         ];
       };
+      team_invitations: {
+        Row: {
+          accepted_at: string | null;
+          accepted_by: string | null;
+          account_id: string;
+          created_at: string;
+          email: string;
+          expires_at: string;
+          id: string;
+          invited_by: string;
+          permissions: Json;
+          revoked_at: string | null;
+          role: Database["public"]["Enums"]["member_role"];
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          account_id: string;
+          created_at?: string;
+          email: string;
+          expires_at?: string;
+          id?: string;
+          invited_by: string;
+          permissions?: Json;
+          revoked_at?: string | null;
+          role: Database["public"]["Enums"]["member_role"];
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          account_id?: string;
+          created_at?: string;
+          email?: string;
+          expires_at?: string;
+          id?: string;
+          invited_by?: string;
+          permissions?: Json;
+          revoked_at?: string | null;
+          role?: Database["public"]["Enums"]["member_role"];
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "team_invitations_account_id_fkey";
+            columns: ["account_id"];
+            isOneToOne: false;
+            referencedRelation: "accounts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       upload_sessions: {
         Row: UploadSessionRow;
         Insert: {
@@ -916,6 +972,16 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      accept_team_invitation: {
+        Args: { p_invitation_id: string };
+        Returns: Database["public"]["Tables"]["account_members"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "account_members";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       abort_media_upload: {
         Args: { p_session_id: string };
         Returns: UploadSessionRow;
@@ -955,6 +1021,24 @@ export type Database = {
         SetofOptions: {
           from: "*";
           to: "accounts";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      admin_update_subscription: {
+        Args: {
+          p_custom_limits?: Json;
+          p_expires_at: string;
+          p_grace_period_ends_at: string;
+          p_plan_id: string;
+          p_starts_at: string;
+          p_status: Database["public"]["Enums"]["subscription_status"];
+          p_target_account_id: string;
+        };
+        Returns: Database["public"]["Tables"]["subscriptions"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "subscriptions";
           isOneToOne: true;
           isSetofReturn: false;
         };
@@ -1108,6 +1192,22 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      create_team_invitation: {
+        Args: {
+          p_email: string;
+          p_expires_at?: string;
+          p_permissions?: Json;
+          p_role: Database["public"]["Enums"]["member_role"];
+          p_target_account_id: string;
+        };
+        Returns: Database["public"]["Tables"]["team_invitations"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "team_invitations";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       expire_stale_uploads: {
         Args: { p_limit?: number };
         Returns: UploadSessionRow[];
@@ -1148,6 +1248,14 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      get_account_entitlements: {
+        Args: { p_target_account_id: string };
+        Returns: Json;
+      };
+      get_my_pending_team_invitations: {
+        Args: never;
+        Returns: Json;
+      };
       get_public_ar_manifest_source: {
         Args: { p_public_slug: string };
         Returns: {
@@ -1166,6 +1274,10 @@ export type Database = {
           video_bucket: string;
           video_path: string;
         }[];
+      };
+      get_team_roster: {
+        Args: { p_target_account_id: string };
+        Returns: Json;
       };
       move_group: {
         Args: {
@@ -1292,6 +1404,16 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      revoke_team_invitation: {
+        Args: { p_invitation_id: string; p_target_account_id: string };
+        Returns: Database["public"]["Tables"]["team_invitations"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "team_invitations";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       rotate_ar_item_public_slug: {
         Args: {
           p_item_id: string;
@@ -1302,6 +1424,20 @@ export type Database = {
         SetofOptions: {
           from: "*";
           to: "qr_codes";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      set_team_member_active: {
+        Args: {
+          p_is_active: boolean;
+          p_member_id: string;
+          p_target_account_id: string;
+        };
+        Returns: Database["public"]["Tables"]["account_members"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "account_members";
           isOneToOne: true;
           isSetofReturn: false;
         };
@@ -1332,6 +1468,21 @@ export type Database = {
         SetofOptions: {
           from: "*";
           to: "qr_codes";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      update_team_member: {
+        Args: {
+          p_member_id: string;
+          p_permissions: Json;
+          p_role: Database["public"]["Enums"]["member_role"];
+          p_target_account_id: string;
+        };
+        Returns: Database["public"]["Tables"]["account_members"]["Row"];
+        SetofOptions: {
+          from: "*";
+          to: "account_members";
           isOneToOne: true;
           isSetofReturn: false;
         };
