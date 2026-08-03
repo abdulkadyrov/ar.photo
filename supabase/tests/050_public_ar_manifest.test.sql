@@ -171,7 +171,7 @@ select is_empty(
 reset role;
 update public.subscriptions
 set status = 'grace_period',
-    grace_period_ends_at = statement_timestamp() + interval '1 day'
+    grace_period_ends_at = coalesce(expires_at, statement_timestamp()) + interval '1 day'
 where account_id = '20000000-0000-4000-8000-000000000001';
 set local role service_role;
 select isnt_empty(
