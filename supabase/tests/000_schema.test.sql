@@ -134,7 +134,10 @@ select is(
         'has_storage_access', 'handle_new_user', 'write_audit_log', 'admin_create_account',
         'create_project', 'create_group', 'create_ar_item', 'reorder_groups', 'move_group',
         'begin_media_upload', 'start_media_upload', 'fail_media_upload', 'finalize_media_upload',
-        'abort_media_upload', 'expire_stale_uploads', 'complete_upload_cleanup'
+        'abort_media_upload', 'expire_stale_uploads', 'complete_upload_cleanup',
+        'create_ar_item_draft', 'prepare_ar_item_processing', 'claim_processing_jobs',
+        'report_processing_progress', 'complete_processing_job', 'fail_processing_job',
+        'retry_ar_item_processing', 'override_marker_quality'
       )
       and not exists (
         select 1
