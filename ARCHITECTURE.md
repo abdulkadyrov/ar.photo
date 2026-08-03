@@ -215,6 +215,14 @@ stateDiagram-v2
 
 Публичный URL строится только из configured HTTPS origin, optional base path и 144-bit random slug. SVG/PNG генерируются в browser из одного durable URL с ECC H и quiet zone 4–8 модулей; пресеты ограничены white, transparent и AR Photo brand, а logo scale — 8–20%. QR download/print не содержит item UUID, account id, PII, Storage path или signed URL. Custom domain меняет только origin; rotate обязателен только при отзыве capability, а смена стиля увеличивает QR version без смены public URL.
 
+### 8.1. Effective entitlements и team boundary
+
+`get_account_entitlements` — единый read contract для аккаунта, текущего тарифа, subscription state, нормализованных permissions, effective limits и фактического usage. Internal routes не выводят `canWrite` из имени роли: production catalog и settings используют серверное значение, учитывающее account status, subscription window и разрешение `edit`.
+
+Разрешения имеют закрытый набор `upload`, `edit`, `publish`, `delete`, `analytics`, `manage_groups`, `manage_team`. PostgreSQL нормализует defaults и не позволяет editor получить `manage_team`, а viewer — write/group/team permissions. Триггеры повторно проверяют нужное разрешение внутри project/group/item/upload/QR mutation независимо от frontend.
+
+Team lifecycle проходит через trusted RPC: приглашение создаётся под advisory lock и учитывает active members вместе с pending invitations; accept атомарно проверяет email получателя, срок и quota; revoke/update/deactivate/reactivate защищают owner, текущего пользователя и manager hierarchy. Таблица `team_invitations` использует forced RLS без прямых Data API grants. Edge Function `team-invite` вызывает RPC от user JWT, отправляет Supabase Auth invitation через server-only Admin API и отзывает запись при ошибке доставки. Платёжный boundary типизирован, но намеренно остаётся `not_configured` до выбора провайдера.
+
 ## 9. AR viewer state machine
 
 ```mermaid

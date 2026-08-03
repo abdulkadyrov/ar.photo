@@ -2,7 +2,7 @@
 
 ## 1. Область документа
 
-Документ описывает применённую PostgreSQL/Supabase схему этапа 2. Источник истины — последовательные SQL-миграции в `supabase/migrations`; CI разворачивает их с нуля на PostgreSQL 17, выполняет seed, lint и pgTAP-тесты.
+Документ описывает применённую PostgreSQL/Supabase схему этапов 2–8. Источник истины — последовательные SQL-миграции в `supabase/migrations`; CI разворачивает их с нуля на PostgreSQL 17, выполняет seed, lint и pgTAP-тесты.
 
 Все UUID генерируются сервером. Все timestamps — `timestamptz`. Денормализованный `account_id` используется на tenant-bound таблицах для простых и быстрых RLS policies, но всегда устанавливается/проверяется доверенной server logic.
 
@@ -81,6 +81,8 @@ Authorization never trusts `user_metadata`; membership tables and server-control
 
 Constraints: unique `(account_id, user_id)`. Index `(user_id, account_id)` and partial active-member index.
 
+`permissions` принимает только `upload`, `edit`, `publish`, `delete`, `analytics`, `manage_groups`, `manage_team` с boolean values. Role ceiling запрещает `manage_team` для editor и все write/group/team permissions для viewer.
+
 ### `subscription_plans`
 
 Fields: `id`, unique `code`, `name`, `description`, `storage_limit_bytes`, `project_limit`, `group_limit`, `ar_item_limit`, `video_duration_limit_seconds`, `max_video_size_bytes`, `team_limit`, `is_active`, `created_at`, `updated_at`.
@@ -89,9 +91,15 @@ All limits are non-negative. Plan rows are modified only by superadmin flow.
 
 ### `subscriptions`
 
-Fields: `id`, `account_id`, `plan_id`, `status`, `starts_at`, `expires_at`, `grace_period_ends_at`, `custom_limits jsonb`, `is_active`, `created_at`, `updated_at`.
+Fields: `id`, `account_id`, `plan_id`, `status`, `starts_at`, `expires_at`, `grace_period_ends_at`, `custom_limits jsonb`, `created_at`, `updated_at`.
 
-Constraints prevent inverted date ranges. There may be only one current subscription per account; history is retained. Effective limits are calculated by trusted SQL/service logic, not frontend merge.
+Constraints prevent inverted date ranges. There is one subscription row per account. `custom_limits` принимает только известные non-negative integer keys и переопределяет соответствующие plan limits. Effective limits are calculated by trusted SQL/service logic, not frontend merge.
+
+### `team_invitations`
+
+Fields: `id`, `account_id`, normalized `email`, `role`, validated `permissions`, `status`, `invited_by`, `expires_at`, `accepted_by`, `accepted_at`, `revoked_at`, `created_at`, `updated_at`.
+
+Pending email unique per account. Invitation rows имеют forced RLS и не получают прямых grants для `authenticated`; create/read/revoke/accept доступны только через trusted functions. Pending invitations учитываются в `team_limit`, а audit metadata не содержит email.
 
 ### `projects`
 
@@ -159,6 +167,7 @@ erDiagram
   AUTH_USERS ||--o| PROFILES : has
   AUTH_USERS ||--o{ ACCOUNT_MEMBERS : joins
   ACCOUNTS ||--o{ ACCOUNT_MEMBERS : contains
+  ACCOUNTS ||--o{ TEAM_INVITATIONS : invites
   ACCOUNTS ||--o{ SUBSCRIPTIONS : has
   SUBSCRIPTION_PLANS ||--o{ SUBSCRIPTIONS : defines
   ACCOUNTS ||--o{ PROJECTS : owns
@@ -187,6 +196,8 @@ Create project/group/AR item, add member, upload finalize и publish выпол�
 
 Повторный request использует idempotency key, чтобы двойной клик не создавал дубликат.
 
+`get_account_entitlements` возвращает нормализованный JSON contract с plan/subscription/limits/usage/permissions. Team invite и reactivate используют account-scoped advisory lock, поэтому одновременные запросы не могут превысить `team_limit`. `admin_update_subscription` повторно проверяет superadmin и нормализует custom limits; UI этого admin flow относится к этапу 10.
+
 ## 7. RLS matrix
 
 | Table                 | anon | authenticated member                 | owner/manager                    | superadmin            |
@@ -194,6 +205,7 @@ Create project/group/AR item, add member, upload finalize и publish выпол�
 | profiles              | нет  | свой профиль/разрешённые team fields | team read/manage via server flow | protected server flow |
 | accounts              | нет  | свой active account read             | update allowed fields            | protected server flow |
 | account_members       | нет  | own membership read                  | team read/manage by permission   | protected server flow |
+| team_invitations      | нет  | только trusted RPC                   | trusted RPC + `manage_team`      | protected server flow |
 | plans/subscriptions   | нет  | current effective read               | current/history read             | protected server flow |
 | projects/groups/items | нет  | account-scoped by permission         | account-scoped CRUD              | protected server flow |
 | processing_jobs       | нет  | account-scoped read                  | retry via server flow            | protected server flow |

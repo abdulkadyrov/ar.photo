@@ -2,7 +2,7 @@
 
 ## 1. Текущий security posture
 
-Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этапы 2–7 добавили Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, private Storage policies, audit logs, quota-aware mutations, resumable upload lifecycle, service-only media processing, минимальный публичный AR boundary и trusted publication/QR lifecycle.
+Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этапы 2–8 добавили Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, granular permissions, protected team lifecycle, private Storage policies, audit logs, quota-aware mutations, resumable upload lifecycle, service-only media processing, минимальный публичный AR boundary и trusted publication/QR lifecycle.
 
 Это ещё не разрешение на работу с реальными клиентами: analytics abuse controls, MFA администратора, hosted advisors, deployed-function/worker observability, physical-device QR/AR matrix и production environment verification закрываются последующими этапами.
 
@@ -92,7 +92,7 @@ Frontend отсутствует, а будущие скрытые кнопки �
 
 Мера: quota-sensitive mutations только через trusted transaction; RLS/constraints остаются второй линией защиты.
 
-Статус этапа 2: project/group/AR-item creation защищены transaction-scoped advisory locks, subscription checks, effective limits и idempotency keys. Upload/team/storage quotas дополняются в этапах 4 и 8.
+Статус этапа 8: project/group/AR-item creation, uploads и team lifecycle защищены subscription checks, effective limits и transaction-scoped advisory locks там, где возможна quota race. Team quota одновременно считает active members и pending invitations; custom limits имеют строгий schema allowlist. Frontend usage meters не являются authorization boundary.
 
 #### SEC-012: отсутствует rate limiting и abuse control
 

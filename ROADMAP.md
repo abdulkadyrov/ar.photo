@@ -207,6 +207,8 @@ Gate:
 
 ## Этап 8 — subscriptions, limits и team
 
+Статус: repository gate выполнен. Effective entitlements, строгие custom limits и permission ceilings, concurrency-safe team lifecycle, Edge invite delivery, usage meters и team UI подтверждены 93 unit-тестами, 10 E2E и 221 pgTAP-проверкой. Hosted email delivery ожидает development Supabase project; админский UI использует готовый RPC на этапе 10. Подробности: `STAGE_8_REPORT.md`.
+
 Цель: обеспечить бизнес-ограничения MVP.
 
 Deliverables:
