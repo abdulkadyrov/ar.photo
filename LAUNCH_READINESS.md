@@ -37,7 +37,7 @@
 |  17 | Analytics видна владельцу                      | ✅     | Privacy-minimized ingestion, scoped aggregates, retention и dashboard filter E2E/pgTAP                                                               |
 |  18 | Subscription limits работают                   | ✅     | Effective entitlements, concurrent quota locks, team/storage/catalog limits и usage UI покрыты pgTAP/E2E                                             |
 |  19 | RLS изолирует tenants                          | ✅     | Forced RLS, explicit grants и negative two-account matrix входят в 323 pgTAP assertions                                                              |
-|  20 | Build/lint/tests проходят                      | ✅     | GitHub Quality run: 132 unit/component, build/budgets/security/SBOM; 323 pgTAP; 17 Chromium + 12 browser/mobile tests; worker container green        |
+|  20 | Build/lint/tests проходят                      | ✅     | GitHub Quality run: 134 unit/component, build/budgets/security/SBOM; 323 pgTAP; 18 Chromium + 12 browser/mobile tests; worker container green        |
 |  21 | Основной сценарий проходит на iPhone и Android | ⛔     | Emulated Pixel/iPhone smoke зелёный, но обязательны два физических устройства и заполненный `MANUAL_DEVICE_CHECKLIST.md`                             |
 
 Итого: 15 ✅, 3 🟨, 3 ⛔. Любой 🟨/⛔ в таблице должен быть закрыт подписанным staging/production evidence до GO.
@@ -46,12 +46,12 @@
 
 - [x] TypeScript frontend + worker.
 - [x] ESLint без warnings.
-- [x] 132 unit/component tests.
+- [x] 134 unit/component tests.
 - [x] Production build и bundle budgets.
 - [x] Secrets/public metadata/security contract/dependency audit.
 - [x] Release manifest + CycloneDX SBOM artifacts.
 - [x] Clean PostgreSQL 17 reset/lint + 323 pgTAP.
-- [x] 17 Chromium E2E, включая WCAG/PWA.
+- [x] 18 Chromium E2E, включая fail-closed config, WCAG и PWA.
 - [x] 12 Firefox/WebKit/mobile-emulation E2E.
 - [x] Production worker Docker build/runtime.
 - [x] No known open repository P0/P1; один reviewed non-applicable RSC dependency advisory остаётся tracked exception.

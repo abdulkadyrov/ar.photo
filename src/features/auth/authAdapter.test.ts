@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DemoAuthAdapter } from "./authAdapter";
+import { DemoAuthAdapter, UnconfiguredAuthAdapter } from "./authAdapter";
 
 describe("demo auth adapter", () => {
   beforeEach(() => {
@@ -37,5 +37,15 @@ describe("demo auth adapter", () => {
     expect(listener).toHaveBeenLastCalledWith(null);
 
     unsubscribe();
+  });
+});
+
+describe("unconfigured auth adapter", () => {
+  it("never creates a local session or accepts credentials", async () => {
+    const adapter = new UnconfiguredAuthAdapter();
+    expect(await adapter.getSession()).toBeNull();
+    await expect(adapter.signIn("owner@example.com", "correct horse battery staple")).rejects.toThrow(
+      /not configured/i,
+    );
   });
 });

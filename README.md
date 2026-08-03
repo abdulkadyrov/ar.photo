@@ -38,7 +38,7 @@ supabase test db --local supabase/tests
 
 ## Environment
 
-Скопируйте `.env.example` в `.env.local` и задайте только browser-safe значения `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` и `VITE_PUBLIC_APP_URL`. Service-role key и database credentials во frontend запрещены.
+Скопируйте `.env.example` в `.env.local` и задайте только browser-safe значения `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` и `VITE_PUBLIC_APP_URL`. Demo разрешается только явным `VITE_ENABLE_DEMO_MODE=true` без Supabase variables; обычный production build без backend-конфигурации fail-closed. Service-role key и database credentials во frontend запрещены.
 
 ## Текущий статус
 

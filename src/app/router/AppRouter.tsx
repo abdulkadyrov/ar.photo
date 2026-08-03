@@ -2,6 +2,7 @@ import { lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { ProtectedRoute } from "../../features/auth/AuthProvider";
 import { RouteErrorBoundary } from "../../shared/errors/RouteErrorBoundary";
+import { getPublicRuntimeConfig } from "../../shared/config/env";
 import { getRouterBasename } from "./routerBase";
 
 const PrototypeHomeRoute = lazy(() =>
@@ -92,6 +93,9 @@ export function AppRouter() {
 
 function RoutedContent() {
   const location = useLocation();
+  const runtime = getPublicRuntimeConfig();
+  const configurationIndependent = location.pathname === "/privacy" || location.pathname === "/unsupported";
+  if (runtime.authMode === "unconfigured" && !configurationIndependent) return <RuntimeConfigurationUnavailable />;
   return (
     <RouteErrorBoundary resetKey={location.key}>
       <Suspense fallback={<RouteLoading />}>
@@ -125,6 +129,19 @@ function RoutedContent() {
         </Routes>
       </Suspense>
     </RouteErrorBoundary>
+  );
+}
+
+function RuntimeConfigurationUnavailable() {
+  return (
+    <main className="grid min-h-screen place-items-center bg-background px-5 text-ink">
+      <div className="max-w-md rounded-card border border-line bg-card p-6 text-center shadow-soft">
+        <h1 className="text-2xl font-semibold">Конфигурация сервиса недоступна</h1>
+        <p className="mt-3 text-sm leading-6 text-muted">
+          AR Photo временно не может подключиться к backend. Повторите попытку позже или сообщите службе поддержки.
+        </p>
+      </div>
+    </main>
   );
 }
 

@@ -48,7 +48,10 @@ export class PublicManifestError extends Error {
 
 export async function loadPublicManifest(publicSlug: string, signal?: AbortSignal): Promise<PublicArManifest> {
   const config = getPublicRuntimeConfig();
-  if (!config.supabaseUrl || !config.supabasePublishableKey) return loadDemoManifest(publicSlug);
+  if (!config.supabaseUrl || !config.supabasePublishableKey) {
+    if (config.authMode === "demo") return loadDemoManifest(publicSlug);
+    throw new PublicManifestError("unavailable", "AR Photo временно не настроен");
+  }
 
   const endpoint = `${config.supabaseUrl.replace(/\/$/, "")}/functions/v1/public-ar-manifest/${encodeURIComponent(publicSlug)}`;
   let response: Response;
@@ -66,7 +69,8 @@ export async function loadPublicManifest(publicSlug: string, signal?: AbortSigna
   }
 
   if (response.status === 404) throw new PublicManifestError("not_found", "AR-фотография не найдена");
-  if (response.status === 429) throw new PublicManifestError("rate_limited", "Слишком много запросов. Попробуйте позже");
+  if (response.status === 429)
+    throw new PublicManifestError("rate_limited", "Слишком много запросов. Попробуйте позже");
   if (!response.ok) throw new PublicManifestError("unavailable", "AR-фотография временно недоступна");
 
   const parsed = publicManifestSchema.safeParse(await response.json().catch(() => null));

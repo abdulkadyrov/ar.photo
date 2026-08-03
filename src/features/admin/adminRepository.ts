@@ -1,5 +1,6 @@
 import { getSupabaseBrowserClient } from "../../shared/api/supabase";
 import type { Json } from "../../shared/api/database.types";
+import { assertDemoRuntimeEnabled } from "../../shared/config/env";
 import {
   AdminError,
   adminAccessSchema,
@@ -240,7 +241,11 @@ let repository: AdminRepository | undefined;
 export function getAdminRepository(): AdminRepository {
   if (repository) return repository;
   const client = getSupabaseBrowserClient();
-  repository = client ? new SupabaseAdminRepository(client) : createDemoAdminRepository();
+  if (client) repository = new SupabaseAdminRepository(client);
+  else {
+    assertDemoRuntimeEnabled();
+    repository = createDemoAdminRepository();
+  }
   return repository;
 }
 

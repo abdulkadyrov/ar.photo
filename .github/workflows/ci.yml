@@ -71,12 +71,12 @@ jobs:
         run: npm ci
       - name: Install browser matrix
         run: npx playwright install --with-deps chromium firefox webkit
-      - name: Production build
-        run: npm run build
-      - name: Browser smoke test
+      - name: Fail-closed production configuration smoke
+        run: npm run test:e2e:configuration
+      - name: Explicit demo browser smoke test
         run: npm run test:e2e
       - name: Cross-browser and mobile emulation matrix
-        run: npm run test:e2e:cross-browser
+        run: npx playwright test --config playwright.cross-browser.config.ts
 
   database:
     runs-on: ubuntu-latest

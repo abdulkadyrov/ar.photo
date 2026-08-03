@@ -7,6 +7,7 @@ import type {
   QrStyle,
 } from "../../entities/ar-item/model";
 import { getSupabaseBrowserClient } from "../../shared/api/supabase";
+import { assertDemoRuntimeEnabled } from "../../shared/config/env";
 import { createDemoArItemRepository } from "./demoArItemRepository";
 
 type SupabaseBrowserClient = NonNullable<ReturnType<typeof getSupabaseBrowserClient>>;
@@ -212,7 +213,11 @@ let repository: ArItemRepository | undefined;
 export function getArItemRepository(): ArItemRepository {
   if (repository) return repository;
   const client = getSupabaseBrowserClient();
-  repository = client ? new SupabaseArItemRepository(client) : createDemoArItemRepository();
+  if (client) repository = new SupabaseArItemRepository(client);
+  else {
+    assertDemoRuntimeEnabled();
+    repository = createDemoArItemRepository();
+  }
   return repository;
 }
 

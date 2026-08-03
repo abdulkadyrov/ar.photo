@@ -1,5 +1,6 @@
 import { getSupabaseBrowserClient } from "../../shared/api/supabase";
 import type { Json } from "../../shared/api/database.types";
+import { assertDemoRuntimeEnabled } from "../../shared/config/env";
 import {
   accountEntitlementsSchema,
   inviteDeliverySchema,
@@ -168,7 +169,11 @@ let repository: SettingsRepository | undefined;
 export function getSettingsRepository(): SettingsRepository {
   if (repository) return repository;
   const client = getSupabaseBrowserClient();
-  repository = client ? new SupabaseSettingsRepository(client) : createDemoSettingsRepository();
+  if (client) repository = new SupabaseSettingsRepository(client);
+  else {
+    assertDemoRuntimeEnabled();
+    repository = createDemoSettingsRepository();
+  }
   return repository;
 }
 

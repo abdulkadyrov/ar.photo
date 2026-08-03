@@ -87,13 +87,13 @@ export function AppShell({
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{auth.session?.user.email ?? "AR Photo"}</p>
               <p className="truncate text-xs text-muted">
-                {auth.mode === "demo" ? "Demo workspace" : "Supabase session"}
+                {auth.mode === "demo" ? "Demo workspace" : auth.mode === "supabase" ? "Supabase session" : "Offline"}
               </p>
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between gap-2">
             <span className="inline-flex rounded-full bg-primary/15 px-2 py-1 text-[11px] font-semibold text-primary">
-              {auth.mode === "demo" ? "DEMO" : "ONLINE"}
+              {auth.mode === "demo" ? "DEMO" : auth.mode === "supabase" ? "ONLINE" : "OFFLINE"}
             </span>
             <button
               aria-label="Выйти"

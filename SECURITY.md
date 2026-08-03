@@ -120,6 +120,8 @@ Public viewer/analytics endpoints пока нет, но без ограниче�
 - произвольные user strings пока безопасно экранируются React, но будущие rich text/SVG требуют отдельной sanitization policy;
 - нет session revocation plan для suspended users.
 
+Demo boundary fail-closed: отсутствие Supabase URL/publishable key больше не включает локальные repositories. Demo доступен только при точном `VITE_ENABLE_DEMO_MODE=true`, конфликт с Supabase configuration отклоняется, production configuration smoke проверяет отсутствие login/demo data, а GitHub Pages preview использует отдельный `build:demo`.
+
 ## 3. Trust boundaries
 
 - Browser считается недоверенным: account id, role, plan, MIME и file name не являются доказательством.

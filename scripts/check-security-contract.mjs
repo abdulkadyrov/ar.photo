@@ -2,6 +2,9 @@ import { readFile } from "node:fs/promises";
 
 const headers = await readFile("public/_headers", "utf8");
 const worker = await readFile("public/sw.js", "utf8");
+const runtimeConfig = await readFile("src/shared/config/env.ts", "utf8");
+const packageManifest = await readFile("package.json", "utf8");
+const previewWorkflow = await readFile(".github/workflows/deploy.yml", "utf8");
 const requiredHeaders = [
   "Content-Security-Policy:",
   "frame-ancestors 'none'",
@@ -18,9 +21,18 @@ const requiredWorkerRules = [
   "!isSafeStaticRequest(event.request)",
   "/private|no-store/i.test(cacheControl)",
 ];
+const requiredDemoBoundaryRules = [
+  [runtimeConfig, "VITE_ENABLE_DEMO_MODE", "runtime demo opt-in"],
+  [runtimeConfig, '"unconfigured"', "fail-closed runtime mode"],
+  [packageManifest, '"build:demo"', "explicit demo build"],
+  [previewWorkflow, "npm run build:demo", "preview-only demo build"],
+];
 const failures = [
   ...requiredHeaders.filter((value) => !headers.includes(value)).map((value) => `missing header contract: ${value}`),
   ...requiredWorkerRules.filter((value) => !worker.includes(value)).map((value) => `missing SW guard: ${value}`),
+  ...requiredDemoBoundaryRules
+    .filter(([source, value]) => !source.includes(value))
+    .map(([, , label]) => `missing demo boundary contract: ${label}`),
 ];
 const connectSources = headers.match(/connect-src ([^;]+)/)?.[1].split(/\s+/) ?? [];
 if (connectSources.includes("*")) failures.push("CSP connect-src must not use a global wildcard origin");

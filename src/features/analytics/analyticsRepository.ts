@@ -1,4 +1,5 @@
 import { getSupabaseBrowserClient } from "../../shared/api/supabase";
+import { assertDemoRuntimeEnabled } from "../../shared/config/env";
 import {
   AnalyticsError,
   analyticsScopeOptionSchema,
@@ -95,7 +96,11 @@ let repository: AnalyticsRepository | undefined;
 export function getAnalyticsRepository(): AnalyticsRepository {
   if (repository) return repository;
   const client = getSupabaseBrowserClient();
-  repository = client ? new SupabaseAnalyticsRepository(client) : createDemoAnalyticsRepository();
+  if (client) repository = new SupabaseAnalyticsRepository(client);
+  else {
+    assertDemoRuntimeEnabled();
+    repository = createDemoAnalyticsRepository();
+  }
   return repository;
 }
 

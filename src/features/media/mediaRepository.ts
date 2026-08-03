@@ -7,7 +7,7 @@ import type {
   UploadSession,
 } from "../../entities/media/model";
 import { getSupabaseBrowserClient } from "../../shared/api/supabase";
-import { getPublicRuntimeConfig } from "../../shared/config/env";
+import { assertDemoRuntimeEnabled, getPublicRuntimeConfig } from "../../shared/config/env";
 import type { Json } from "../../shared/api/database.types";
 import { createDemoMediaRepository } from "./demoMediaRepository";
 
@@ -229,7 +229,11 @@ let repository: MediaRepository | undefined;
 export function getMediaRepository(): MediaRepository {
   if (repository) return repository;
   const client = getSupabaseBrowserClient();
-  repository = client ? new SupabaseMediaRepository(client) : createDemoMediaRepository();
+  if (client) repository = new SupabaseMediaRepository(client);
+  else {
+    assertDemoRuntimeEnabled();
+    repository = createDemoMediaRepository();
+  }
   return repository;
 }
 

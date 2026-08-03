@@ -12,6 +12,7 @@ import type {
 import { groupFormSchema, projectFormSchema, projectListParamsSchema } from "../../entities/catalog/catalogSchemas";
 import { getSupabaseBrowserClient } from "../../shared/api/supabase";
 import type { Database } from "../../shared/api/database.types";
+import { assertDemoRuntimeEnabled } from "../../shared/config/env";
 import { validateCoverFile } from "./coverFile";
 
 type SupabaseBrowserClient = NonNullable<ReturnType<typeof getSupabaseBrowserClient>>;
@@ -402,7 +403,11 @@ let repository: CatalogRepository | undefined;
 export function getCatalogRepository(): CatalogRepository {
   if (repository) return repository;
   const client = getSupabaseBrowserClient();
-  repository = client ? new SupabaseCatalogRepository(client) : createDemoCatalogRepository();
+  if (client) repository = new SupabaseCatalogRepository(client);
+  else {
+    assertDemoRuntimeEnabled();
+    repository = createDemoCatalogRepository();
+  }
   return repository;
 }
 

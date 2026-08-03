@@ -12,7 +12,7 @@ export type AuthSession = {
 };
 
 export interface AuthAdapter {
-  readonly mode: "supabase" | "demo";
+  readonly mode: "supabase" | "demo" | "unconfigured";
   getSession(): Promise<AuthSession | null>;
   signIn(email: string, password: string): Promise<void>;
   signOut(): Promise<void>;
@@ -120,12 +120,54 @@ export class DemoAuthAdapter implements AuthAdapter {
   }
 }
 
+export class UnconfiguredAuthAdapter implements AuthAdapter {
+  readonly mode = "unconfigured" as const;
+
+  async getSession() {
+    return null;
+  }
+
+  async signIn(_email: string, _password: string) {
+    void _email;
+    void _password;
+    throw configurationError();
+  }
+
+  async signOut() {
+    throw configurationError();
+  }
+
+  async requestPasswordReset(_email: string) {
+    void _email;
+    throw configurationError();
+  }
+
+  async updatePassword(_password: string) {
+    void _password;
+    throw configurationError();
+  }
+
+  onAuthStateChange(_listener: (session: AuthSession | null) => void) {
+    void _listener;
+    return () => undefined;
+  }
+}
+
 let authAdapter: AuthAdapter | undefined;
 
 export function getAuthAdapter(): AuthAdapter {
   if (authAdapter) return authAdapter;
-  authAdapter = getSupabaseBrowserClient() ? new SupabaseAuthAdapter() : new DemoAuthAdapter();
+  const client = getSupabaseBrowserClient();
+  authAdapter = client
+    ? new SupabaseAuthAdapter()
+    : getPublicRuntimeConfig().authMode === "demo"
+      ? new DemoAuthAdapter()
+      : new UnconfiguredAuthAdapter();
   return authAdapter;
+}
+
+function configurationError() {
+  return new Error("AR Photo backend is not configured");
 }
 
 function mapSession(session: Session | null): AuthSession | null {

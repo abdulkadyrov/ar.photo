@@ -2,7 +2,7 @@
 
 ## Статус среды
 
-GitHub Pages workflow в репозитории является только frontend preview: он собирает base path `/ar.photo/`, но GitHub Pages не применяет Netlify-style `public/_headers`, не разворачивает Supabase/worker и без `VITE_SUPABASE_*` запускает demo adapters. Его нельзя считать production SaaS deployment.
+GitHub Pages workflow в репозитории является только frontend preview: он явно использует `build:demo` и base path `/ar.photo/`, но GitHub Pages не применяет Netlify-style `public/_headers` и не разворачивает Supabase/worker. Обычный production build без Supabase variables fail-closed и не показывает demo data. Preview нельзя считать production SaaS deployment.
 
 Production требует отдельно управляемые frontend host/CDN, Supabase project, processing worker, DNS/TLS, scheduler, secrets, monitoring и backup policy.
 
@@ -40,7 +40,10 @@ Browser build получает только:
 VITE_SUPABASE_URL
 VITE_SUPABASE_PUBLISHABLE_KEY
 VITE_PUBLIC_APP_URL
+VITE_ENABLE_DEMO_MODE
 ```
+
+`VITE_ENABLE_DEMO_MODE=true` допустим только для local/test/preview и взаимоисключающ с Supabase configuration. В staging/production он должен отсутствовать или быть `false`; отсутствие backend variables показывает controlled configuration error.
 
 Edge Functions получают server-side:
 

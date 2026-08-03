@@ -28,6 +28,17 @@ export function LoginRoute() {
     defaultValues: { email: auth.mode === "demo" ? "demo@arphoto.local" : "", password: "" },
   });
 
+  if (auth.mode === "unconfigured") {
+    return (
+      <AuthLayout
+        title="Конфигурация сервиса недоступна"
+        description="AR Photo временно не может подключиться к backend."
+      >
+        <FormNotice tone="error">Вход отключён. Повторите попытку позже или сообщите службе поддержки.</FormNotice>
+      </AuthLayout>
+    );
+  }
+
   if (auth.status === "authenticated") return <Navigate replace to="/dashboard" />;
 
   const submit = handleSubmit(async (values) => {

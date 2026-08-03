@@ -27,7 +27,8 @@ Production launch намеренно не отмечен выполненным:
 - Axe scan выбранных WCAG 2 A/AA/2.1 AA/2.2 AA tags не выявил serious/critical violations на landing, login, dashboard, admin и public AR intro.
 - Responsive smoke покрывает desktop Firefox/WebKit, Pixel 7 Chromium и iPhone 14 WebKit без horizontal overflow.
 - E2E подтверждает static-only PWA cache и offline shell.
-- Initial JS 553 KiB, dashboard graph 713 KiB, CSS 33 KiB; MindAR/Three остаются lazy route/runtime chunks.
+- Initial JS 555 KiB, dashboard graph 715 KiB, CSS 33 KiB; MindAR/Three остаются lazy route/runtime chunks.
+- Production build без backend variables fail-closed; demo repositories доступны только отдельному explicit `build:demo`, что проверяет специальный Chromium smoke.
 
 ## Observability
 
@@ -46,8 +47,8 @@ Production launch намеренно не отмечен выполненным:
 
 Состав gate:
 
-- 35 Vitest files, 132 tests;
-- 17 Chromium E2E;
+- 35 Vitest files, 134 tests;
+- 18 Chromium E2E, включая отдельный production configuration boundary;
 - 12 cross-browser/mobile-emulation E2E;
 - 323 pgTAP assertions после clean reset;
 - TypeScript, ESLint, production build, bundle budget;

@@ -5,6 +5,7 @@
 ```sh
 npm ci
 npm run check
+npm run test:e2e:configuration
 npm run test:e2e
 npm run test:e2e:cross-browser
 ```
@@ -37,11 +38,11 @@ supabase stop --no-backup
 
 ## Зафиксированный baseline этапа 11
 
-- 35 Vitest files, 132 tests.
-- 17 Chromium E2E, включая accessibility и PWA.
+- 35 Vitest files, 134 tests.
+- 18 Chromium E2E: отдельный fail-closed production-configuration smoke плюс demo suite с accessibility и PWA.
 - 12 cross-browser/mobile-emulation E2E: desktop Firefox/WebKit, Pixel 7 Chromium, iPhone 14 WebKit.
 - 323 pgTAP assertions после clean reset PostgreSQL 17.
-- Initial JS graph 553 KiB, dashboard graph 713 KiB, CSS 33 KiB; MindAR/Three остаются lazy.
+- Initial JS graph 555 KiB, dashboard graph 715 KiB, CSS 33 KiB; MindAR/Three остаются lazy.
 - Axe не находит serious/critical violations на landing, login, dashboard, admin и public AR intro для выбранных WCAG tags.
 
 Актуальные CI evidence links находятся в `STAGE_11_REPORT.md`.
@@ -52,7 +53,7 @@ supabase stop --no-backup
 
 - `quality`: install, typecheck, lint, unit, build, budgets/scans, release manifest и CycloneDX SBOM artifacts;
 - `database`: clean Supabase start/reset, SQL lint, pgTAP, generated types;
-- `e2e`: запускается после quality и выполняет Chromium smoke, axe и отдельную browser/mobile matrix.
+- `e2e`: запускается после quality, сначала проверяет production build без backend/demo, затем собирает явный demo mode и выполняет Chromium smoke, axe и отдельную browser/mobile matrix.
 
 `Processing worker` строит production Dockerfile и проверяет Node entrypoint, FFmpeg, ffprobe и cwebp. Все сторонние GitHub actions закреплены полным commit SHA.
 
