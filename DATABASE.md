@@ -238,7 +238,13 @@ accounts/{accountId}/projects/{projectId}/groups/{groupId}/uploads/{sessionId}/v
 
 Имена пользователя и ФИО не входят в paths. Replace создаёт новую immutable asset version. Upsert используется только с policies на INSERT + SELECT + UPDATE; предпочтительнее versioned write без upsert.
 
-## 9. Миграции и seed
+## 9. Public manifest boundary
+
+`get_public_ar_manifest_source(public_slug)` — service-only `SECURITY DEFINER` RPC с пустым `search_path`. Он возвращает только allowlisted presentation/behavior fields и private bucket/path source для Edge signing, причём только для `published + public + ready` item без expiry/deletion, активного account и действующей trial/active/grace subscription. Внешние роли `public`, `anon` и `authenticated` не имеют `EXECUTE`.
+
+`private.public_manifest_rate_limits` хранит только ключи вида `ip:<salted_sha256>` и `slug:<salted_sha256>`, начало окна и счётчик. `consume_public_manifest_rate_limit` обновляет bucket атомарным upsert; таблица полностью закрыта от browser roles. Edge Function применяет окна 60 секунд с бюджетами 60 запросов для network identifier и 240 для slug. Raw IP и raw slug в таблицу не попадают.
+
+## 10. Миграции и seed
 
 Основа этапа 2 реализована reviewable миграциями, а этапы 3–4 добавляют только последующие migrations:
 
@@ -250,6 +256,7 @@ accounts/{accountId}/projects/{projectId}/groups/{groupId}/uploads/{sessionId}/v
 - catalog mutations: atomic group reorder/move и cover constraints;
 - media uploads: reservation lifecycle, private versions, accounting, metadata limits и cleanup lease/ack;
 - AR processing: idempotent draft, media attachment/revision, four-job DAG, worker lease/heartbeat, retry, marker override и immutable generated-asset accounting.
+- public AR manifest: service-only filtered source и durable privacy-preserving rate buckets.
 
 `supabase/seed.sql` содержит только синтетические данные: superadmin, два изолированных аккаунта, active/expired subscription и role fixtures. `supabase/tests` проверяет schema/grants и RLS/Storage matrix. Тип `Database` генерируется Supabase CLI из реально поднятой схемы и хранится в `src/shared/api/database.types.ts`.
 

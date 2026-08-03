@@ -40,6 +40,6 @@ supabase test db --local supabase/tests
 
 ## Текущий статус
 
-Этапы 0–5 завершены на уровне репозитория. Production CRUD проектов/групп, защищённый media upload и AR-item processing используют Supabase/RLS, private Storage, TUS, immutable versions, atomic quota accounting и service-only worker. Девятишаговый мастер доводит marker/video до проверенного tracking dataset; публикация намеренно остаётся закрыта до public manifest/viewer и QR boundary этапов 6–7. Старый IndexedDB flow сохранён как regression prototype и не считается multi-device production storage.
+Этапы 0–6 завершены на уровне репозитория. Production CRUD проектов/групп, защищённый media upload и AR-item processing используют Supabase/RLS, private Storage, TUS, immutable versions, atomic quota accounting и service-only worker. Публичный `/ar/:publicSlug` получает минимальный manifest через rate-limited Edge Function, обновляет короткоживущие signed URLs и запускает камеру/MindAR только после явного действия; обычное видео остаётся fallback без камеры. Publication/QR mutation намеренно остаётся закрыта до этапа 7. Старый IndexedDB flow сохранён как regression prototype и не считается multi-device production storage.
 
-См. `ARCHITECTURE.md`, `DATABASE.md`, `SECURITY.md` и отчёты `STAGE_1_REPORT.md`–`STAGE_5_REPORT.md`.
+См. `ARCHITECTURE.md`, `DATABASE.md`, `SECURITY.md` и отчёты `STAGE_1_REPORT.md`–`STAGE_6_REPORT.md`.

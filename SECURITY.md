@@ -2,9 +2,9 @@
 
 ## 1. Текущий security posture
 
-Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этапы 2–5 добавили Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, private Storage policies, audit logs, quota-aware mutations, resumable upload lifecycle и service-only media processing.
+Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этапы 2–6 добавили Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, private Storage policies, audit logs, quota-aware mutations, resumable upload lifecycle, service-only media processing и минимальный публичный AR boundary.
 
-Это ещё не разрешение на работу с реальными клиентами: public manifest/signed viewer URLs, rate limiting, MFA администратора, hosted advisors, deployed-worker observability и production environment verification закрываются последующими этапами.
+Это ещё не разрешение на работу с реальными клиентами: publication/slug rotation, analytics abuse controls, MFA администратора, hosted advisors, deployed-function/worker observability и production environment verification закрываются последующими этапами.
 
 ## 2. Findings
 
@@ -24,7 +24,7 @@ Blob остаются в IndexedDB, а QR содержит внутренний 
 
 Мера: unpredictable `public_slug`, public manifest endpoint, private originals, short-lived signed URLs и отдельный optimized asset.
 
-Статус этапа 2: частично закрыто. 144-bit slug и private buckets реализованы; public manifest и short-lived signed URLs относятся к этапу 6.
+Статус этапа 6: public media boundary закрыт на уровне репозитория. Service-only RPC допускает только published/public/ready item активного account с trial/active/grace subscription; Edge Function возвращает минимальный контракт и signed URLs на 300 секунд. Publication/rotation и QR lifecycle закрываются этапом 7.
 
 #### SEC-003: файлы не валидируются
 
@@ -82,6 +82,8 @@ JSON приводится к TypeScript type без runtime validation. Нет �
 
 Мера: intro screen, explicit «Начать», privacy link, capability checks и управляемый permission state.
 
+Статус этапа 6: закрыто на уровне repository/browser gate. `/ar/:publicSlug` не вызывает camera API до кнопки «Начать AR»; HTTPS, mediaDevices и WebGL проверяются заранее, permission/unsupported/errors имеют normal-video fallback, а teardown освобождает camera и WebGL resources.
+
 #### SEC-011: нет backend quota enforcement
 
 Frontend отсутствует, а будущие скрытые кнопки не дают защиты от прямого API вызова.
@@ -95,6 +97,8 @@ Frontend отсутствует, а будущие скрытые кнопки �
 Public viewer/analytics endpoints пока нет, но без ограничения slug enumeration и event spam будут дешёвыми.
 
 Мера: per-IP coarse rate limit без долгого хранения raw IP, per-slug/session budgets, WAF/platform controls, idempotency и anomaly alerts.
+
+Статус этапа 6: manifest abuse boundary закрыт на уровне репозитория. Edge Function применяет атомарные 60/IP/minute и 240/slug/minute buckets, где network identifier и slug salted SHA-256 до записи; raw значения не логируются. Analytics session budgets, WAF и anomaly alerts относятся к этапам 9/11.
 
 ### P2 — hardening
 

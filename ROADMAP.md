@@ -157,6 +157,8 @@ Gate:
 
 ## Этап 6 — публичный AR viewer
 
+Статус: repository gate выполнен. Service-only manifest с пятиминутными signed URLs, hashed rate-limit buckets, camera-explicit MindAR/Three viewer, normal-video fallback, 80 unit-тестов, 9 E2E и 129 pgTAP-проверок подтверждены GitHub Actions. Hosted Edge Function и physical iPhone/Android tracking matrix ожидают infrastructure/device gate. Подробности: `STAGE_6_REPORT.md`.
+
 Цель: camera-first image tracking на iPhone/Android с fallback.
 
 Deliverables:

@@ -178,6 +178,8 @@ Viewer вызывает public manifest endpoint, который:
 4. возвращает только title, behavior flags, dimensions, poster, tracking asset и optimized video;
 5. не возвращает `account_id`, внутренний item UUID, email или постоянный Storage path.
 
+Этап 6 реализует этот boundary функцией `public-ar-manifest`. Endpoint принимает только `GET/OPTIONS`, проверяет allowlist origin, требует 36-символьный hex slug и работает с `verify_jwt = false`, но использует service role только внутри Edge runtime. PostgreSQL source RPC и rate-limit RPC отозваны у `public`, `anon` и `authenticated`. Лимиты составляют 60 запросов на hashed network identifier и 240 на hashed slug за 60 секунд; raw IP/slug в rate buckets и логах не сохраняются. Tracking, optimized video и poster подписываются на 300 секунд, ответ имеет `private, no-store`, а viewer запрашивает обновление до истечения TTL.
+
 Пример контракта:
 
 ```ts
@@ -226,6 +228,8 @@ Viewer обязан:
 - освобождать camera tracks, renderer, textures и Object URLs;
 - иметь обычный video fallback;
 - отправлять аналитику асинхронно и без блокировки playback.
+
+Реализованный viewer lazy-loads MindAR/Three только после кнопки «Начать AR». Plane масштабируется по `markerAspectRatio`; `targetFound/targetLost` применяют `pause_hide`, `continue_audio_hide` или `stop_reset`. Orientation/resize, `visibilitychange`, fullscreen, muted user gesture и полный teardown камеры, renderer, texture, geometry, material и video source находятся внутри provider adapter. Capability, permission, asset и tracking failures переводятся в безопасный fallback без внутренних error details.
 
 ## 9. Upload pipeline
 
