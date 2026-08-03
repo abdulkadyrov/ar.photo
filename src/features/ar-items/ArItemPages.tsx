@@ -207,7 +207,7 @@ function ArItemWizard() {
     queryKey: ["ar-item", accountId, currentItemId],
     queryFn: () => arItemRepository.getItem(accountId!, currentItemId),
     enabled: Boolean(accountId && currentItemId),
-    refetchInterval: step >= 7 && step <= 8 ? 400 : false,
+    refetchInterval: step >= 7 && step <= 8 ? 3_000 : false,
   });
   const assetsQuery = useQuery({
     queryKey: ["media", "assets", accountId, projectId, groupId],
@@ -218,7 +218,7 @@ function ArItemWizard() {
     queryKey: ["ar-item", "jobs", accountId, currentItemId],
     queryFn: () => arItemRepository.listJobs(accountId!, currentItemId),
     enabled: Boolean(accountId && currentItemId && step >= 7),
-    refetchInterval: step === 7 ? 400 : false,
+    refetchInterval: step === 7 ? 3_000 : false,
   });
 
   useEffect(() => {
@@ -818,6 +818,12 @@ function ProcessingStep({
 }) {
   return (
     <div>
+      {item?.status === "processing" ? (
+        <div className="mb-4 rounded-xl border border-primary/20 bg-primary/10 p-4 text-sm leading-6 text-muted">
+          Обработка выполняется автоматически и обычно занимает несколько минут. Эту страницу можно оставить
+          открытой — статусы обновятся сами.
+        </div>
+      ) : null}
       <div className="grid gap-3">
         {jobs.map((job) => (
           <div key={job.id} className="rounded-2xl border border-line bg-white/[0.02] p-4">
