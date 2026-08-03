@@ -137,7 +137,8 @@ select is(
         'abort_media_upload', 'expire_stale_uploads', 'complete_upload_cleanup',
         'create_ar_item_draft', 'prepare_ar_item_processing', 'claim_processing_jobs',
         'report_processing_progress', 'complete_processing_job', 'fail_processing_job',
-        'retry_ar_item_processing', 'override_marker_quality'
+        'retry_ar_item_processing', 'override_marker_quality', 'publish_ar_item',
+        'unpublish_ar_item', 'rotate_ar_item_public_slug', 'update_ar_item_qr_style'
       )
       and not exists (
         select 1
