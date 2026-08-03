@@ -61,7 +61,7 @@ readonly accounts_rls="$(query_database "$restore_database" "select relrowsecuri
 readonly anon_accounts_select="$(query_database "$restore_database" "select has_table_privilege('anon', 'public.accounts', 'select');")"
 readonly anon_private_usage="$(query_database "$restore_database" "select has_schema_privilege('anon', 'private', 'usage');")"
 readonly dump_sha256="$(docker exec "$db_container" sha256sum "$dump_path" | awk '{print $1}')"
-readonly dump_bytes="$(docker exec "$db_container" stat --format '%s' "$dump_path")"
+readonly dump_bytes="$(docker exec "$db_container" stat -c '%s' "$dump_path")"
 
 [[ "$source_migration_count" -ge 1 ]] || { echo "Source migration history is empty" >&2; exit 1; }
 [[ "$migration_count" == "$source_migration_count" ]] || { echo "Restored migration history does not match source" >&2; exit 1; }
