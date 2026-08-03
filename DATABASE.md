@@ -2,7 +2,7 @@
 
 ## 1. Область документа
 
-Документ описывает применённую PostgreSQL/Supabase схему этапов 2–10. Источник истины — последовательные SQL-миграции в `supabase/migrations`; CI разворачивает их с нуля на PostgreSQL 17, выполняет seed, lint и pgTAP-тесты.
+Документ описывает применённую PostgreSQL/Supabase схему этапов 2–11. Этап 11 не изменял schema, а закрепил clean-database/release evidence и operational runbooks. Источник истины — последовательные SQL-миграции в `supabase/migrations`; CI разворачивает их с нуля на PostgreSQL 17, выполняет seed, lint и 323 pgTAP assertions.
 
 Все UUID генерируются сервером. Все timestamps — `timestamptz`. Денормализованный `account_id` используется на tenant-bound таблицах для простых и быстрых RLS policies, но всегда устанавливается/проверяется доверенной server logic.
 
@@ -277,7 +277,7 @@ Authenticated clients используют четыре audited RPC вместо
 
 ## 11. Миграции и seed
 
-Основа этапа 2 реализована reviewable миграциями, а этапы 3–4 добавляют только последующие migrations:
+Основа этапа 2 реализована reviewable миграциями; каждый следующий backend-этап добавляет только последующую migration:
 
 - foundation: extensions, enums, timestamps и 144-bit public slug;
 - core schema: 13 таблиц, constraints, foreign keys и supporting indexes;
@@ -296,5 +296,7 @@ Authenticated clients используют четыре audited RPC вместо
 `supabase/seed.sql` содержит только синтетические данные: superadmin, два изолированных аккаунта, active/expired subscription и role fixtures. `supabase/tests` проверяет schema/grants и RLS/Storage matrix. Тип `Database` генерируется Supabase CLI из реально поднятой схемы и хранится в `src/shared/api/database.types.ts`.
 
 Hosted advisors запускаются после привязки development Supabase project; их отсутствие не заменяется утверждением о проверке remote infrastructure.
+
+Каждая release manifest фиксирует SHA-256 полного migration set. Production rollout использует forward-only expand/contract и предварительный backup/PITR check; staging rollback/restore procedure описана в `DEPLOYMENT.md`.
 
 Особое правило 2026 года: exposed Data API grants задаются явно; RLS и GRANT проверяются как две отдельные границы.

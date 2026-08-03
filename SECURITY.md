@@ -2,9 +2,9 @@
 
 ## 1. Текущий security posture
 
-Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этапы 2–10 добавили Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, granular permissions, protected team lifecycle, private Storage policies, audit logs, quota-aware mutations, resumable upload lifecycle, service-only media processing, минимальный публичный AR boundary, trusted publication/QR lifecycle, privacy-minimized analytics и MFA-gated admin operations.
+Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этапы 2–11 добавили Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, granular permissions, protected team lifecycle, private Storage policies, audit logs, quota-aware mutations, resumable upload lifecycle, service-only media processing, минимальный публичный AR boundary, trusted publication/QR lifecycle, privacy-minimized analytics, MFA-gated admin operations, static-only PWA caching, supply-chain evidence и redacted operational error envelope.
 
-Это ещё не разрешение на работу с реальными клиентами: repository-level MFA enforcement реализован, но hosted TOTP enrollment/recovery rehearsal, hosted advisors, deployed-function/worker observability, physical-device QR/AR matrix и production environment verification закрываются этапом 11.
+Это ещё не разрешение на работу с реальными клиентами: repository gate этапа 11 зелёный, но hosted TOTP enrollment/recovery, hosted advisors, external observability/alerts, physical-device QR/AR matrix, rollback/restore rehearsal и production environment/legal verification остаются обязательными внешними gates.
 
 ## 2. Findings
 
@@ -40,6 +40,8 @@ Picker accepts не являются защитой. Нет magic-byte inspectio
 
 Мера: удалить/заменить production-public fixture на синтетический asset, strip metadata, добавить CI check. До решения не публиковать текущий build как продуктовый.
 
+Статус этапа 11: закрыто. Public и source regression JPEG losslessly очищены от APP1/EXIF/GPS, APP13 и comments; CI scanner проверяет каждый public JPEG и ломает gate при повторном появлении metadata.
+
 #### SEC-005: dependency vulnerabilities
 
 `npm audit` обнаружил 1 critical и 4 high. Critical `tar` и часть high-находок приходят через `mind-ar → canvas → @mapbox/node-pre-gyp`; direct high найден в `postcss`. Обычный `npm ci` также ломается на Node 26 из-за native `canvas@2.11.2`.
@@ -47,6 +49,8 @@ Picker accepts не являются защитой. Нет magic-byte inspectio
 Мера: в этапе 1 провести controlled update/override audit, отделить offline compiler dependencies от browser runtime, закрепить Node 22, повторить build/AR regression и добиться приемлемого audit baseline. Не выполнять слепой `npm audit fix`.
 
 Статус этапа 1: critical `tar`, vulnerable `form-data` и direct `postcss` устранены pin/override. `npm audit` всё ещё сообщает один high advisory через `react-router-dom@7.18.2`; он затрагивает RSC action execution, тогда как AR Photo использует только client-side Vite routing и не включает React Server Components/Data RSC mode. Это временное documented exception: версия закреплена, dependency bot должен поднять PR сразу после выхода исправленного стабильного релиза.
+
+Статус этапа 11: audit gate теперь fail-closed для любого нового production advisory и допускает только точный advisory 1124282 с дополнительной проверкой отсутствия RSC server APIs. CI создаёт CycloneDX SBOM и release manifest; исключение остаётся tracked до публикации совместимого исправления.
 
 ### P1 — должны быть закрыты до MVP
 
@@ -64,6 +68,8 @@ JSON приводится к TypeScript type без runtime validation. Нет �
 
 Мера: Zod schema, manifest version, compressed/uncompressed limits, allowlisted paths, entry count limit, checksum и transactional import preview. Для server import — sandbox worker.
 
+Статус этапа 11: закрыто для сохранённого client-only legacy import. Strict schema v1, allowlisted paths, limits entries/compressed/uncompressed size, CRC и SHA-256, relation integrity, selected-project export, preview confirmation и одна atomic IndexedDB transaction проверяются unit tests. Server import по-прежнему потребует отдельной sandbox boundary, если будет добавлен.
+
 #### SEC-008: public id недостаточно отделён от internal id
 
 `createId` оставляет 14 hex characters (56 bits) и этот id используется в QR. Публичная ссылка раскрывает внутреннюю структуру `viewer/livephoto_*`.
@@ -77,6 +83,8 @@ JSON приводится к TypeScript type без runtime validation. Нет �
 Текущий worker кэширует любой GET, который видит в scope, без allowlist и без проверки типа ответа. После добавления API/signed media это может сохранить приватные ответы в Cache Storage.
 
 Мера: Workbox/vite-plugin-pwa strategy с precache hashed assets; network-only для Auth/API/signed media; cache version/update UI; тест logout/cache cleanup.
+
+Статус этапа 11: закрыто raw service worker'ом с минимальным allowlist вместо дополнительного runtime dependency. Кэшируются только same-origin `/ar.photo/assets/` script/style/font/image без query; API/media/signed responses не перехватываются; navigation network-first, update требует пользовательского подтверждения, logout может очистить versioned static caches. Contract и browser E2E входят в CI.
 
 #### SEC-010: камера запрашивается до user gesture
 
@@ -104,11 +112,11 @@ Public viewer/analytics endpoints пока нет, но без ограниче�
 
 ### P2 — hardening
 
-- нет CSP, frame-ancestors, Permissions-Policy и формализованных security headers;
-- нет central error redaction и observability integration;
+- CSP, frame-ancestors, Permissions-Policy, HSTS, no-sniff/frame deny формализованы и проверяются repository gate; фактическое применение production host требует HTTP smoke;
+- central error envelope redacts email/tokens/keys/UUID/query secrets и покрывает route/global failures; внешний sink/alerts ещё не подключены;
 - tenant audit и private admin audit покрывают реализованные mutation flows; production alerting/retention ещё не подключены;
-- нет automatic secret scan/dependency review в CI;
-- unused `public/vendor` copies попадают в build и увеличивают supply-chain surface;
+- automatic secret scan, dependency contract, public metadata scan, release manifest и SBOM включены в CI;
+- unused `public/vendor` copies удалены, а MindAR/Three остаются pinned lazy dependencies;
 - произвольные user strings пока безопасно экранируются React, но будущие rich text/SVG требуют отдельной sanitization policy;
 - нет session revocation plan для suspended users.
 
@@ -219,9 +227,19 @@ Retention настраивается server-side в диапазоне 30–730 
 - invitation/recovery-only Auth flows без password visibility;
 - content suspension, processing retry и protected settings negative tests.
 
+### Этап 11
+
+- static-only service worker allowlist, controlled update и browser cache test;
+- strict ZIP schema/size/path/checksum/relation/transaction tests;
+- public JPEG metadata scanner и tracked-file secret scan;
+- fail-closed production dependency gate, pinned actions, CycloneDX SBOM и release manifest;
+- CSP/Permissions/HSTS/no-sniff/frame/cache repository contract;
+- redacted route/global operational error envelope;
+- WCAG serious/critical scan и Chromium/Firefox/WebKit/mobile-emulation matrix.
+
 ### Перед MVP
 
-- dependency review и SBOM;
+- сверить dependency review, SBOM и release manifest с production artifact;
 - cross-tenant penetration tests;
 - upload abuse/zip bomb tests;
 - slug enumeration/rate limit tests;
@@ -229,7 +247,9 @@ Retention настраивается server-side в диапазоне 30–730 
 - logout/cache cleanup test;
 - soft-delete/restore/destruction test;
 - camera permission/privacy device checklist;
-- incident response и backup/restore rehearsal.
+- hosted TOTP/advisors/headers/scheduler/alert verification;
+- incident response, rollback и backup/restore rehearsal;
+- legal/privacy/data residency approval.
 
 ## 9. Secrets и environment
 

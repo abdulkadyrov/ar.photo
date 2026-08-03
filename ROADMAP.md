@@ -6,7 +6,7 @@
 - Следующий этап не начинается при красном quality/security gate.
 - После каждого этапа: typecheck, lint, unit tests, build, затронутые integration/E2E, запуск приложения и ручной smoke-test.
 - Database changes всегда через reviewable migrations.
-- Push/production deploy только по прямому указанию.
+- Commit/push выполняются по действующему разрешению пользователя после локального gate и с ожиданием зелёного CI; production deploy требует отдельного GO.
 
 ## Этап 0 — аудит и планирование
 
@@ -277,6 +277,8 @@ Gate:
 - dangerous actions подтверждаются.
 
 ## Этап 11 — stabilization и launch readiness
+
+Статус: repository gate выполнен. Security/PWA/legacy import hardening, redacted observability envelope, WCAG и Chromium/Firefox/WebKit/mobile-emulation suite, release manifest/SBOM и полный набор deployment/device/launch документов подтверждены CI. Production launch остаётся NO-GO до physical iPhone/Android AR, hosted infrastructure, rollback/restore, monitoring и legal approval. Подробности: `STAGE_11_REPORT.md` и `LAUNCH_READINESS.md`.
 
 Цель: подтвердить критерии MVP на реальных устройствах и production-like environment.
 

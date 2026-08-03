@@ -300,7 +300,7 @@ sequenceDiagram
 
 ## 11. Deployment
 
-Для коммерческой версии static GitHub Pages недостаточно. Минимальная схема:
+GitHub Pages остаётся frontend preview и не является production SaaS environment. Коммерческая схема требует:
 
 - frontend hosting с HTTPS, SPA rewrites, CSP и security headers;
 - отдельные preview/staging/production environments;
@@ -308,9 +308,15 @@ sequenceDiagram
 - migrations в Git и controlled deploy;
 - custom domain для стабильных QR;
 - secrets только в platform secret storage;
-- Sentry/эквивалент — отдельное решение после согласования, без передачи media/PII.
+- внешний operational error sink/alerts с redaction и без передачи media/PII;
+- schedulers для bounded upload/analytics cleanup;
+- backup/PITR, Storage recovery и staging rollback rehearsal.
 
-PWA caching должен иметь allowlist: hashed application assets и явно разрешённые metadata. Signed media responses, auth endpoints и private API responses не кэшируются service worker по умолчанию.
+Реализованный PWA worker кэширует только same-origin hashed application assets под `/ar.photo/assets/`; signed media, Auth/API и произвольные responses не перехватываются. Навигация network-first восстанавливает только shell, а новый worker активируется после пользовательского update action.
+
+Operational errors проходят через bounded redaction envelope и получают reference id; sink по умолчанию пустой, чтобы не отправить данные без согласованной платформы. CI создаёт release manifest, связывающий commit, lockfile, migration set и каждый `dist` file SHA-256, плюс CycloneDX SBOM.
+
+Точная последовательность rollout/rollback/restore/incident response находится в `DEPLOYMENT.md`; repository и physical evidence разделены в `LAUNCH_READINESS.md`.
 
 ## 12. Architecture decisions
 

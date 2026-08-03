@@ -11,7 +11,7 @@
 - Node 22 processing worker с MindAR OfflineCompiler, FFmpeg/ffprobe и WebP thumbnails;
 - Vitest, Testing Library, Playwright и pgTAP;
 - MindAR + Three.js как lazy-loaded WebAR provider;
-- GitHub Actions для quality, E2E и clean-database gates.
+- GitHub Actions для quality, E2E, clean-database, supply-chain и worker gates.
 
 ## Commands
 
@@ -22,7 +22,9 @@ npm run typecheck
 npm run lint
 npm run test
 npm run build
+npm run check
 npm run test:e2e
+npm run test:e2e:cross-browser
 ```
 
 Для локальной базы нужен Docker-compatible runtime и Supabase CLI 2.109.1:
@@ -40,6 +42,8 @@ supabase test db --local supabase/tests
 
 ## Текущий статус
 
-Этапы 0–10 завершены на уровне репозитория. Production CRUD проектов/групп, защищённый media upload и AR-item processing используют Supabase/RLS, private Storage, TUS, immutable versions, atomic quota accounting и service-only worker. Публичный `/ar/:publicSlug` получает минимальный manifest через rate-limited Edge Function, обновляет короткоживущие signed URLs и запускает камеру/MindAR только после явного действия; обычное видео остаётся fallback без камеры. Публикация выполняется trusted RPC только после успешной текущей processing revision, создаёт стабильный capability URL и печатный QR с SVG/PNG, безопасными стилями, rotate/revoke и software readability gate. Effective entitlements управляют write-доступом и usage meters, а `/settings/subscription` и `/settings/team` поддерживают тарифы, роли, точечные разрешения, приглашения и отключение сотрудников. Privacy-safe телеметрия не блокирует AR playback, принимает только coarse allowlisted dimensions, хранит salted session hash и отдаёт `/analytics` только permission-scoped агрегаты. `/admin` требует active superadmin и MFA `aal2`, ведёт private audit для support/mutations и инициирует только invitation/recovery Auth flows без доступа к паролям. Старый IndexedDB flow сохранён как regression prototype и не считается multi-device production storage.
+Этапы 0–11 завершены на уровне репозитория. Production CRUD проектов/групп, защищённый media upload и AR-item processing используют Supabase/RLS, private Storage, TUS, immutable versions, atomic quota accounting и service-only worker. Публичный `/ar/:publicSlug` получает минимальный manifest через rate-limited Edge Function, обновляет короткоживущие signed URLs и запускает камеру/MindAR только после явного действия; обычное видео остаётся fallback без камеры. Публикация выполняется trusted RPC только после успешной текущей processing revision, создаёт стабильный capability URL и печатный QR с SVG/PNG, безопасными стилями, rotate/revoke и software readability gate. Effective entitlements управляют write-доступом и usage meters, а `/settings/subscription` и `/settings/team` поддерживают тарифы, роли, точечные разрешения, приглашения и отключение сотрудников. Privacy-safe телеметрия не блокирует AR playback, принимает только coarse allowlisted dimensions, хранит salted session hash и отдаёт `/analytics` только permission-scoped агрегаты. `/admin` требует active superadmin и MFA `aal2`, ведёт private audit для support/mutations и инициирует только invitation/recovery Auth flows без доступа к паролям. PWA кэширует только статические assets; CI проверяет WCAG, browser/mobile matrix, secrets, public metadata, dependency contract, SBOM и reproducible release manifest. Старый IndexedDB flow сохранён как regression prototype и не считается multi-device production storage.
 
-См. `ARCHITECTURE.md`, `DATABASE.md`, `SECURITY.md` и отчёты `STAGE_1_REPORT.md`–`STAGE_10_REPORT.md`.
+Repository readiness зелёный, но production launch остаётся **NO-GO**, пока не выполнены физические iPhone/Android AR-тесты, hosted infrastructure, rollback/restore, monitoring и legal gates. Точный статус 21 критериев: `LAUNCH_READINESS.md`.
+
+Основные документы: `ARCHITECTURE.md`, `DATABASE.md`, `SECURITY.md`, `AR_TRACKING.md`, `STORAGE.md`, `TESTING.md`, `DEPLOYMENT.md`, `MANUAL_DEVICE_CHECKLIST.md`, `ROADMAP.md` и отчёты `STAGE_1_REPORT.md`–`STAGE_11_REPORT.md`.
