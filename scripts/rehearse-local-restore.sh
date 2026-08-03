@@ -8,7 +8,7 @@ readonly dump_path="/tmp/ar-photo-restore-rehearsal.dump"
 readonly evidence_path="${1:-artifacts/local-restore-evidence.txt}"
 
 cleanup() {
-  docker exec "$db_container" dropdb --username postgres --if-exists "$restore_database" >/dev/null 2>&1 || true
+  docker exec "$db_container" dropdb --username supabase_admin --if-exists "$restore_database" >/dev/null 2>&1 || true
   docker exec "$db_container" rm -f "$dump_path" >/dev/null 2>&1 || true
 }
 
@@ -21,7 +21,7 @@ fi
 
 cleanup
 docker exec "$db_container" pg_dump \
-  --username postgres \
+  --username supabase_admin \
   --dbname "$source_database" \
   --format custom \
   --no-owner \
@@ -29,13 +29,13 @@ docker exec "$db_container" pg_dump \
 docker exec "$db_container" pg_restore --list "$dump_path" >/dev/null
 
 docker exec "$db_container" createdb \
-  --username postgres \
+  --username supabase_admin \
   --template template0 \
   --encoding UTF8 \
   "$restore_database"
 
 docker exec "$db_container" pg_restore \
-  --username postgres \
+  --username supabase_admin \
   --dbname "$restore_database" \
   --no-owner \
   --exit-on-error \
@@ -45,7 +45,7 @@ query_database() {
   local database="$1"
   local query="$2"
   docker exec "$db_container" psql \
-    --username postgres \
+    --username supabase_admin \
     --dbname "$database" \
     --no-psqlrc \
     --tuples-only \
