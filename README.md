@@ -40,7 +40,7 @@ supabase test db --local supabase/tests
 
 Скопируйте `.env.example` в `.env.local` и задайте только browser-safe значения `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` и `VITE_PUBLIC_APP_URL`. Demo разрешается только явным `VITE_ENABLE_DEMO_MODE=true` без Supabase variables; обычный production build без backend-конфигурации fail-closed. Service-role key и database credentials во frontend запрещены.
 
-Self-service `/register` принимает email и пароль, а после первой сессии транзакционно создаёт один tenant-isolated trial workspace. Для входа сразу после регистрации отключите `Confirm email` в Supabase Auth Email provider; SMS/phone provider приложению не нужен. Если подтверждение оставлено включённым, UI безопасно покажет fallback с ожиданием письма. Redirect URLs для login/reset должны входить в Auth allowlist.
+Self-service `/register` принимает email и пароль, а после первой сессии транзакционно создаёт один tenant-isolated trial workspace. Репозиторий фиксирует email signup с autoconfirm в `supabase/config.toml`; hosted-проект должен зеркалировать эти настройки (`Confirm email` выключен), SMS/phone provider приложению не нужен. Если подтверждение ошибочно оставлено включённым, UI безопасно покажет fallback с ожиданием письма. Redirect URLs для login/reset должны входить в Auth allowlist.
 
 ## Текущий статус
 
