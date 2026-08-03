@@ -547,21 +547,23 @@ set search_path = ''
 as $$
 declare
   updated_setting private.system_settings;
+  invalid_value boolean;
 begin
   perform private.require_admin_mfa();
+  invalid_value := case p_key
+    when 'maintenance_mode' then jsonb_typeof(p_value) <> 'boolean'
+    when 'registration_enabled' then jsonb_typeof(p_value) <> 'boolean'
+    when 'public_ar_enabled' then jsonb_typeof(p_value) <> 'boolean'
+    when 'analytics_retention_days' then
+      jsonb_typeof(p_value) <> 'number' or (p_value #>> '{}')::numeric <> trunc((p_value #>> '{}')::numeric)
+        or (p_value #>> '{}')::integer not between 30 and 730
+    when 'support_banner' then
+      jsonb_typeof(p_value) <> 'string' or char_length(p_value #>> '{}') > 160
+    else true
+  end;
   if not exists (select 1 from private.system_settings setting where setting.key = p_key)
     or p_value is null
-    or case p_key
-      when 'maintenance_mode' then jsonb_typeof(p_value) <> 'boolean'
-      when 'registration_enabled' then jsonb_typeof(p_value) <> 'boolean'
-      when 'public_ar_enabled' then jsonb_typeof(p_value) <> 'boolean'
-      when 'analytics_retention_days' then
-        jsonb_typeof(p_value) <> 'number' or (p_value #>> '{}')::numeric <> trunc((p_value #>> '{}')::numeric)
-          or (p_value #>> '{}')::integer not between 30 and 730
-      when 'support_banner' then
-        jsonb_typeof(p_value) <> 'string' or char_length(p_value #>> '{}') > 160
-      else true
-    end
+    or invalid_value
   then
     raise exception 'Invalid system setting' using errcode = '22023';
   end if;
