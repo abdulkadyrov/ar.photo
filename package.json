@@ -23,8 +23,9 @@
     "check:metadata": "node scripts/check-public-metadata.mjs",
     "check:dependencies": "node scripts/check-dependency-audit.mjs",
     "check:security": "node scripts/check-security-contract.mjs",
-    "check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run check:bundle && npm run check:secrets && npm run check:metadata && npm run check:dependencies && npm run check:security",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build && npm run check:bundle && npm run check:secrets && npm run check:metadata && npm run check:dependencies && npm run check:security && npm run release:manifest",
     "sbom": "npm sbom --sbom-format cyclonedx",
+    "release:manifest": "node scripts/create-release-manifest.mjs",
     "build": "tsc -b && vite build",
     "build:worker": "tsc -p tsconfig.worker.json --pretty false",
     "generate:test-mind": "node scripts/generate-test-mind.mjs",
@@ -50,7 +51,6 @@
     "zustand": "5.0.14"
   },
   "devDependencies": {
-    "@axe-core/playwright": "4.12.1",
     "@eslint/js": "10.0.1",
     "@axe-core/playwright": "4.12.1",
     "@playwright/test": "1.62.1",

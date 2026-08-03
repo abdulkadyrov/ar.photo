@@ -73,6 +73,10 @@ test("keeps the public AR viewer camera-explicit with a no-camera fallback", asy
 
   await expect(page.getByRole("heading", { name: "Демо AR Photo" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Начать AR" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Подробнее о камере и приватности" })).toHaveAttribute(
+    "href",
+    "/ar.photo/privacy",
+  );
   expect(
     await page.evaluate(() => (window as typeof window & { __arPhotoCameraRequests: number }).__arPhotoCameraRequests),
   ).toBe(0);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Camera, Expand, Play, RotateCcw, ScanLine, ShieldCheck, Volume2, VolumeX } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { Button } from "../../shared/ui";
 import {
   isManifestFresh,
@@ -181,6 +181,12 @@ export function PublicArViewerRoute() {
               <ShieldCheck className="mt-0.5 shrink-0" size={15} /> Камера запускается только после нажатия и не
               записывает кадры.
             </p>
+            <Link
+              className="mt-3 inline-flex text-xs font-semibold text-violet-200 underline-offset-4 hover:underline"
+              to="/privacy"
+            >
+              Подробнее о камере и приватности
+            </Link>
           </div>
         </section>
       )}
