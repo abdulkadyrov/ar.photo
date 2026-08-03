@@ -54,6 +54,8 @@ create index ar_view_events_item_occurred_idx
 on public.ar_view_events(ar_item_id, occurred_at desc, id);
 create index ar_view_events_account_occurred_idx
 on public.ar_view_events(account_id, occurred_at desc, id);
+create index ar_view_events_session_scope_idx
+on public.ar_view_events(session_id, ar_item_id, account_id);
 
 alter table public.ar_view_events enable row level security;
 alter table public.ar_view_events force row level security;
