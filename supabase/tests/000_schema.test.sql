@@ -13,12 +13,12 @@ select is(
       and c.relkind = 'r'
       and c.relname = any(array[
         'subscription_plans', 'accounts', 'profiles', 'account_members', 'subscriptions',
-        'projects', 'groups', 'ar_items', 'media_assets', 'processing_jobs', 'qr_codes',
+        'projects', 'groups', 'ar_items', 'media_assets', 'upload_sessions', 'processing_jobs', 'qr_codes',
         'ar_view_sessions', 'audit_logs'
       ])
   ),
-  13::bigint,
-  'all stage-two tables exist'
+  14::bigint,
+  'all application tables exist'
 );
 
 select is(
@@ -30,11 +30,11 @@ select is(
       and c.relrowsecurity
       and c.relname = any(array[
         'subscription_plans', 'accounts', 'profiles', 'account_members', 'subscriptions',
-        'projects', 'groups', 'ar_items', 'media_assets', 'processing_jobs', 'qr_codes',
+        'projects', 'groups', 'ar_items', 'media_assets', 'upload_sessions', 'processing_jobs', 'qr_codes',
         'ar_view_sessions', 'audit_logs'
       ])
   ),
-  13::bigint,
+  14::bigint,
   'RLS is enabled on every application table'
 );
 
@@ -47,11 +47,11 @@ select is(
       and c.relforcerowsecurity
       and c.relname = any(array[
         'subscription_plans', 'accounts', 'profiles', 'account_members', 'subscriptions',
-        'projects', 'groups', 'ar_items', 'media_assets', 'processing_jobs', 'qr_codes',
+        'projects', 'groups', 'ar_items', 'media_assets', 'upload_sessions', 'processing_jobs', 'qr_codes',
         'ar_view_sessions', 'audit_logs'
       ])
   ),
-  13::bigint,
+  14::bigint,
   'RLS is forced on every application table'
 );
 
@@ -63,7 +63,7 @@ select is(
       and g.grantee = 'anon'
       and g.table_name = any(array[
         'subscription_plans', 'accounts', 'profiles', 'account_members', 'subscriptions',
-        'projects', 'groups', 'ar_items', 'media_assets', 'processing_jobs', 'qr_codes',
+        'projects', 'groups', 'ar_items', 'media_assets', 'upload_sessions', 'processing_jobs', 'qr_codes',
         'ar_view_sessions', 'audit_logs'
       ])
   ),
@@ -80,7 +80,7 @@ select is(
       and g.privilege_type in ('INSERT', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER')
       and g.table_name = any(array[
         'subscription_plans', 'accounts', 'profiles', 'account_members', 'subscriptions',
-        'projects', 'groups', 'ar_items', 'media_assets', 'processing_jobs', 'qr_codes',
+        'projects', 'groups', 'ar_items', 'media_assets', 'upload_sessions', 'processing_jobs', 'qr_codes',
         'ar_view_sessions', 'audit_logs'
       ])
   ),
@@ -132,7 +132,9 @@ select is(
         'is_superadmin', 'has_account_access', 'has_account_role', 'shares_account',
         'subscription_allows_write', 'can_write_account', 'effective_limit',
         'has_storage_access', 'handle_new_user', 'write_audit_log', 'admin_create_account',
-        'create_project', 'create_group', 'create_ar_item', 'reorder_groups', 'move_group'
+        'create_project', 'create_group', 'create_ar_item', 'reorder_groups', 'move_group',
+        'begin_media_upload', 'start_media_upload', 'fail_media_upload', 'finalize_media_upload',
+        'abort_media_upload', 'expire_stale_uploads'
       )
       and not exists (
         select 1
