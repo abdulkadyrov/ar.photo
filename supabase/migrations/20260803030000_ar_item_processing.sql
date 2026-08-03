@@ -504,10 +504,10 @@ begin
     if not found or object_size is null or object_size <= 0 then
       raise exception 'Generated Storage object not found' using errcode = '23503';
     end if;
-    if object_mime is not null and object_mime <> case
+    if object_mime is not null and object_mime <> (case
       when generated_kind = 'tracking' then 'application/octet-stream'
       else 'image/webp'
-    end then
+    end) then
       raise exception 'Generated Storage object MIME mismatch' using errcode = '22000';
     end if;
 
