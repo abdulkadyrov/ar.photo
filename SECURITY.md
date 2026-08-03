@@ -2,9 +2,9 @@
 
 ## 1. Текущий security posture
 
-Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этапы 2–9 добавили Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, granular permissions, protected team lifecycle, private Storage policies, audit logs, quota-aware mutations, resumable upload lifecycle, service-only media processing, минимальный публичный AR boundary, trusted publication/QR lifecycle и privacy-minimized analytics.
+Репозиторий содержит browser prototype как изолированный regression path и production-oriented Supabase foundation. Этапы 2–10 добавили Auth identity boundary, membership, forced RLS, explicit grants, subscription enforcement, granular permissions, protected team lifecycle, private Storage policies, audit logs, quota-aware mutations, resumable upload lifecycle, service-only media processing, минимальный публичный AR boundary, trusted publication/QR lifecycle, privacy-minimized analytics и MFA-gated admin operations.
 
-Это ещё не разрешение на работу с реальными клиентами: MFA администратора, hosted advisors, deployed-function/worker observability, physical-device QR/AR matrix и production environment verification закрываются последующими этапами.
+Это ещё не разрешение на работу с реальными клиентами: repository-level MFA enforcement реализован, но hosted TOTP enrollment/recovery rehearsal, hosted advisors, deployed-function/worker observability, physical-device QR/AR matrix и production environment verification закрываются этапом 11.
 
 ## 2. Findings
 
@@ -106,7 +106,7 @@ Public viewer/analytics endpoints пока нет, но без ограниче�
 
 - нет CSP, frame-ancestors, Permissions-Policy и формализованных security headers;
 - нет central error redaction и observability integration;
-- audit logs добавлены для основных tenant mutations; coverage расширяется вместе с новыми mutation flows;
+- tenant audit и private admin audit покрывают реализованные mutation flows; production alerting/retention ещё не подключены;
 - нет automatic secret scan/dependency review в CI;
 - unused `public/vendor` copies попадают в build и увеличивают supply-chain surface;
 - произвольные user strings пока безопасно экранируются React, но будущие rich text/SVG требуют отдельной sanitization policy;
@@ -160,12 +160,12 @@ Data API GRANT и RLS тестируются отдельно: отсутств�
 
 - Email/password обрабатывает Supabase Auth; приложение не хранит пароль/хэш.
 - Hosted email confirmation/reset flow использует allowlisted redirect URLs.
-- Суперадмин создаёт пользователя через server-only Admin API.
-- Temporary password не логируется и должен быть заменён.
+- Суперадмин создаёт пользователя через server-only Admin API только после active-role и `aal2` проверки; пользователю отправляется invitation без временного пароля.
+- Password reset — только account-scoped recovery delivery: email разрешается server-side, password/token/link не возвращаются администратору.
 - Suspended account/member проверяется на каждом privileged request, не только при login.
 - JWT claims могут устаревать; critical operations перепроверяют database state.
 - Перед блокировкой пользователя активные sessions отзываются, насколько позволяет выбранная конфигурация.
-- MFA для суперадминов — обязательная pre-production задача.
+- Все operational reads/mutations требуют `aal2`; hosted TOTP enrollment/recovery и break-glass rehearsal остаются pre-production gate.
 
 ## 7. Public viewer privacy
 
@@ -210,6 +210,14 @@ Retention настраивается server-side в диапазоне 30–730 
 - rate-limit и milestone idempotency tests;
 - cross-tenant aggregate scope/permission tests;
 - bounded retention cleanup и non-blocking playback tests.
+
+### Этап 10
+
+- active superadmin + `aal2` для operational reads и каждой mutation;
+- private append-only audit для support access и admin changes;
+- account-scoped reason capture и typed confirmation для dangerous actions;
+- invitation/recovery-only Auth flows без password visibility;
+- content suspension, processing retry и protected settings negative tests.
 
 ### Перед MVP
 

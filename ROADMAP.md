@@ -254,6 +254,8 @@ Gate:
 
 ## Этап 10 — admin
 
+Статус: repository gate выполнен. MFA/aal2 authorization, private append-only admin audit, account-scoped support access, invitation/recovery-only Auth flows и адаптивная operations console подтверждены 124 unit/component тестами, 12 E2E и 323 pgTAP-проверками. Hosted Auth delivery и production TOTP rehearsal остаются infrastructure gate. Подробности: `STAGE_10_REPORT.md`.
+
 Цель: безопасное управление клиентами и operations.
 
 Deliverables:

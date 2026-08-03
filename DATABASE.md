@@ -2,7 +2,7 @@
 
 ## 1. Область документа
 
-Документ описывает применённую PostgreSQL/Supabase схему этапов 2–8. Источник истины — последовательные SQL-миграции в `supabase/migrations`; CI разворачивает их с нуля на PostgreSQL 17, выполняет seed, lint и pgTAP-тесты.
+Документ описывает применённую PostgreSQL/Supabase схему этапов 2–10. Источник истины — последовательные SQL-миграции в `supabase/migrations`; CI разворачивает их с нуля на PostgreSQL 17, выполняет seed, lint и pgTAP-тесты.
 
 Все UUID генерируются сервером. Все timestamps — `timestamptz`. Денормализованный `account_id` используется на tenant-bound таблицах для простых и быстрых RLS policies, но всегда устанавливается/проверяется доверенной server logic.
 
@@ -160,6 +160,10 @@ Fields: `id`, `account_id`, `actor_user_id`, `action`, `entity_type`, `entity_id
 
 Append-only for application roles. Sensitive values, raw filenames and signed URLs are excluded.
 
+### Private admin operations tables
+
+`private.admin_audit_logs` хранит append-only actor, account scope, action, bounded reason, safe metadata и timestamp для support reads и admin mutations. `private.admin_ar_item_suspensions` хранит server-controlled suspension overlay и actor/reason без изменения private media. `private.system_settings` хранит только allowlisted operational keys; analytics retention дополнительно ограничен 30–730 днями. Все три таблицы используют forced RLS, не имеют `anon`/`authenticated` table grants и доступны browser только через MFA-gated functions.
+
 ## 5. Relationships
 
 ```mermaid
@@ -199,6 +203,8 @@ Create project/group/AR item, add member, upload finalize и publish выпол�
 `get_account_entitlements` возвращает нормализованный JSON contract с plan/subscription/limits/usage/permissions. Team invite и reactivate используют account-scoped advisory lock, поэтому одновременные запросы не могут превысить `team_limit`. `admin_update_subscription` повторно проверяет superadmin и нормализует custom limits; UI этого admin flow относится к этапу 10.
 
 Analytics ingestion доступен только service role: `record_public_ar_event` сам разрешает опубликованный item, upsert-ит session и идемпотентно записывает milestone; `consume_public_analytics_rate_limit` атомарно считает только salted hash buckets. Authenticated dashboard получает исключительно aggregate JSON через `get_analytics_summary` после permission/scope проверки. `purge_analytics_before` — service-only bounded batch delete с запретом удалять данные моложе 30 дней.
+
+Admin contract разделён на минимальный `get_admin_access`, MFA-gated operational reads и trusted mutations. `private.require_admin_mfa` требует active `superadmin` и `aal2`; `admin_get_account_detail` дополнительно требует reason и создаёт support audit. Account/status/subscription/plan/content/settings/retry/reset/create functions повторяют authorization внутри transaction и создают private audit. Старые прямые browser grants на `admin_create_account` и `admin_update_subscription` отозваны. Ни один database contract не принимает и не возвращает password/hash/recovery credential.
 
 ## 7. RLS matrix
 
@@ -285,6 +291,7 @@ Authenticated clients используют четыре audited RPC вместо
 - publication/QR: trusted readiness gate, reversible unpublish, slug rotation, strict style normalization и audit coverage.
 - subscriptions/team: effective entitlements, permission ceilings, invitation lifecycle и concurrency-safe team quota.
 - analytics: private idempotent events, salted session identity, scoped aggregate RPC, rate budgets и bounded retention cleanup.
+- admin operations: private append-only audit, content suspension overlay, allowlisted system settings, account-scoped support access и MFA-gated trusted mutations.
 
 `supabase/seed.sql` содержит только синтетические данные: superadmin, два изолированных аккаунта, active/expired subscription и role fixtures. `supabase/tests` проверяет schema/grants и RLS/Storage matrix. Тип `Database` генерируется Supabase CLI из реально поднятой схемы и хранится в `src/shared/api/database.types.ts`.
 

@@ -29,6 +29,8 @@ flowchart LR
   Worker --> Storage
   Public --> Analytics["Rate-limited analytics endpoint"]
   Analytics --> DB
+  App --> AdminAPI["MFA-gated admin RPC / Edge"]
+  AdminAPI --> DB
 ```
 
 ## 3. Frontend boundaries
@@ -230,6 +232,14 @@ Public viewer формирует короткоживущий случайный
 Edge Function `public-ar-analytics` ограничивает размер и поля запроса, проверяет origin, хеширует transient network/session identifiers отдельной солью и применяет атомарные бюджеты 120/IP/minute и 60/session/minute. Service-only RPC повторно разрешает item по действующему published manifest boundary, записывает одну session и идемпотентные milestones. Raw session/event tables используют forced RLS и не имеют browser grants.
 
 Кабинет вызывает только `get_analytics_summary`: функция требует active membership и permission `analytics`, валидирует account/project/group/item scope и возвращает агрегаты максимум за 366 дней. `cleanup-analytics` запускает service-only batch purge с настраиваемым retention 30–730 дней; удаление session каскадно удаляет events и старые rate buckets. Ошибка ingestion никогда не блокирует camera, tracking или playback.
+
+### 8.3. Admin operations boundary
+
+`/admin` — отдельный lazy route, а не authorization boundary. Production repository сначала получает минимальный access contract; operational reads и каждая mutation дополнительно вызывают server-side `require_admin_mfa`, который проверяет active `superadmin` profile и JWT assurance level `aal2`. Обычный пользователь и `aal1` не получают account, user, subscription, content, error, audit или setting data.
+
+Support account detail требует account id и причину от 10 символов и фиксируется в private append-only `admin_audit_logs`. Account/subscription/plan/content/settings/retry/reset/create mutations записывают actor, account, action, bounded reason и безопасные metadata в той же trusted boundary. Content suspension закрывает публичную видимость независимо от frontend; restore не перепубликует item автоматически.
+
+Edge Functions `admin-create-user` и `admin-reset-password` используют service role только после user-JWT/MFA RPC authorization. Создание пользователя отправляет invitation без временного пароля; reset разрешает account-scoped recovery delivery, server-side разрешает email по user id и никогда не возвращает password/reset token/link в browser. Production UI выполняет Supabase TOTP challenge/verify, а strict Zod schemas отклоняют лишние и password-like поля.
 
 ## 9. AR viewer state machine
 
