@@ -6,6 +6,7 @@ export type VideoOptimizationInput = {
   width: number;
   height: number;
   durationSeconds: number;
+  audioCodec?: "aac" | "none";
 };
 
 export type VideoOptimizationResult = {
@@ -13,7 +14,7 @@ export type VideoOptimizationResult = {
   strategy: "source-kept" | "webcodecs-h264";
 };
 
-export type InspectedVideoSource = VideoOptimizationInput & {
+export type InspectedVideoSource = Omit<VideoOptimizationInput, "audioCodec"> & {
   videoCodec: string;
   audioCodec: string | null;
 };
@@ -40,6 +41,17 @@ export function shouldOptimizeVideo(file: File, metadata: VideoOptimizationInput
     Math.max(metadata.width, metadata.height) > clientVideoMaxDimension ||
     (file.size > 8 * 1024 * 1024 && averageBitrate > targetBitrate * 1.25)
   );
+}
+
+export function audioConversionOptions() {
+  return {
+    codec: "aac" as const,
+    // Safari can remux an existing AAC track even when its WebCodecs runtime
+    // cannot create a new AAC encoder. Omitting bitrate/quality keeps that
+    // lossless fast path available; non-AAC input is still transcoded because
+    // its source codec differs from the requested AAC output codec.
+    forceTranscode: false,
+  };
 }
 
 export async function inspectVideoSource(file: File): Promise<InspectedVideoSource> {
@@ -119,18 +131,21 @@ export async function optimizeVideoFile(
         allowRotationMetadata: false,
         forceTranscode: true,
       },
-      audio: {
-        codec: "aac",
-        bitrate: 128_000,
-        forceTranscode: true,
-      },
+      audio: audioConversionOptions(),
       tags: {},
       showWarnings: false,
     });
 
-    if (!conversion.isValid || conversion.discardedTracks.some(({ track }) => track.isVideoTrack())) {
+    const discardedRequiredTrack = conversion.discardedTracks.some(
+      ({ track }) => track.isVideoTrack() || (metadata.audioCodec === "aac" && track.isAudioTrack()),
+    );
+    if (!conversion.isValid || discardedRequiredTrack) {
       input.dispose();
-      throw new VideoOptimizationUnavailableError();
+      throw new VideoOptimizationUnavailableError(
+        discardedRequiredTrack && metadata.audioCodec === "aac"
+          ? "Браузер не смог сохранить аудиодорожку видео"
+          : undefined,
+      );
     }
 
     conversion.onProgress = (progress) => onProgress?.(Math.max(0, Math.min(1, progress)));

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  audioConversionOptions,
   clientVideoTargetBytes,
   containedVideoSize,
   shouldOptimizeVideo,
@@ -36,5 +37,11 @@ describe("video optimization policy", () => {
     expect(targetVideoBitrate({ width: 1280, height: 720 })).toBeLessThan(
       targetVideoBitrate({ width: 1920, height: 1080 }),
     );
+  });
+
+  it("keeps AAC passthrough available for Safari", () => {
+    expect(audioConversionOptions()).toEqual({ codec: "aac", forceTranscode: false });
+    expect(audioConversionOptions()).not.toHaveProperty("bitrate");
+    expect(audioConversionOptions()).not.toHaveProperty("quality");
   });
 });
