@@ -97,7 +97,7 @@ test("keeps the public AR viewer camera-explicit with a no-camera fallback", asy
 
   await page.getByRole("button", { name: "Начать AR" }).click();
   const guide = page.getByTestId("marker-scan-guide");
-  await expect(guide).toHaveCSS("aspect-ratio", "1200 / 1600");
+  await expect(guide).toHaveCSS("aspect-ratio", "2742 / 1542");
   await expect(page.getByText("AR не удалось запустить", { exact: false })).toBeVisible();
 
   await page.getByRole("button", { name: "Смотреть обычное видео" }).click();

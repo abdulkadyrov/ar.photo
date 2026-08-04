@@ -13,7 +13,7 @@ export type Workspace = {
   accountId: string;
   accountName: string;
   accountStatus: Database["public"]["Enums"]["account_status"];
-  memberRole: MemberRole;
+  memberRole: MemberRole | "superadmin";
   canWrite: boolean;
   subscriptionStatus: SubscriptionStatus;
   subscriptionExpiresAt: string | null;

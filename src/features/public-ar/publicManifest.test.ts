@@ -9,6 +9,7 @@ describe("public AR manifest client", () => {
     const manifest = await loadPublicManifest("demo");
 
     expect(manifest.title).toBe("Демо AR Photo");
+    expect(manifest.marker).toEqual({ width: 2742, height: 1542, aspectRatio: 2742 / 1542 });
     expect(manifest.assets.trackingAssetUrl).toContain("test.mind");
     expect(fetchSpy).not.toHaveBeenCalled();
   });

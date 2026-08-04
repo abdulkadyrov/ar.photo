@@ -25,6 +25,7 @@ function snapshot(): StoreSnapshot {
         studentId: "student_one",
         imageId: "image_one",
         videoId: "video_one",
+        trackingId: "tracking_one",
         qrCode: "https://example.test/ar/public_one",
         createdAt: timestamp,
       },
@@ -32,11 +33,13 @@ function snapshot(): StoreSnapshot {
     media: [
       { id: "image_one", type: "image", fileName: "marker.jpg", blobId: "blob_image_one" },
       { id: "video_one", type: "video", fileName: "clip.mp4", blobId: "blob_video_one" },
+      { id: "tracking_one", type: "tracking", fileName: "marker.mind", blobId: "blob_tracking_one" },
       { id: "image_other", type: "image", fileName: "other.jpg", blobId: "blob_image_other" },
     ],
     mediaBlobs: [
       { id: "blob_image_one", blob: new Blob(["safe-image"]) },
       { id: "blob_video_one", blob: new Blob(["safe-video"]) },
+      { id: "blob_tracking_one", blob: new Blob(["safe-tracking"]) },
       { id: "blob_image_other", blob: new Blob(["must-not-export"]) },
     ],
   };
@@ -53,9 +56,10 @@ describe("secure ZIP import/export", () => {
 
     expect(imported.data.projects.map((item) => item.id)).toEqual(["project_one"]);
     expect(imported.data.classes.map((item) => item.id)).toEqual(["class_one"]);
-    expect(imported.data.media.map((item) => item.id)).toEqual(["image_one", "video_one"]);
-    expect(imported.blobs).toHaveLength(2);
-    expect(imported.summary).toMatchObject({ projects: 1, classes: 1, students: 1, livePhotos: 1, media: 2 });
+    expect(imported.data.media.map((item) => item.id)).toEqual(["image_one", "video_one", "tracking_one"]);
+    expect(imported.data.livePhotos[0].trackingId).toBe("tracking_one");
+    expect(imported.blobs).toHaveLength(3);
+    expect(imported.summary).toMatchObject({ projects: 1, classes: 1, students: 1, livePhotos: 1, media: 3 });
   });
 
   it("rejects media tampering before returning import data", async () => {

@@ -35,7 +35,7 @@ declare module "mind-ar/dist/mindar-image-three.prod.js" {
       dispose?: () => void;
       forceContextLoss?: () => void;
     };
-    controller?: { dispose?: () => void };
+    controller?: { dispose?: () => void; markerDimensions?: Array<[number, number]> };
     cssRenderer?: { domElement?: HTMLElement };
     scene: unknown;
     camera: unknown;
@@ -47,6 +47,16 @@ declare module "mind-ar/dist/mindar-image-three.prod.js" {
     start(): Promise<void>;
     stop(): void;
     resize?(): void;
+  }
+}
+
+declare module "mind-ar/src/image-target/compiler.js" {
+  export class Compiler {
+    compileImageTargets(
+      images: Array<CanvasImageSource & { width: number; height: number }>,
+      progressCallback: (progress: number) => void,
+    ): Promise<unknown>;
+    exportData(): Uint8Array;
   }
 }
 

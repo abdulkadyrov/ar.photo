@@ -29,7 +29,7 @@ const publicManifestSchema = z
         posterUrl: assetUrl,
       })
       .strict(),
-    signedUrlsExpireAt: z.string().datetime(),
+    signedUrlsExpireAt: z.string().datetime({ offset: true }),
   })
   .strict();
 
@@ -97,7 +97,10 @@ function loadDemoManifest(publicSlug: string): PublicArManifest {
   return {
     version: 1,
     title: "Демо AR Photo",
-    marker: { width: 1200, height: 1600, aspectRatio: 0.75 },
+    // `test.mind` is compiled from public/test-assets/test.jpg. Keeping the
+    // source pixel dimensions here is essential: MindAR's unit-wide anchor
+    // must receive the same aspect ratio as the image it tracks.
+    marker: { width: 2742, height: 1542, aspectRatio: 2742 / 1542 },
     behavior: { autoplay: true, loop: true, markerLost: "pause_hide", audioDefault: "muted" },
     fallbackEnabled: true,
     assets: {

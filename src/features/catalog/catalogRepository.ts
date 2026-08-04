@@ -378,14 +378,16 @@ const projectSort = {
   name_desc: { column: "name", ascending: false },
 } as const;
 
-const workspaceEntitlementSchema = z.object({
+export const workspaceEntitlementSchema = z.object({
   accountName: z.string().min(1),
   accountStatus: z.enum(["active", "suspended", "closed"]),
-  memberRole: z.enum(["owner", "manager", "editor", "viewer"]),
+  memberRole: z.enum(["owner", "manager", "editor", "viewer", "superadmin"]),
   canWrite: z.boolean(),
   subscription: z.object({
     status: z.enum(["trial", "active", "grace_period", "expired", "suspended", "cancelled"]),
-    expiresAt: z.string().datetime().nullable(),
+    // Postgres `timestamptz` values returned through PostgREST use an explicit
+    // offset (for example `+00:00`) rather than always ending in `Z`.
+    expiresAt: z.string().datetime({ offset: true }).nullable(),
   }),
 });
 

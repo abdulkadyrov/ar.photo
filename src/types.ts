@@ -22,13 +22,14 @@ export type LivePhoto = {
   studentId: string;
   imageId: string;
   videoId: string;
+  trackingId?: string;
   qrCode: string;
   createdAt: string;
 };
 
 export type Media = {
   id: string;
-  type: "image" | "video";
+  type: "image" | "video" | "tracking";
   fileName: string;
   blobId: string;
 };

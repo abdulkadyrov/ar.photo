@@ -23,9 +23,9 @@ describe("settings schemas", () => {
       },
       subscription: {
         status: "active",
-        startsAt: "2026-08-03T00:00:00.000Z",
-        expiresAt: "2027-08-03T00:00:00.000Z",
-        gracePeriodEndsAt: "2027-08-10T00:00:00.000Z",
+        startsAt: "2026-08-03T00:00:00.000000+00:00",
+        expiresAt: "2027-08-03T03:00:00.000000+03:00",
+        gracePeriodEndsAt: "2027-08-10T00:00:00.000000+00:00",
       },
       limits: {
         storageBytes: 10_000,

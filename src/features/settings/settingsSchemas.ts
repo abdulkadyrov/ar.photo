@@ -34,6 +34,7 @@ export const permissionsSchema = z
   .strict();
 
 const nullableLimit = z.number().int().nonnegative().nullable();
+const timestamp = z.string().datetime({ offset: true });
 
 export const accountEntitlementsSchema = z
   .object({
@@ -54,9 +55,9 @@ export const accountEntitlementsSchema = z
     subscription: z
       .object({
         status: subscriptionStatusSchema,
-        startsAt: z.string().datetime(),
-        expiresAt: z.string().datetime().nullable(),
-        gracePeriodEndsAt: z.string().datetime().nullable(),
+        startsAt: timestamp,
+        expiresAt: timestamp.nullable(),
+        gracePeriodEndsAt: timestamp.nullable(),
       })
       .strict(),
     limits: z
@@ -92,7 +93,7 @@ export const teamMemberSchema = z
     role: memberRoleSchema,
     permissions: permissionsSchema,
     isActive: z.boolean(),
-    acceptedAt: z.string().datetime().nullable(),
+    acceptedAt: timestamp.nullable(),
   })
   .strict();
 
@@ -102,8 +103,8 @@ export const teamInvitationSchema = z
     email: z.string().email(),
     role: assignableMemberRoleSchema,
     permissions: permissionsSchema,
-    expiresAt: z.string().datetime(),
-    createdAt: z.string().datetime(),
+    expiresAt: timestamp,
+    createdAt: timestamp,
   })
   .strict();
 
@@ -120,7 +121,7 @@ export const pendingTeamInvitationSchema = z
     accountId: z.string().uuid(),
     accountName: z.string().min(1),
     role: assignableMemberRoleSchema,
-    expiresAt: z.string().datetime(),
+    expiresAt: timestamp,
   })
   .strict();
 
@@ -137,7 +138,7 @@ export const inviteTeamMemberSchema = z
 export const inviteDeliverySchema = z
   .object({
     invitation: z
-      .object({ id: z.string().uuid(), role: assignableMemberRoleSchema, expiresAt: z.string().datetime() })
+      .object({ id: z.string().uuid(), role: assignableMemberRoleSchema, expiresAt: timestamp })
       .strict(),
     delivery: z.enum(["email", "in_app"]),
   })

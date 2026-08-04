@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { coverTextureTransform, markerPlaneGeometry, publicArTrackingConfig } from "./mindArAdapter";
+import {
+  coverTextureTransform,
+  markerPlaneGeometry,
+  publicArTrackingConfig,
+  resolveMarkerDimensions,
+} from "./mindArAdapter";
 
 describe("public AR alignment contract", () => {
   it("places the plane exactly on the marker without a parallax offset", () => {
@@ -10,6 +15,17 @@ describe("public AR alignment contract", () => {
   it("rejects invalid marker geometry", () => {
     expect(() => markerPlaneGeometry({ width: 0, height: 1200 })).toThrow("Invalid marker geometry");
     expect(() => markerPlaneGeometry({ width: Number.NaN, height: 1200 })).toThrow("Invalid marker geometry");
+  });
+
+  it("uses the compiled tracking target as the authoritative marker format", () => {
+    expect(resolveMarkerDimensions({ width: 1200, height: 1600 }, [[2742, 1542]])).toEqual({
+      width: 2742,
+      height: 1542,
+    });
+    expect(resolveMarkerDimensions({ width: 1200, height: 1600 }, [[0, 1542]])).toEqual({
+      width: 1200,
+      height: 1600,
+    });
   });
 
   it("center-crops wide and tall video without stretching it", () => {

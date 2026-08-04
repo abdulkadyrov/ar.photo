@@ -112,7 +112,9 @@ export async function deleteProjectCascade(projectId: string) {
   const classIds = data.classes.filter((item) => item.projectId === projectId).map((item) => item.id);
   const studentIds = data.students.filter((item) => classIds.includes(item.classId)).map((item) => item.id);
   const livePhotos = data.livePhotos.filter((item) => studentIds.includes(item.studentId));
-  const mediaIds = livePhotos.flatMap((item) => [item.imageId, item.videoId]);
+  const mediaIds = livePhotos.flatMap((item) =>
+    item.trackingId ? [item.imageId, item.videoId, item.trackingId] : [item.imageId, item.videoId],
+  );
   const media = data.media.filter((item) => mediaIds.includes(item.id));
   await Promise.all([
     remove("projects", projectId),

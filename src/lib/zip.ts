@@ -42,6 +42,7 @@ const appDataSchema = z
             studentId: idSchema,
             imageId: idSchema,
             videoId: idSchema,
+            trackingId: idSchema.optional(),
             qrCode: z
               .string()
               .min(1)
@@ -55,7 +56,12 @@ const appDataSchema = z
     media: z
       .array(
         z
-          .object({ id: idSchema, type: z.enum(["image", "video"]), fileName: fileNameSchema, blobId: idSchema })
+          .object({
+            id: idSchema,
+            type: z.enum(["image", "video", "tracking"]),
+            fileName: fileNameSchema,
+            blobId: idSchema,
+          })
           .strict(),
       )
       .max(MAX_MEDIA_ENTRIES),
@@ -140,8 +146,11 @@ export async function exportClassZip(snapshot: StoreSnapshot, arClass: ARClass) 
     if (!folder) continue;
     const image = mediaById.get(livePhoto.imageId);
     const video = mediaById.get(livePhoto.videoId);
+    const tracking = livePhoto.trackingId ? mediaById.get(livePhoto.trackingId) : undefined;
     if (image) folder.file(safeExportFileName(image.fileName, `${image.id}.jpg`), blobById.get(image.blobId) ?? "");
     if (video) folder.file(safeExportFileName(video.fileName, `${video.id}.mp4`), blobById.get(video.blobId) ?? "");
+    if (tracking)
+      folder.file(safeExportFileName(tracking.fileName, `${tracking.id}.mind`), blobById.get(tracking.blobId) ?? "");
     folder.file("qr.png", await qrPngBlob(livePhoto.qrCode));
     folder.file("livephoto.json", JSON.stringify({ student, livePhoto, image, video }, null, 2));
   }
@@ -243,7 +252,14 @@ export async function parseImportZip(
     const media = mediaByBlobId.get(item.id);
     blobs.push({
       id: item.id,
-      blob: new Blob([arrayBuffer], { type: media?.type === "image" ? "image/*" : "video/*" }),
+      blob: new Blob([arrayBuffer], {
+        type:
+          media?.type === "image"
+            ? "image/*"
+            : media?.type === "video"
+              ? "video/*"
+              : "application/octet-stream",
+      }),
     });
   }
 
@@ -334,6 +350,9 @@ function validateAppData(data: AppData) {
     if (media.get(item.imageId)?.type !== "image" || media.get(item.videoId)?.type !== "video") {
       throw new Error("Live photo содержит неверные image/video references");
     }
+    if (item.trackingId && media.get(item.trackingId)?.type !== "tracking") {
+      throw new Error("Live photo содержит неверный tracking reference");
+    }
   }
 }
 
@@ -372,7 +391,11 @@ function dataForRelations(
   const students = snapshot.students.filter((item) => classIds.has(item.classId));
   const studentIds = new Set(students.map((item) => item.id));
   const livePhotos = snapshot.livePhotos.filter((item) => studentIds.has(item.studentId));
-  const mediaIds = new Set(livePhotos.flatMap((item) => [item.imageId, item.videoId]));
+  const mediaIds = new Set(
+    livePhotos.flatMap((item) =>
+      item.trackingId ? [item.imageId, item.videoId, item.trackingId] : [item.imageId, item.videoId],
+    ),
+  );
   const media = snapshot.media.filter((item) => mediaIds.has(item.id));
   return { projects, classes, students, livePhotos, media };
 }

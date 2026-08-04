@@ -13,6 +13,24 @@ export const publicArTrackingConfig = Object.freeze({
 
 export type MarkerDimensions = { width: number; height: number };
 
+export function resolveMarkerDimensions(
+  manifestMarker: MarkerDimensions,
+  trackingDimensions?: readonly (readonly [number, number])[],
+) {
+  const [trackingWidth, trackingHeight] = trackingDimensions?.[0] ?? [];
+  if (
+    typeof trackingWidth === "number" &&
+    typeof trackingHeight === "number" &&
+    Number.isFinite(trackingWidth) &&
+    Number.isFinite(trackingHeight) &&
+    trackingWidth > 0 &&
+    trackingHeight > 0
+  ) {
+    return { width: trackingWidth, height: trackingHeight };
+  }
+  return manifestMarker;
+}
+
 export function markerPlaneGeometry(marker: MarkerDimensions) {
   if (!Number.isFinite(marker.width) || !Number.isFinite(marker.height) || marker.width <= 0 || marker.height <= 0) {
     throw new Error("Invalid marker geometry");
@@ -87,8 +105,11 @@ export async function startPublicMindAr(options: {
   renderer.setPixelRatio?.(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setClearColor(0x000000, 0);
   const texture = new Three.VideoTexture(video);
-  const markerGeometry = markerPlaneGeometry(manifest.marker);
-  const geometry = new Three.PlaneGeometry(markerGeometry.width, markerGeometry.height);
+  let activeMarker: MarkerDimensions = manifest.marker;
+  let markerGeometry = markerPlaneGeometry(activeMarker);
+  // The unit plane is scaled after the .mind dataset loads. This lets the
+  // compiled target remain authoritative if manifest metadata ever drifts.
+  const geometry = new Three.PlaneGeometry(markerGeometry.width, markerGeometry.width);
   const material = new Three.MeshBasicMaterial({
     map: texture,
     transparent: false,
@@ -98,6 +119,7 @@ export async function startPublicMindAr(options: {
   });
   const plane = new Three.Mesh(geometry, material);
   plane.position.set(0, 0, markerGeometry.z);
+  plane.scale.set(1, markerGeometry.height, 1);
   plane.frustumCulled = false;
   plane.renderOrder = 1;
   const anchor = mindar.addAnchor(0);
@@ -107,7 +129,7 @@ export async function startPublicMindAr(options: {
     if (!video.videoWidth || !video.videoHeight) return;
     const transform = coverTextureTransform(
       video.videoWidth / video.videoHeight,
-      manifest.marker.width / manifest.marker.height,
+      activeMarker.width / activeMarker.height,
     );
     texture.repeat.set(transform.repeatX, transform.repeatY);
     texture.offset.set(transform.offsetX, transform.offsetY);
@@ -158,6 +180,10 @@ export async function startPublicMindAr(options: {
 
   try {
     await mindar.start();
+    activeMarker = resolveMarkerDimensions(manifest.marker, mindar.controller?.markerDimensions);
+    markerGeometry = markerPlaneGeometry(activeMarker);
+    plane.scale.set(1, markerGeometry.height, 1);
+    fitVideoToMarker();
     keepCameraVisible(mindar);
     renderer.setAnimationLoop(() => renderer.render(scene, camera));
     onTrackingState("searching");

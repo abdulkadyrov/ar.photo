@@ -48,6 +48,8 @@ import { exportClassZip, exportProjectZip, getClassStats, parseImportZip } from 
 import { go, viewerUrl } from "../../lib/routes";
 import { AppShell } from "../../app/layout/AppShell";
 import { Button, FileButton, Input, MetricCard, Panel, StatusBadge, StatusPanel } from "../../shared/ui";
+import type { PublicArSession } from "../public-ar/mindArAdapter";
+import { compilePrototypeMarker, readPrototypeMarkerDimensions } from "./compileMarker";
 import { usePrototypeSnapshot } from "./usePrototypeSnapshot";
 
 const AR_CALIBRATION_KEY = "ar-photo-calibration-v1";
@@ -413,8 +415,12 @@ function StudentCard({
   const livePhoto = snapshot.livePhotos.find((item) => item.studentId === student.id);
   const image = livePhoto ? snapshot.media.find((item) => item.id === livePhoto.imageId) : undefined;
   const video = livePhoto ? snapshot.media.find((item) => item.id === livePhoto.videoId) : undefined;
+  const tracking = livePhoto?.trackingId
+    ? snapshot.media.find((item) => item.id === livePhoto.trackingId)
+    : undefined;
   const [draftImage, setDraftImage] = useState<{ media: Media; blob: Blob } | null>(null);
   const [draftVideo, setDraftVideo] = useState<{ media: Media; blob: Blob } | null>(null);
+  const [generation, setGeneration] = useState<{ progress: number; error?: string } | null>(null);
 
   const upload = async (type: "image" | "video", file?: File) => {
     if (!file) return;
@@ -426,20 +432,47 @@ function StudentCard({
   const generate = async () => {
     if (!draftImage && !image) return;
     if (!draftVideo && !video) return;
-    if (draftImage) await saveMedia(draftImage.media, draftImage.blob);
-    if (draftVideo) await saveMedia(draftVideo.media, draftVideo.blob);
-    const id = livePhoto?.id ?? createId("livephoto");
-    await saveLivePhoto({
-      id,
-      studentId: student.id,
-      imageId: draftImage?.media.id ?? image!.id,
-      videoId: draftVideo?.media.id ?? video!.id,
-      qrCode: viewerUrl(id),
-      createdAt: livePhoto?.createdAt ?? nowIso(),
-    });
-    setDraftImage(null);
-    setDraftVideo(null);
-    await refresh();
+    setGeneration({ progress: 0 });
+    try {
+      const imageBlob = draftImage?.blob ?? (image ? await getMediaBlob(image.blobId) : undefined);
+      if (!imageBlob) throw new Error("Фотография недоступна — загрузите её повторно");
+      const savedTrackingBlob = tracking ? await getMediaBlob(tracking.blobId) : undefined;
+      const shouldCompile = Boolean(draftImage || !tracking || !savedTrackingBlob);
+      const trackingMedia: Media = shouldCompile
+        ? {
+            id: createId("tracking"),
+            type: "tracking",
+            fileName: `${student.lastName}_${student.firstName}.mind`,
+            blobId: createId("blob"),
+          }
+        : tracking!;
+
+      if (shouldCompile) {
+        const compiled = await compilePrototypeMarker(imageBlob, (progress) => setGeneration({ progress }));
+        await saveMedia(trackingMedia, compiled.blob);
+      }
+      if (draftImage) await saveMedia(draftImage.media, draftImage.blob);
+      if (draftVideo) await saveMedia(draftVideo.media, draftVideo.blob);
+      const id = livePhoto?.id ?? createId("livephoto");
+      await saveLivePhoto({
+        id,
+        studentId: student.id,
+        imageId: draftImage?.media.id ?? image!.id,
+        videoId: draftVideo?.media.id ?? video!.id,
+        trackingId: trackingMedia.id,
+        qrCode: viewerUrl(id),
+        createdAt: livePhoto?.createdAt ?? nowIso(),
+      });
+      setDraftImage(null);
+      setDraftVideo(null);
+      setGeneration(null);
+      await refresh();
+    } catch (error) {
+      setGeneration({
+        progress: 0,
+        error: error instanceof Error ? error.message : "Не удалось создать AR tracking-файл",
+      });
+    }
   };
 
   const downloadQr = () => {
@@ -473,8 +506,14 @@ function StudentCard({
         <FileButton accept="video/*" icon={<Upload size={18} />} onPick={(file) => upload("video", file)}>
           Загрузить видео
         </FileButton>
-        <Button type="button" variant="ghost" onClick={generate} icon={<QrCode size={18} />}>
-          Сгенерировать QR
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={Boolean(generation && !generation.error)}
+          onClick={generate}
+          icon={<QrCode size={18} />}
+        >
+          {generation && !generation.error ? `AR-файл ${generation.progress}%` : "Сгенерировать AR + QR"}
         </Button>
         <Button
           type="button"
@@ -486,14 +525,21 @@ function StudentCard({
           Открыть Viewer
         </Button>
       </div>
+      {generation?.error ? <p className="mt-3 text-sm text-rose-300">{generation.error}</p> : null}
       {livePhoto && (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <Button type="button" variant="quiet" onClick={downloadQr} icon={<Download size={17} />}>
-            PNG QR
-          </Button>
-          <span className="min-w-0 flex-1 truncate rounded-xl bg-white/[0.04] px-3 py-2 text-xs text-muted">
-            {livePhoto.qrCode}
-          </span>
+        <div className="mt-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="quiet" onClick={downloadQr} icon={<Download size={17} />}>
+              PNG QR
+            </Button>
+            <span className="min-w-0 flex-1 truncate rounded-xl bg-white/[0.04] px-3 py-2 text-xs text-muted">
+              {livePhoto.qrCode}
+            </span>
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            Демо хранит AR-файлы в этом браузере. Для QR, открываемого на другом телефоне, опубликуйте работу в
+            разделе «AR-работы».
+          </p>
         </div>
       )}
     </Panel>
@@ -502,39 +548,87 @@ function StudentCard({
 
 function ViewerPage({ snapshot, livePhotoId }: { snapshot: StoreSnapshot; livePhotoId: string }) {
   const livePhoto = snapshot.livePhotos.find((item) => item.id === livePhotoId);
+  const imageMeta = livePhoto ? snapshot.media.find((item) => item.id === livePhoto.imageId) : undefined;
   const videoMeta = livePhoto ? snapshot.media.find((item) => item.id === livePhoto.videoId) : undefined;
-  const [videoUrl, setVideoUrl] = useState("");
-  const [cameraReady, setCameraReady] = useState(false);
-  const [videoVisible, setVideoVisible] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const cameraRef = useRef<HTMLVideoElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const trackingMeta = livePhoto?.trackingId
+    ? snapshot.media.find((item) => item.id === livePhoto.trackingId)
+    : undefined;
+  const [mode, setMode] = useState<"loading" | "searching" | "tracking" | "error">("loading");
+  const [status, setStatus] = useState("Подготавливаем image tracking…");
+  const [muted, setMuted] = useState(true);
+  const [playing, setPlaying] = useState(false);
+  const [markerAspect, setMarkerAspect] = useState(3 / 4);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const sessionRef = useRef<PublicArSession | null>(null);
 
   useEffect(() => {
-    let stream: MediaStream | null = null;
-    let objectUrl = "";
+    let active = true;
+    const objectUrls: string[] = [];
     async function boot() {
-      if (videoMeta) {
-        const blob = await getMediaBlob(videoMeta.blobId);
-        if (blob) {
-          objectUrl = URL.createObjectURL(blob);
-          setVideoUrl(objectUrl);
-        }
+      if (!livePhoto || !imageMeta || !videoMeta || !containerRef.current) return;
+      const [imageBlob, videoBlob, savedTrackingBlob] = await Promise.all([
+        getMediaBlob(imageMeta.blobId),
+        getMediaBlob(videoMeta.blobId),
+        trackingMeta ? getMediaBlob(trackingMeta.blobId) : Promise.resolve(undefined),
+      ]);
+      if (!imageBlob || !videoBlob) throw new Error("Фото или видео отсутствует в локальном хранилище");
+
+      const marker = await readPrototypeMarkerDimensions(imageBlob);
+      if (!active) return;
+      setMarkerAspect(marker.width / marker.height);
+
+      if (!savedTrackingBlob) {
+        throw new Error("Tracking-файл отсутствует. Откройте проект и нажмите «Сгенерировать AR + QR» ещё раз.");
       }
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
-      if (cameraRef.current) {
-        cameraRef.current.srcObject = stream;
-        await cameraRef.current.play();
-        setCameraReady(true);
+
+      const imageUrl = URL.createObjectURL(imageBlob);
+      const videoUrl = URL.createObjectURL(videoBlob);
+      const trackingUrl = URL.createObjectURL(savedTrackingBlob);
+      objectUrls.push(imageUrl, videoUrl, trackingUrl);
+      setStatus("Запускаем камеру и ищем фотографию…");
+      const { startPublicMindAr } = await import("../public-ar/mindArAdapter");
+      const session = await startPublicMindAr({
+        container: containerRef.current,
+        manifest: {
+          version: 1,
+          title: "Demo AR Photo",
+          marker: { ...marker, aspectRatio: marker.width / marker.height },
+          behavior: { autoplay: true, loop: true, markerLost: "pause_hide", audioDefault: "muted" },
+          fallbackEnabled: false,
+          assets: { trackingAssetUrl: trackingUrl, videoUrl, posterUrl: imageUrl },
+          signedUrlsExpireAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        },
+        muted: true,
+        onTrackingState: (trackingState) => {
+          if (!active) return;
+          setMode(trackingState);
+          setPlaying(trackingState === "tracking");
+          setStatus(
+            trackingState === "tracking"
+              ? "Фото найдено — видео закреплено на изображении"
+              : "Наведите камеру на всю фотографию",
+          );
+        },
+        onPlaybackEvent: () => undefined,
+      });
+      if (!active) {
+        session.stop();
+        return;
       }
+      sessionRef.current = session;
     }
-    boot().catch(() => setCameraReady(false));
+    void boot().catch((error) => {
+      if (!active) return;
+      setMode("error");
+      setStatus(error instanceof Error ? error.message : "Не удалось запустить image tracking");
+    });
     return () => {
-      stream?.getTracks().forEach((track) => track.stop());
-      videoRef.current?.pause();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      active = false;
+      sessionRef.current?.stop();
+      sessionRef.current = null;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [videoMeta]);
+  }, [imageMeta, livePhoto, trackingMeta, videoMeta]);
 
   if (!livePhoto)
     return (
@@ -544,62 +638,39 @@ function ViewerPage({ snapshot, livePhotoId }: { snapshot: StoreSnapshot; livePh
     );
 
   const toggleVideo = async () => {
-    const video = videoRef.current;
-    if (!video || !videoUrl) return;
-    if (videoVisible) {
-      video.pause();
-      setVideoVisible(false);
-      return;
-    }
-    setVideoVisible(true);
-    video.currentTime = 0;
-    await video.play().catch(() => undefined);
+    const next = await sessionRef.current?.togglePlayback().catch(() => undefined);
+    if (typeof next === "boolean") setPlaying(next);
   };
 
   return (
     <Shell flush>
       <div className="relative min-h-screen overflow-hidden bg-black">
-        <video ref={cameraRef} className="absolute inset-0 h-full w-full object-cover" playsInline muted />
-        <div className="absolute inset-0 bg-black/20" />
-        <div className="pointer-events-none absolute left-1/2 top-1/2 aspect-[3/4] w-[76vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-[18px] border-2 border-dashed border-white/70 bg-white/5 shadow-[0_30px_90px_rgba(0,0,0,0.28)]">
-          <div className="grid h-full place-items-center p-6 text-center text-sm font-semibold text-white/80">
-            Наведите фотографию в рамку
+        <div ref={containerRef} className="absolute inset-0" />
+        {mode !== "tracking" && mode !== "error" ? (
+          <div
+            className="pointer-events-none absolute left-1/2 top-1/2 max-h-[62dvh] w-[76vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-[18px] border-2 border-dashed border-white/70 bg-white/5 shadow-[0_30px_90px_rgba(0,0,0,0.28)]"
+            style={{ aspectRatio: markerAspect }}
+          >
+            <div className="grid h-full place-items-center p-6 text-center text-sm font-semibold text-white/80">
+              Наведите всю фотографию в рамку
+            </div>
           </div>
-        </div>
-        <div
-          className={`absolute left-1/2 top-1/2 aspect-[3/4] w-[76vw] max-w-[420px] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[18px] border border-white/50 bg-black shadow-[0_30px_90px_rgba(0,0,0,0.45)] transition-opacity ${videoVisible ? "opacity-100" : "pointer-events-none opacity-0"}`}
-        >
-          {videoUrl ? (
-            <video
-              ref={videoRef}
-              className="h-full w-full object-cover"
-              src={videoUrl}
-              muted={muted}
-              loop
-              playsInline
-              preload="metadata"
-            />
-          ) : (
-            <div className="grid h-full place-items-center text-white">Подготовка видео...</div>
-          )}
-        </div>
+        ) : null}
         <div className="absolute inset-x-4 top-5 rounded-[20px] bg-black/45 p-4 text-white backdrop-blur">
           <div className="text-sm font-semibold">
-            {cameraReady ? "Наведите камеру на фотографию" : "Подготовка AR..."}
+            {mode === "tracking" ? "Фотография найдена" : mode === "error" ? "Ошибка AR" : "Image tracking"}
           </div>
-          <div className="mt-1 text-xs text-white/70">
-            {videoVisible
-              ? "Видео включено вручную"
-              : videoUrl
-                ? "Камера готова, видео не закрывает обзор"
-                : "Загружаем видео"}
-          </div>
+          <div className={`mt-1 text-xs ${mode === "error" ? "text-rose-200" : "text-white/70"}`}>{status}</div>
         </div>
         <div className="absolute inset-x-4 bottom-5 grid grid-cols-3 gap-2">
           <ControlButton
-            onClick={() => setMuted((value) => !value)}
+            onClick={() => {
+              const next = !muted;
+              setMuted(next);
+              sessionRef.current?.setMuted(next);
+            }}
             icon={muted ? <VolumeX /> : <Volume2 />}
-            label="Звук"
+            label={muted ? "Включить звук" : "Без звука"}
           />
           <ControlButton
             onClick={() => document.documentElement.requestFullscreen?.()}
@@ -608,8 +679,8 @@ function ViewerPage({ snapshot, livePhotoId }: { snapshot: StoreSnapshot; livePh
           />
           <ControlButton
             onClick={toggleVideo}
-            icon={videoVisible ? <RotateCcw /> : <Play />}
-            label={videoVisible ? "Скрыть" : "Видео"}
+            icon={playing ? <RotateCcw /> : <Play />}
+            label={playing ? "Пауза" : "Видео"}
           />
         </div>
       </div>

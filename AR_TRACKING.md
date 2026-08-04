@@ -50,7 +50,7 @@ Worker вычисляет brightness, contrast, sharpness, feature density и en
 ## Геометрия и playback
 
 - Один target на сессию: `maxTrack: 1`.
-- Plane имеет ширину 1 и высоту `marker.height / marker.width`, центр совпадает с anchor target, а `z = 0` исключает угловой параллакс.
+- Plane имеет ширину 1 и высоту `marker.height / marker.width`, центр совпадает с anchor target, а `z = 0` исключает угловой параллакс. После загрузки `.mind` его target dimensions имеют приоритет над manifest metadata, поэтому случайный drift размеров не искажает overlay.
 - Видео не растягивается: UV координаты выполняют симметричный `cover` crop к пропорциям маркера; при одинаковом aspect UV остаётся 1:1.
 - MindAR OneEuroFilter использует профиль `filterMinCF=0.001`, `filterBeta=100`, warmup/miss по 5 кадров: дрожание ниже default beta=1000, а краткая потеря не оставляет overlay надолго в устаревшей позе.
 - Scan guide использует реальные пропорции маркера и исчезает после `targetFound`, поэтому неподвижная рамка не конкурирует с tracked plane.
