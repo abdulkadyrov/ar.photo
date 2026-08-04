@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(28);
+select plan(33);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000010', true);
@@ -201,6 +201,58 @@ select is(
   (select metadata ->> 'videoCodec' from public.media_assets where sha256 = repeat('b', 64)),
   'h264',
   'finalized video keeps inspected codec metadata'
+);
+
+select lives_ok(
+  $$
+    select public.begin_media_upload(
+      '20000000-0000-4000-8000-000000000001',
+      '50000000-0000-4000-8000-000000000001',
+      '60000000-0000-4000-8000-000000000001',
+      'video',
+      'iphone.source.mp4',
+      'video/mp4',
+      8192,
+      '82000000-0000-4000-8000-000000000007'
+    )
+  $$,
+  'owner reserves an iPhone source video upload'
+);
+
+select lives_ok(
+  $$
+    select public.start_media_upload(
+      (select id from public.upload_sessions where idempotency_key = '82000000-0000-4000-8000-000000000007')
+    )
+  $$,
+  'owner starts the source video upload'
+);
+
+select lives_ok(
+  $$
+    insert into storage.objects (bucket_id, name, metadata)
+    select storage_bucket, storage_path, '{"mimetype":"video/mp4","size":8192}'::jsonb
+    from public.upload_sessions
+    where idempotency_key = '82000000-0000-4000-8000-000000000007'
+  $$,
+  'owner writes the source video to private Storage'
+);
+
+select lives_ok(
+  $$
+    select public.finalize_media_upload(
+      (select id from public.upload_sessions where idempotency_key = '82000000-0000-4000-8000-000000000007'),
+      repeat('c', 64),
+      '{"width":1920,"height":1080,"durationSeconds":12,"videoCodec":"source","audioCodec":"source","serverTranscodeRequired":true,"optimization":{"strategy":"server-transcode","optimized":false}}'::jsonb
+    )
+  $$,
+  'server-transcode source metadata can finalize before authoritative inspection'
+);
+
+select is(
+  (select metadata ->> 'serverTranscodeRequired' from public.media_assets where sha256 = repeat('c', 64)),
+  'true',
+  'finalized source remains explicitly queued for server transcoding'
 );
 
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000012', true);
