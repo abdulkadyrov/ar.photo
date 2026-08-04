@@ -58,4 +58,54 @@ describe("media video transcoding", () => {
       },
     });
   });
+
+  it("uploads the untouched source for secure server transcoding when Safari drops audio", async () => {
+    vi.mocked(inspectVideoSource).mockReset().mockResolvedValue({
+      width: 1920,
+      height: 1080,
+      durationSeconds: 12,
+      videoCodec: "hevc",
+      audioCodec: "aac",
+    });
+    vi.mocked(optimizeVideoFile).mockRejectedValue(new Error("Браузер не смог сохранить аудиодорожку видео"));
+
+    const source = new File(["quicktime-source"], "iphone.mov", { type: "video/quicktime" });
+    const prepared = await prepareMediaFile(source);
+
+    expect(prepared).toMatchObject({
+      kind: "video",
+      file: expect.objectContaining({ name: "iphone.source.mp4", type: "video/mp4" }),
+      metadata: {
+        width: 1920,
+        height: 1080,
+        durationSeconds: 12,
+        videoCodec: "source",
+        audioCodec: "source",
+        serverTranscodeRequired: true,
+        sourceVideoCodec: "hevc",
+        sourceAudioCodec: "aac",
+        optimization: { strategy: "server-transcode", optimized: false },
+      },
+    });
+    expect(await prepared.file.text()).toBe("quicktime-source");
+  });
+
+  it("accepts a video for server inspection when the browser cannot decode its codec", async () => {
+    vi.mocked(inspectVideoSource).mockReset().mockRejectedValue(new Error("unsupported codec"));
+    const source = new File(["mkv-source"], "camera.mkv", { type: "video/x-matroska" });
+
+    const prepared = await prepareMediaFile(source);
+
+    expect(optimizeVideoFile).not.toHaveBeenCalled();
+    expect(prepared).toMatchObject({
+      kind: "video",
+      metadata: {
+        width: null,
+        height: null,
+        durationSeconds: null,
+        serverTranscodeRequired: true,
+        optimization: { strategy: "server-transcode" },
+      },
+    });
+  });
 });

@@ -1540,6 +1540,36 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      complete_video_transcode_job: {
+        Args: { p_job_id: number; p_output_metadata: Json; p_worker_id: string };
+        Returns: {
+          account_id: string;
+          ar_item_id: string;
+          attempt_count: number;
+          completed_at: string | null;
+          created_at: string;
+          dedupe_key: string;
+          error_code: string | null;
+          error_message: string | null;
+          id: number;
+          input_metadata: Json;
+          locked_at: string | null;
+          locked_by: string | null;
+          max_attempts: number;
+          output_metadata: Json;
+          progress: number;
+          started_at: string | null;
+          status: Database["public"]["Enums"]["job_status"];
+          type: Database["public"]["Enums"]["job_type"];
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "processing_jobs";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       complete_upload_cleanup: {
         Args: { p_session_ids: string[]; p_succeeded: boolean };
         Returns: number;

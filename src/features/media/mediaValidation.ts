@@ -25,7 +25,13 @@ type DecodedImage = {
   draw(sourceContext: CanvasRenderingContext2D, width: number, height: number): void;
   close(): void;
 };
-type DecodedVideoMetadata = Omit<VideoMetadata, "optimization">;
+type DecodedVideoMetadata = {
+  width: number;
+  height: number;
+  durationSeconds: number;
+  videoCodec: "h264";
+  audioCodec: "aac" | "none";
+};
 
 export type PrepareMediaOptions = {
   onProgress?: (progress: number) => void;
@@ -134,12 +140,19 @@ async function prepareVideo(file: File, options: PrepareMediaOptions): Promise<P
       ? new Uint8Array(await file.slice(Math.max(0, file.size - 2 * 1024 * 1024)).arrayBuffer())
       : new Uint8Array();
   const codec = inspectMp4CodecTokens(concatBytes(head, tail));
-  const inspected = await inspectVideoSource(file).catch((error) => {
-    throw new MediaValidationError(
-      "unsupported_codec",
-      error instanceof Error ? error.message : "Формат видео не поддерживается этим браузером",
-    );
-  });
+  let inspected: Awaited<ReturnType<typeof inspectVideoSource>>;
+  try {
+    inspected = await inspectVideoSource(file);
+  } catch (error) {
+    const claimsMp4 = file.type.toLowerCase() === "video/mp4" || /\.mp4$/i.test(file.name);
+    if (claimsMp4 && !hasMp4Signature(head)) {
+      throw new MediaValidationError(
+        "unsupported_codec",
+        error instanceof Error ? error.message : "MP4-файл повреждён или имеет неверное расширение",
+      );
+    }
+    return prepareServerTranscode(file);
+  }
   const sourceIsCompatible =
     hasMp4Signature(head) &&
     inspected.videoCodec === "avc" &&
@@ -169,12 +182,7 @@ async function prepareVideo(file: File, options: PrepareMediaOptions): Promise<P
     ) {
       optimized = { file: normalizedSource, strategy: "source-kept" as const };
     } else {
-      throw new MediaValidationError(
-        "optimization_unavailable",
-        error instanceof Error
-          ? `${error.message}. Попробуйте актуальную версию Safari, Chrome или Edge.`
-          : "Не удалось преобразовать видео в совместимый формат",
-      );
+      return prepareServerTranscode(file, inspected);
     }
   }
   const optimizedMetadata =
@@ -194,6 +202,39 @@ async function prepareVideo(file: File, options: PrepareMediaOptions): Promise<P
     },
   };
   return { file: optimized.file, kind: "video", sha256: await sha256Hex(optimized.file), metadata };
+}
+
+async function prepareServerTranscode(
+  file: File,
+  inspected?: Awaited<ReturnType<typeof inspectVideoSource>>,
+): Promise<PreparedMedia> {
+  const baseName = file.name.replace(/\.[^.]+$/, "") || "video";
+  // Supabase Storage validates the declared upload MIME. The worker probes the
+  // actual bytes with FFmpeg, so retaining the bytes while using the canonical
+  // video MIME lets MOV/HEVC/WebM sources take the secure server fallback.
+  const source = new File([file], `${baseName}.source.mp4`, {
+    type: "video/mp4",
+    lastModified: file.lastModified,
+  });
+  const metadata: VideoMetadata = {
+    width: inspected?.width ?? null,
+    height: inspected?.height ?? null,
+    durationSeconds: inspected?.durationSeconds ?? null,
+    videoCodec: "source",
+    audioCodec: inspected?.audioCodec === null ? "none" : "source",
+    serverTranscodeRequired: true,
+    sourceVideoCodec: inspected?.videoCodec,
+    sourceAudioCodec: inspected?.audioCodec,
+    optimization: {
+      strategy: "server-transcode",
+      originalBytes: file.size,
+      uploadBytes: source.size,
+      savedBytes: 0,
+      reductionPercent: 0,
+      optimized: false,
+    },
+  };
+  return { file: source, kind: "video", sha256: await sha256Hex(source), metadata };
 }
 
 function assertFileSize(file: File, maxBytes: number, message: string) {
@@ -279,7 +320,7 @@ async function optimizeMarkerImage(decoded: DecodedImage, format: ImageFormat | 
 
 const videoExtensions = new Set(["mp4", "mov", "m4v", "mkv", "webm", "avi", "mts", "m2ts", "3gp", "3g2", "wmv", "flv"]);
 
-async function validateOptimizedVideo(file: File, expectedAudioCodec: VideoMetadata["audioCodec"]) {
+async function validateOptimizedVideo(file: File, expectedAudioCodec: "aac" | "none") {
   const head = new Uint8Array(await file.slice(0, Math.min(file.size, 2 * 1024 * 1024)).arrayBuffer());
   const tail = new Uint8Array(await file.slice(Math.max(0, file.size - 2 * 1024 * 1024)).arrayBuffer());
   const codec = inspectMp4CodecTokens(concatBytes(head, tail));

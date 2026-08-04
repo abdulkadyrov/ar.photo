@@ -131,11 +131,52 @@ async function generateThumbnail(sourcePath: string, outputPath: string) {
   }
 }
 
+async function transcodeVideo(sourcePath: string, outputPath: string) {
+  try {
+    await command(
+      "ffmpeg",
+      [
+        "-v",
+        "error",
+        "-y",
+        "-i",
+        sourcePath,
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a:0?",
+        "-vf",
+        "scale='if(gt(iw,ih),min(1920,iw),-2)':'if(gt(iw,ih),-2,min(1920,ih))'",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "medium",
+        "-crf",
+        "22",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-movflags",
+        "+faststart",
+        "-max_muxing_queue_size",
+        "2048",
+        outputPath,
+      ],
+      20 * 60 * 1000,
+    );
+  } catch {
+    throw new WorkerFault("video_transcode_failed");
+  }
+}
+
 async function uploadGeneratedObject(
   client: WorkerClient,
   path: string,
   localPath: string,
-  contentType: "application/octet-stream" | "image/webp",
+  contentType: "application/octet-stream" | "image/webp" | "video/mp4",
 ) {
   const bytes = await readFile(localPath);
   const digest = sha256(bytes);
@@ -175,6 +216,14 @@ async function executeJob(
   }
 
   const storagePath = buildGeneratedObjectPath(job, input);
+  if (job.type === "video_transcode") {
+    const outputPath = join(tempDirectory, "video.mp4");
+    await transcodeVideo(sourcePath, outputPath);
+    await reportProgress(client, job, workerId, 75);
+    const metadata = await inspectVideo(outputPath);
+    const digest = await uploadGeneratedObject(client, storagePath, outputPath, "video/mp4");
+    return { storageBucket: "generated-private", storagePath, sha256: digest, ...metadata };
+  }
   if (job.type === "marker_compilation") {
     const outputPath = join(tempDirectory, "target.mind");
     await compileMarker(sourcePath, outputPath);
@@ -203,11 +252,18 @@ export async function processClaimedJob(client: WorkerClient, job: ProcessingJob
     assertSupportedJob(job.type);
     await downloadSource(client, input, sourcePath);
     const output = await executeJob(client, job, input, sourcePath, tempDirectory, workerId);
-    const { error } = await client.rpc("complete_processing_job", {
-      p_job_id: job.id,
-      p_worker_id: workerId,
-      p_output_metadata: output,
-    });
+    const { error } =
+      job.type === "video_transcode"
+        ? await client.rpc("complete_video_transcode_job", {
+            p_job_id: job.id,
+            p_worker_id: workerId,
+            p_output_metadata: output,
+          })
+        : await client.rpc("complete_processing_job", {
+            p_job_id: job.id,
+            p_worker_id: workerId,
+            p_output_metadata: output,
+          });
     if (error) throw new WorkerFault("job_completion_failed");
     return { status: "succeeded" as const, code: "ok" };
   } catch (error) {

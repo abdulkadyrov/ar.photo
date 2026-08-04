@@ -17,6 +17,6 @@ npm run build:worker
 node dist-worker/workers/processing/index.js
 ```
 
-Production should build `workers/processing/Dockerfile`. The image pins Node 22.22.2 and installs FFmpeg plus the native libraries required by MindAR and Canvas. Long jobs refresh a database lease every 30 seconds; expired leases are reclaimed after 20 minutes, up to the configured attempt limit.
+Production should build `workers/processing/Dockerfile`. The image pins Node 22.22.2 and installs FFmpeg plus the native libraries required by MindAR and Canvas. When a phone browser cannot safely create H.264/AAC, the worker converts the private original into an immutable mobile-compatible MP4 before inspection and thumbnail generation. Long jobs refresh a database lease every 30 seconds; expired leases are reclaimed after 20 minutes, up to the configured attempt limit.
 
 The production GitHub Actions workflow drains the hosted Supabase queue every five minutes and can also be started manually. It uses repository secrets named `PROCESSING_SUPABASE_URL` and `PROCESSING_SUPABASE_SERVICE_ROLE_KEY`; the service credential is passed only to the isolated worker container.

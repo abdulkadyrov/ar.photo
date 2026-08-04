@@ -56,6 +56,7 @@ const statusLabels = {
 const jobLabels: Partial<Record<ProcessingJob["type"], string>> = {
   marker_analysis: "Анализ маркера",
   video_inspection: "Проверка видео",
+  video_transcode: "Подготовка H.264/AAC",
   marker_compilation: "Компиляция tracking dataset",
   thumbnail_generation: "Превью видео",
 };
@@ -254,6 +255,14 @@ function ArItemWizard() {
   );
 
   useEffect(() => {
+    const item = itemQuery.data;
+    if (!item?.video_asset_id || item.video_asset_id === videoAssetId) return;
+    if (item.status !== "ready" && item.status !== "published") return;
+    setVideoAssetId(item.video_asset_id);
+    void queryClient.invalidateQueries({ queryKey: ["media", "assets", accountId, item.project_id, item.group_id] });
+  }, [accountId, itemQuery.data, queryClient, videoAssetId]);
+
+  useEffect(() => {
     if (step !== 8 || !selectedMarker || !selectedVideo) return;
     let active = true;
     void Promise.all([mediaRepository.getAssetUrl(selectedMarker), mediaRepository.getAssetUrl(selectedVideo)]).then(
@@ -318,7 +327,14 @@ function ArItemWizard() {
         setQuality(null);
       } else setVideoAssetId(asset.id);
       await queryClient.invalidateQueries({ queryKey: ["media", "assets", accountId, projectId, groupId] });
-      setNotice({ title: kind === "marker" ? "Маркер загружен" : "Видео загружено", tone: "success" });
+      setNotice({
+        title: kind === "marker" ? "Маркер загружен" : "Видео загружено",
+        message:
+          kind === "video" && prepared.kind === "video" && prepared.metadata.serverTranscodeRequired
+            ? "Телефон передал исходник. Сервер автоматически подготовит H.264/AAC перед просмотром."
+            : undefined,
+        tone: "success",
+      });
     } catch (error) {
       showError(error);
     } finally {
@@ -801,7 +817,8 @@ function SettingsStep({ settings, onChange }: { settings: ArItemSettings; onChan
         ]}
       />
       <div className="rounded-xl border border-line bg-white/[0.025] p-4 text-sm leading-6 text-muted">
-        Перед запуском будут созданы четыре задания: анализ маркера, проверка кодеков, компиляция `.mind` и WebP-превью.
+        Перед запуском будут созданы задания анализа маркера, проверки кодеков, компиляции `.mind` и WebP-превью. Если
+        телефону недоступно преобразование, сервер дополнительно подготовит H.264/AAC.
       </div>
     </div>
   );

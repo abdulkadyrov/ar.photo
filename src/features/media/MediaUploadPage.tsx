@@ -216,7 +216,15 @@ export function MediaUploadRoute() {
       patchQueue(item.id, { status: "completed", progress: 100, asset });
       await removePreparedUpload(item.id).catch(() => undefined);
       await queryClient.invalidateQueries({ queryKey: ["media", "assets"] });
-      setNotice({ title: "Файл загружен", message: item.prepared.file.name, tone: "success" });
+      const needsServerTranscode =
+        item.prepared.kind === "video" && item.prepared.metadata.serverTranscodeRequired === true;
+      setNotice({
+        title: "Файл загружен",
+        message: needsServerTranscode
+          ? "Видео принято. Совместимая версия H.264/AAC будет подготовлена сервером при создании AR-работы."
+          : item.prepared.file.name,
+        tone: "success",
+      });
     } catch (error) {
       const cancelled =
         (error instanceof MediaRepositoryError && error.code === "cancelled") ||
@@ -544,7 +552,9 @@ function MetadataLine({ prepared }: { prepared: PreparedMedia }) {
         : " · уже оптимально";
   const details =
     prepared.kind === "video"
-      ? `${dimensions} · ${prepared.metadata.durationSeconds.toFixed(1)} сек · H.264/${prepared.metadata.audioCodec === "aac" ? "AAC" : "без аудио"}${savings}`
+      ? prepared.metadata.serverTranscodeRequired
+        ? `${prepared.metadata.width && prepared.metadata.height ? `${dimensions} · ` : ""}${prepared.metadata.durationSeconds ? `${prepared.metadata.durationSeconds.toFixed(1)} сек · ` : ""}сервер подготовит H.264/AAC`
+        : `${dimensions} · ${(prepared.metadata.durationSeconds ?? 0).toFixed(1)} сек · H.264/${prepared.metadata.audioCodec === "aac" ? "AAC" : "без аудио"}${savings}`
       : `${dimensions} · EXIF удалён${savings}`;
   return <p className="mt-2 text-[11px] leading-5 text-muted">{details}</p>;
 }

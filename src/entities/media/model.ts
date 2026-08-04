@@ -16,13 +16,16 @@ export type MarkerMetadata = {
 };
 
 export type VideoMetadata = {
-  width: number;
-  height: number;
-  durationSeconds: number;
-  videoCodec: "h264";
-  audioCodec: "aac" | "none";
+  width: number | null;
+  height: number | null;
+  durationSeconds: number | null;
+  videoCodec: "h264" | "source";
+  audioCodec: "aac" | "none" | "source";
+  serverTranscodeRequired?: boolean;
+  sourceVideoCodec?: string;
+  sourceAudioCodec?: string | null;
   optimization: MediaOptimizationMetadata & {
-    strategy: "source-kept" | "webcodecs-h264";
+    strategy: "source-kept" | "webcodecs-h264" | "server-transcode";
   };
 };
 

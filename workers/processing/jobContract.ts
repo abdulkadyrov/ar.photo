@@ -2,7 +2,7 @@ import type { Json, Tables } from "../../src/shared/api/database.types.js";
 
 export type ProcessingJob = Tables<"processing_jobs">;
 export type SupportedProcessingJob =
-  "marker_analysis" | "video_inspection" | "marker_compilation" | "thumbnail_generation";
+  "marker_analysis" | "video_inspection" | "video_transcode" | "marker_compilation" | "thumbnail_generation";
 
 export type ProcessingInput = {
   revision: number;
@@ -52,6 +52,7 @@ export function assertSupportedJob(type: ProcessingJob["type"]): asserts type is
   if (
     type !== "marker_analysis" &&
     type !== "video_inspection" &&
+    type !== "video_transcode" &&
     type !== "marker_compilation" &&
     type !== "thumbnail_generation"
   ) {
@@ -61,7 +62,7 @@ export function assertSupportedJob(type: ProcessingJob["type"]): asserts type is
 
 export function buildGeneratedObjectPath(job: ProcessingJob, input: ProcessingInput) {
   assertSupportedJob(job.type);
-  if (job.type !== "marker_compilation" && job.type !== "thumbnail_generation") {
+  if (job.type !== "video_transcode" && job.type !== "marker_compilation" && job.type !== "thumbnail_generation") {
     throw new WorkerFault("job_has_no_generated_object");
   }
 
@@ -71,7 +72,12 @@ export function buildGeneratedObjectPath(job: ProcessingJob, input: ProcessingIn
   );
   if (!scope) throw new WorkerFault("invalid_source_scope");
 
-  const suffix = job.type === "marker_compilation" ? "tracking/target.mind" : "thumbnail/video.webp";
+  const suffix =
+    job.type === "video_transcode"
+      ? "video/video.mp4"
+      : job.type === "marker_compilation"
+        ? "tracking/target.mind"
+        : "thumbnail/video.webp";
   return `accounts/${job.account_id}/projects/${scope[1]}/groups/${scope[2]}/items/${job.ar_item_id}/v${input.revision}/${suffix}`;
 }
 

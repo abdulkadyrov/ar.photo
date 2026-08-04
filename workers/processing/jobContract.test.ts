@@ -48,6 +48,10 @@ describe("processing worker contracts", () => {
     expect(buildGeneratedObjectPath(job("thumbnail_generation"), input)).toMatch(/\/v3\/thumbnail\/video\.webp$/);
   });
 
+  it("builds an immutable compatible video path", () => {
+    expect(buildGeneratedObjectPath(job("video_transcode"), input)).toMatch(/\/v3\/video\/video\.mp4$/);
+  });
+
   it("rejects source paths outside the job account", () => {
     const forged = { ...input, path: input.path.replace("20000000", "90000000") };
     expect(() => buildGeneratedObjectPath(job("marker_compilation"), forged)).toThrow("invalid_source_scope");
