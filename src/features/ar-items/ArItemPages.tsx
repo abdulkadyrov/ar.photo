@@ -370,6 +370,13 @@ function ArItemWizard() {
     setBusy(true);
     try {
       await arItemRepository.prepare(accountId, currentItemId, { ...settings, markerAssetId, videoAssetId });
+      if (quality && !quality.suitable && qualityAccepted) {
+        await arItemRepository.overrideMarkerQuality(
+          accountId,
+          currentItemId,
+          "Пользователь подтвердил риск слабого маркера перед обработкой",
+        );
+      }
       setStep(7);
       await Promise.all([itemQuery.refetch(), jobsQuery.refetch()]);
     } catch (error) {
@@ -767,10 +774,7 @@ function MarkerQualityStep({
                 checked={accepted}
                 onChange={(event) => onAccepted(event.target.checked)}
               />
-              <span>
-                Я понимаю риск потери распознавания. После серверной проверки потребуется указать причину ручного
-                подтверждения.
-              </span>
+              <span>Я понимаю риск потери распознавания и всё равно хочу собрать AR-маркер из этой фотографии.</span>
             </label>
           ) : null}
         </div>

@@ -21,6 +21,7 @@ describe("processing worker configuration", () => {
       pollIntervalMs: 2000,
       runOnce: false,
       idlePollsBeforeExit: 0,
+      maxRuntimeMs: 0,
     });
   });
 
@@ -30,8 +31,14 @@ describe("processing worker configuration", () => {
     vi.stubEnv("PROCESSING_CONCURRENCY", "4");
     vi.stubEnv("PROCESSING_RUN_ONCE", "1");
     vi.stubEnv("PROCESSING_IDLE_POLLS_BEFORE_EXIT", "3");
+    vi.stubEnv("PROCESSING_MAX_RUNTIME_MS", "19800000");
 
-    expect(getWorkerConfig()).toMatchObject({ concurrency: 4, runOnce: true, idlePollsBeforeExit: 3 });
+    expect(getWorkerConfig()).toMatchObject({
+      concurrency: 4,
+      runOnce: true,
+      idlePollsBeforeExit: 3,
+      maxRuntimeMs: 19_800_000,
+    });
   });
 
   it("rejects insecure remote endpoints and unbounded concurrency", () => {
@@ -46,5 +53,9 @@ describe("processing worker configuration", () => {
     vi.stubEnv("PROCESSING_CONCURRENCY", "1");
     vi.stubEnv("PROCESSING_IDLE_POLLS_BEFORE_EXIT", "61");
     expect(() => getWorkerConfig()).toThrow(/PROCESSING_IDLE_POLLS_BEFORE_EXIT/);
+
+    vi.stubEnv("PROCESSING_IDLE_POLLS_BEFORE_EXIT", "0");
+    vi.stubEnv("PROCESSING_MAX_RUNTIME_MS", "21600001");
+    expect(() => getWorkerConfig()).toThrow(/PROCESSING_MAX_RUNTIME_MS/);
   });
 });

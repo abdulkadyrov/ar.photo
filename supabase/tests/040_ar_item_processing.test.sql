@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(42);
+select plan(44);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000010', true);
@@ -146,6 +146,31 @@ select is(
   4::bigint,
   'repeated preparation does not duplicate jobs'
 );
+
+select lives_ok(
+  $$
+    select public.override_marker_quality(
+      '20000000-0000-4000-8000-000000000001',
+      (select id from public.ar_items where idempotency_key = '84000000-0000-4000-8000-000000000001'),
+      'Клиент подтвердил риск слабого маркера до серверного анализа'
+    )
+  $$,
+  'owner can persist a confirmed marker risk before server analysis finishes'
+);
+
+select ok(
+  (select marker_quality_overridden_at is not null from public.ar_items where idempotency_key = '84000000-0000-4000-8000-000000000001'),
+  'pre-analysis marker risk is attributed and timestamped'
+);
+
+reset role;
+update public.ar_items
+set marker_quality_overridden_at = null,
+    marker_quality_overridden_by = null,
+    marker_quality_override_reason = null
+where idempotency_key = '84000000-0000-4000-8000-000000000001';
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '10000000-0000-4000-8000-000000000010', true);
 
 select is(
   (select count(*) from public.media_assets where ar_item_id = (

@@ -12,6 +12,7 @@ type WorkerConfig = {
   pollIntervalMs: number;
   runOnce: boolean;
   idlePollsBeforeExit: number;
+  maxRuntimeMs: number;
 };
 
 const required = (name: string) => {
@@ -43,6 +44,7 @@ export function getWorkerConfig(): WorkerConfig {
     pollIntervalMs: boundedInteger("PROCESSING_POLL_INTERVAL_MS", 2000, 250, 60_000),
     runOnce: process.env.PROCESSING_RUN_ONCE === "1",
     idlePollsBeforeExit: boundedInteger("PROCESSING_IDLE_POLLS_BEFORE_EXIT", 0, 0, 60),
+    maxRuntimeMs: boundedInteger("PROCESSING_MAX_RUNTIME_MS", 0, 0, 21_600_000),
   };
 }
 
@@ -58,6 +60,7 @@ export async function runProcessingWorker(config = getWorkerConfig()) {
   });
   let stopping = false;
   let consecutiveIdlePolls = 0;
+  const stopAt = config.maxRuntimeMs > 0 ? Date.now() + config.maxRuntimeMs : null;
   const stop = () => {
     stopping = true;
   };
@@ -65,7 +68,7 @@ export async function runProcessingWorker(config = getWorkerConfig()) {
   process.once("SIGTERM", stop);
   logEvent("worker_started", { concurrency: config.concurrency });
 
-  while (!stopping) {
+  while (!stopping && (stopAt === null || Date.now() < stopAt)) {
     const claim = await client.rpc("claim_processing_jobs", {
       p_worker_id: config.workerId,
       p_limit: config.concurrency,

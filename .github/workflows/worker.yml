@@ -3,7 +3,7 @@ name: Processing worker
 on:
   workflow_dispatch:
   schedule:
-    - cron: "2-57/5 * * * *"
+    - cron: "17,47 * * * *"
   pull_request:
     paths:
       - ".github/workflows/worker.yml"
@@ -36,7 +36,7 @@ concurrency:
 jobs:
   container:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 355
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -54,8 +54,9 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROCESSING_SUPABASE_SERVICE_ROLE_KEY }}
           PROCESSING_WORKER_ID: github-actions-${{ github.run_id }}-${{ github.run_attempt }}
           PROCESSING_CONCURRENCY: "4"
-          PROCESSING_POLL_INTERVAL_MS: "2000"
-          PROCESSING_IDLE_POLLS_BEFORE_EXIT: "3"
+          PROCESSING_POLL_INTERVAL_MS: "10000"
+          PROCESSING_IDLE_POLLS_BEFORE_EXIT: "0"
+          PROCESSING_MAX_RUNTIME_MS: "19800000"
         run: |
           test -n "$SUPABASE_URL"
           test -n "$SUPABASE_SERVICE_ROLE_KEY"
@@ -66,4 +67,5 @@ jobs:
             -e PROCESSING_CONCURRENCY \
             -e PROCESSING_POLL_INTERVAL_MS \
             -e PROCESSING_IDLE_POLLS_BEFORE_EXIT \
+            -e PROCESSING_MAX_RUNTIME_MS \
             ar-photo-processing-worker:test
