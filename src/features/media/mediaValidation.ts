@@ -279,47 +279,26 @@ async function optimizeMarkerImage(decoded: DecodedImage, format: ImageFormat | 
 
 const videoExtensions = new Set(["mp4", "mov", "m4v", "mkv", "webm", "avi", "mts", "m2ts", "3gp", "3g2", "wmv", "flv"]);
 
-function decodeVideoMetadata(
-  file: File,
-  codec: Pick<VideoMetadata, "videoCodec" | "audioCodec">,
-): Promise<DecodedVideoMetadata> {
-  return new Promise<DecodedVideoMetadata>((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const video = document.createElement("video");
-    const timeout = window.setTimeout(() => finish(() => reject(new Error("timeout"))), 15_000);
-    const finish = (callback: () => void) => {
-      window.clearTimeout(timeout);
-      video.removeAttribute("src");
-      video.load();
-      URL.revokeObjectURL(url);
-      callback();
-    };
-    video.preload = "metadata";
-    video.onloadedmetadata = () => {
-      const { duration, videoWidth: width, videoHeight: height } = video;
-      if (!Number.isFinite(duration) || duration <= 0 || width < 1 || height < 1) {
-        finish(() => reject(new Error("invalid metadata")));
-        return;
-      }
-      finish(() => resolve({ width, height, durationSeconds: duration, ...codec }));
-    };
-    video.onerror = () => finish(() => reject(new Error("decode failed")));
-    video.src = url;
-  }).catch(() => {
-    throw new MediaValidationError("decode_failed", "Видео повреждено или не декодируется браузером");
-  });
-}
-
 async function validateOptimizedVideo(file: File, expectedAudioCodec: VideoMetadata["audioCodec"]) {
   const head = new Uint8Array(await file.slice(0, Math.min(file.size, 2 * 1024 * 1024)).arrayBuffer());
   const tail = new Uint8Array(await file.slice(Math.max(0, file.size - 2 * 1024 * 1024)).arrayBuffer());
   const codec = inspectMp4CodecTokens(concatBytes(head, tail));
   if (!codec) throw new MediaValidationError("unsupported_codec", "После оптимизации не удалось подтвердить H.264");
-  const metadata = await decodeVideoMetadata(file, codec);
-  if (expectedAudioCodec === "aac" && metadata.audioCodec !== "aac") {
+  const inspected = await inspectVideoSource(file).catch(() => {
+    throw new MediaValidationError("decode_failed", "После оптимизации видео не декодируется браузером");
+  });
+  if (inspected.videoCodec !== "avc") {
+    throw new MediaValidationError("unsupported_codec", "После оптимизации не удалось подтвердить H.264");
+  }
+  if (expectedAudioCodec === "aac" && inspected.audioCodec !== "aac") {
     throw new MediaValidationError("unsupported_codec", "После оптимизации пропала аудиодорожка AAC");
   }
-  return metadata;
+  return {
+    width: inspected.width,
+    height: inspected.height,
+    durationSeconds: inspected.durationSeconds,
+    ...codec,
+  };
 }
 
 export function containedDimensions(width: number, height: number, maxDimension: number) {
