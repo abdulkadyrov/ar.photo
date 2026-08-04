@@ -179,7 +179,7 @@ export async function startPublicMindAr(options: {
   document.addEventListener("visibilitychange", visibility);
 
   try {
-    await mindar.start();
+    await startMindArWithVisibleCamera(mindar);
     activeMarker = resolveMarkerDimensions(manifest.marker, mindar.controller?.markerDimensions);
     markerGeometry = markerPlaneGeometry(activeMarker);
     plane.scale.set(1, markerGeometry.height, 1);
@@ -261,7 +261,7 @@ function stopMindAr(mindar: {
   mindar.renderer.forceContextLoss?.();
 }
 
-function keepCameraVisible(mindar: {
+export function keepCameraVisible(mindar: {
   video?: HTMLVideoElement;
   renderer: { domElement?: HTMLCanvasElement; setClearColor?: (color: number, alpha?: number) => void };
   cssRenderer?: { domElement?: HTMLElement };
@@ -273,4 +273,15 @@ function keepCameraVisible(mindar: {
   mindar.renderer.domElement?.style.setProperty("background", "transparent");
   mindar.cssRenderer?.domElement?.style.setProperty("z-index", "2");
   mindar.cssRenderer?.domElement?.style.setProperty("pointer-events", "none");
+}
+
+export async function startMindArWithVisibleCamera(
+  mindar: Parameters<typeof keepCameraVisible>[0] & { start(): Promise<void> },
+) {
+  const startPromise = mindar.start();
+  // MindAR creates the camera video synchronously, then waits for target data
+  // and its worker while the video still has the library's z-index of -2.
+  keepCameraVisible(mindar);
+  await startPromise;
+  keepCameraVisible(mindar);
 }

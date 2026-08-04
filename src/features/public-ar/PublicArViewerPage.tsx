@@ -139,7 +139,11 @@ export function PublicArViewerRoute() {
   const allowFallback = manifest.fallbackEnabled || mode === "error";
   return (
     <main className="relative min-h-[100dvh] overflow-hidden bg-black text-white">
-      <div ref={containerRef} className={active ? "absolute inset-0" : "hidden"} aria-hidden={!active} />
+      <div
+        ref={containerRef}
+        className={active ? "absolute inset-0 isolate overflow-hidden" : "hidden"}
+        aria-hidden={!active}
+      />
 
       {(mode === "intro" || mode === "error") && (
         <section className="relative grid min-h-[100dvh] place-items-end overflow-hidden px-5 py-7 sm:place-items-center">
@@ -196,11 +200,11 @@ export function PublicArViewerRoute() {
           {mode !== "tracking" ? (
             <div
               data-testid="marker-scan-guide"
-              className="pointer-events-none absolute left-1/2 top-1/2 max-h-[62dvh] w-[78vw] max-w-[430px] -translate-x-1/2 -translate-y-1/2 rounded-[22px] border-2 border-dashed border-white/65 bg-white/[0.025] shadow-[0_30px_90px_rgba(0,0,0,0.3)]"
+              className="pointer-events-none absolute left-1/2 top-1/2 z-10 max-h-[62dvh] w-[78vw] max-w-[430px] -translate-x-1/2 -translate-y-1/2 rounded-[22px] border-2 border-dashed border-white/65 bg-white/[0.025] shadow-[0_30px_90px_rgba(0,0,0,0.3)]"
               style={{ aspectRatio: `${manifest.marker.width} / ${manifest.marker.height}` }}
             />
           ) : null}
-          <div className="absolute inset-x-4 top-4 rounded-2xl border border-white/10 bg-black/55 p-4 backdrop-blur-xl">
+          <div className="absolute inset-x-4 top-4 z-10 rounded-2xl border border-white/10 bg-black/55 p-4 backdrop-blur-xl">
             <div className="flex items-center gap-2 text-sm font-semibold">
               {mode === "tracking" ? <Play size={17} /> : <Camera size={17} />}
               {mode === "starting"
@@ -213,7 +217,7 @@ export function PublicArViewerRoute() {
               {mode === "tracking" ? "Видео привязано к маркеру" : "Держите всю фотографию внутри рамки"}
             </p>
           </div>
-          <div className="absolute inset-x-4 bottom-4 grid grid-cols-4 gap-2">
+          <div className="absolute inset-x-4 bottom-4 z-10 grid grid-cols-4 gap-2">
             <ViewerControl
               label={muted ? "Звук" : "Без звука"}
               onClick={toggleMuted}
