@@ -21,9 +21,10 @@ select ok(
   'browser clients cannot complete a video transcode'
 );
 select ok(
-  'video/mp4' = any(
-    (select allowed_mime_types from storage.buckets where id = 'generated-private')
-  ),
+  array_position(
+    (select allowed_mime_types from storage.buckets where id = 'generated-private'),
+    'video/mp4'
+  ) is not null,
   'generated private storage accepts the compatible MP4 output'
 );
 
