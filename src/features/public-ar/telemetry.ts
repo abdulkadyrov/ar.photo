@@ -121,6 +121,7 @@ export function viewerErrorCode(error: unknown) {
   if (name === "NotAllowedError" || name === "PermissionDeniedError") return "camera_permission_denied";
   if (name === "NotFoundError" || name === "DevicesNotFoundError") return "camera_unavailable";
   if (name === "NotReadableError" || name === "TrackStartError") return "camera_busy";
+  if (name === "TimeoutError") return "tracking_timeout";
   return "tracking_failed";
 }
 

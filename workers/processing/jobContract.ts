@@ -19,6 +19,19 @@ export type VideoInspection = {
   audioCodec: "aac" | "none";
 };
 
+export const MAX_TRACKING_IMAGE_DIMENSION = 1280;
+
+export function fitTrackingImageDimensions(width: number, height: number) {
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
+    throw new WorkerFault("invalid_marker_dimensions");
+  }
+  const scale = Math.min(1, MAX_TRACKING_IMAGE_DIMENSION / Math.max(width, height));
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
+
 export class WorkerFault extends Error {
   constructor(readonly code: string) {
     super(code);

@@ -3,6 +3,7 @@ import type { ProcessingJob } from "./jobContract.js";
 import {
   WorkerFault,
   buildGeneratedObjectPath,
+  fitTrackingImageDimensions,
   parseFfprobeOutput,
   parseProcessingInput,
   safeWorkerErrorCode,
@@ -38,6 +39,12 @@ const input = parseProcessingInput({
 });
 
 describe("processing worker contracts", () => {
+  it("normalizes phone photos for deterministic mobile tracking datasets", () => {
+    expect(fitTrackingImageDimensions(1290, 1720)).toEqual({ width: 960, height: 1280 });
+    expect(fitTrackingImageDimensions(800, 600)).toEqual({ width: 800, height: 600 });
+    expect(() => fitTrackingImageDimensions(0, 600)).toThrow("invalid_marker_dimensions");
+  });
+
   it("builds the only accepted tracking object path", () => {
     expect(buildGeneratedObjectPath(job("marker_compilation"), input)).toBe(
       "accounts/20000000-0000-4000-8000-000000000001/projects/50000000-0000-4000-8000-000000000001/groups/60000000-0000-4000-8000-000000000001/items/70000000-0000-4000-8000-000000000001/v3/tracking/target.mind",

@@ -11,6 +11,14 @@ export const publicArTrackingConfig = Object.freeze({
   missTolerance: 5,
 });
 
+export const publicArCameraConstraints = Object.freeze({
+  width: { ideal: 1280, max: 1280 },
+  height: { ideal: 720, max: 720 },
+  frameRate: { ideal: 30, max: 30 },
+});
+
+export const PUBLIC_AR_START_TIMEOUT_MS = 45_000;
+
 export type MarkerDimensions = { width: number; height: number };
 
 export function resolveMarkerDimensions(
@@ -68,6 +76,19 @@ export type PublicArSession = {
   stop(): void;
 };
 
+export function isIosWebKit(userAgent = navigator.userAgent, maxTouchPoints = navigator.maxTouchPoints) {
+  return /iphone|ipad|ipod/i.test(userAgent) || (/macintosh/i.test(userAgent) && maxTouchPoints > 1);
+}
+
+export function boundedCameraConstraints(constraints: MediaStreamConstraints = {}): MediaStreamConstraints {
+  if (constraints.video === false) return constraints;
+  const requested = typeof constraints.video === "object" ? constraints.video : {};
+  return {
+    ...constraints,
+    video: { ...requested, ...publicArCameraConstraints },
+  };
+}
+
 export async function startPublicMindAr(options: {
   container: HTMLDivElement;
   manifest: PublicArManifest;
@@ -75,26 +96,33 @@ export async function startPublicMindAr(options: {
   onTrackingState(state: PublicArTrackingState): void;
   onPlaybackEvent(event: PublicArAnalyticsEvent, valueSeconds?: number | null, errorCode?: string | null): void;
 }): Promise<PublicArSession> {
-  const [{ MindARThree }, THREE] = await Promise.all([
+  const [{ MindARThree }, THREE, trackingAsset] = await Promise.all([
     import("mind-ar/dist/mindar-image-three.prod.js"),
     import("three"),
+    fetchTrackingAsset(options.manifest.assets.trackingAssetUrl),
   ]);
   const Three = THREE as typeof ThreeModule;
   const { container, manifest, onTrackingState, onPlaybackEvent } = options;
   const video = document.createElement("video");
-  video.src = manifest.assets.videoUrl;
   video.loop = manifest.behavior.loop;
   video.muted = options.muted;
+  video.defaultMuted = options.muted;
+  if (options.muted) video.setAttribute("muted", "");
+  video.autoplay = false;
   video.playsInline = true;
-  video.preload = "auto";
+  video.preload = "metadata";
   video.crossOrigin = "anonymous";
   video.disablePictureInPicture = true;
   video.setAttribute("webkit-playsinline", "");
+  // Safari evaluates autoplay eligibility as soon as the media source is set.
+  video.src = manifest.assets.videoUrl;
   video.load();
+
+  const trackingAssetUrl = URL.createObjectURL(trackingAsset);
 
   const mindar = new MindARThree({
     container,
-    imageTargetSrc: manifest.assets.trackingAssetUrl,
+    imageTargetSrc: trackingAssetUrl,
     uiLoading: "no",
     uiScanning: "no",
     uiError: "no",
@@ -199,6 +227,7 @@ export async function startPublicMindAr(options: {
     texture.dispose();
     geometry.dispose();
     material.dispose();
+    URL.revokeObjectURL(trackingAssetUrl);
     container.replaceChildren();
     throw error;
   }
@@ -206,6 +235,8 @@ export async function startPublicMindAr(options: {
   return {
     setMuted(muted) {
       video.muted = muted;
+      video.defaultMuted = muted;
+      video.toggleAttribute("muted", muted);
       if (!muted && targetVisible) video.play().catch(() => undefined);
     },
     async togglePlayback() {
@@ -230,6 +261,7 @@ export async function startPublicMindAr(options: {
       texture.dispose();
       geometry.dispose();
       material.dispose();
+      URL.revokeObjectURL(trackingAssetUrl);
       container.replaceChildren();
     },
   };
@@ -276,12 +308,91 @@ export function keepCameraVisible(mindar: {
 }
 
 export async function startMindArWithVisibleCamera(
-  mindar: Parameters<typeof keepCameraVisible>[0] & { start(): Promise<void> },
+  mindar: Parameters<typeof keepCameraVisible>[0] & {
+    start(): Promise<void>;
+    controller?: object;
+  },
+  timeoutMs = PUBLIC_AR_START_TIMEOUT_MS,
 ) {
-  const startPromise = mindar.start();
+  const restoreCameraRequest = installBoundedCameraRequest();
+  const stopWarmupGuard = isIosWebKit() ? bypassIosWarmup(mindar) : () => undefined;
+  let startPromise: Promise<void>;
+  try {
+    startPromise = mindar.start();
+  } finally {
+    restoreCameraRequest();
+  }
   // MindAR creates the camera video synchronously, then waits for target data
   // and its worker while the video still has the library's z-index of -2.
   keepCameraVisible(mindar);
-  await startPromise;
+  try {
+    await withTimeout(startPromise, timeoutMs);
+  } finally {
+    stopWarmupGuard();
+  }
   keepCameraVisible(mindar);
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(
+      () => reject(new DOMException("AR startup timed out", "TimeoutError")),
+      timeoutMs,
+    );
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+async function fetchTrackingAsset(url: string) {
+  let response: Response;
+  try {
+    response = await fetch(url, { cache: "no-store", credentials: "omit" });
+  } catch {
+    throw new DOMException("Tracking asset unavailable", "NetworkError");
+  }
+  if (!response.ok) throw new DOMException("Tracking asset unavailable", "NetworkError");
+  const blob = await response.blob();
+  if (blob.size < 1024 || blob.size > 10 * 1024 * 1024) {
+    throw new DOMException("Tracking asset is invalid", "DataError");
+  }
+  return blob;
+}
+
+function installBoundedCameraRequest() {
+  const mediaDevices = navigator.mediaDevices;
+  if (!mediaDevices || typeof mediaDevices.getUserMedia !== "function") return () => undefined;
+  const original = mediaDevices.getUserMedia;
+  try {
+    mediaDevices.getUserMedia = (constraints) => original.call(mediaDevices, boundedCameraConstraints(constraints));
+  } catch {
+    return () => undefined;
+  }
+  return () => {
+    try {
+      mediaDevices.getUserMedia = original;
+    } catch {
+      // The browser may expose mediaDevices as a read-only host object.
+    }
+  };
+}
+
+function bypassIosWarmup(mindar: { controller?: object }) {
+  const timer = window.setInterval(() => {
+    const controller = mindar.controller as
+      | { dummyRun?: (input: HTMLVideoElement) => Promise<void> }
+      | undefined;
+    if (!controller) return;
+    controller.dummyRun = async () => undefined;
+    window.clearInterval(timer);
+  }, 16);
+  return () => window.clearInterval(timer);
 }

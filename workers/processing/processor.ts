@@ -15,6 +15,7 @@ import {
   WorkerFault,
   assertSupportedJob,
   buildGeneratedObjectPath,
+  fitTrackingImageDimensions,
   parseFfprobeOutput,
   parseProcessingInput,
   safeWorkerErrorCode,
@@ -95,10 +96,48 @@ async function inspectVideo(sourcePath: string) {
 
 async function compileMarker(sourcePath: string, outputPath: string) {
   const image = await loadImage(sourcePath);
+  const dimensions = fitTrackingImageDimensions(image.width, image.height);
+  const normalized = createCanvas(dimensions.width, dimensions.height);
+  const context = normalized.getContext("2d");
+  context.imageSmoothingEnabled = true;
+  context.patternQuality = "best";
+  context.quality = "best";
+  context.drawImage(image, 0, 0, dimensions.width, dimensions.height);
   const compiler = new OfflineCompiler();
   try {
-    await compiler.compileImageTargets([image], () => undefined);
-    await writeFile(outputPath, Buffer.from(compiler.exportData()), { flag: "wx" });
+    await compiler.compileImageTargets([normalized], () => undefined);
+    const bytes = Buffer.from(compiler.exportData());
+    const verifier = new OfflineCompiler();
+    const [compiled] = verifier.importData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+    if (
+      !compiled ||
+      compiled.targetImage?.width !== dimensions.width ||
+      compiled.targetImage?.height !== dimensions.height ||
+      !Array.isArray(compiled.matchingData) ||
+      compiled.matchingData.length === 0 ||
+      !Array.isArray(compiled.trackingData) ||
+      compiled.trackingData.length === 0
+    ) {
+      throw new Error("Invalid compiled target");
+    }
+    const matchingFeatureCount = compiled.matchingData.reduce(
+      (total: number, level: { maximaPoints?: unknown[]; minimaPoints?: unknown[] }) =>
+        total + (level.maximaPoints?.length ?? 0) + (level.minimaPoints?.length ?? 0),
+      0,
+    );
+    const trackingFeatureCount = compiled.trackingData.reduce(
+      (total: number, level: { points?: unknown[] }) => total + (level.points?.length ?? 0),
+      0,
+    );
+    if (matchingFeatureCount < 100 || trackingFeatureCount < 8) throw new Error("Insufficient target features");
+    await writeFile(outputPath, bytes, { flag: "wx" });
+    return {
+      width: dimensions.width,
+      height: dimensions.height,
+      byteSize: bytes.byteLength,
+      matchingFeatureCount,
+      trackingFeatureCount,
+    };
   } catch {
     throw new WorkerFault("marker_compilation_failed");
   }
@@ -226,10 +265,10 @@ async function executeJob(
   }
   if (job.type === "marker_compilation") {
     const outputPath = join(tempDirectory, "target.mind");
-    await compileMarker(sourcePath, outputPath);
+    const target = await compileMarker(sourcePath, outputPath);
     await reportProgress(client, job, workerId, 75);
     const digest = await uploadGeneratedObject(client, storagePath, outputPath, "application/octet-stream");
-    return { storageBucket: "generated-private", storagePath, sha256: digest };
+    return { storageBucket: "generated-private", storagePath, sha256: digest, target };
   }
 
   const outputPath = join(tempDirectory, "video.webp");

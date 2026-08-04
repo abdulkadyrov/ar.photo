@@ -38,6 +38,9 @@ export function classifyViewerError(error: unknown) {
   if (name === "NotReadableError" || name === "TrackStartError") {
     return "Камера занята другим приложением. Закройте его или откройте обычное видео.";
   }
+  if (name === "TimeoutError") {
+    return "Камера запускается слишком долго. Повторите попытку или откройте обычное видео.";
+  }
   return "AR не удалось запустить. Откройте обычное видео или повторите попытку.";
 }
 

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  boundedCameraConstraints,
   coverTextureTransform,
+  isIosWebKit,
   keepCameraVisible,
   markerPlaneGeometry,
   publicArTrackingConfig,
@@ -9,6 +11,26 @@ import {
 } from "./mindArAdapter";
 
 describe("public AR alignment contract", () => {
+  it("bounds camera capture work on mobile devices", () => {
+    expect(boundedCameraConstraints({ audio: false, video: { facingMode: "environment" } })).toEqual({
+      audio: false,
+      video: {
+        facingMode: "environment",
+        width: { ideal: 1280, max: 1280 },
+        height: { ideal: 720, max: 720 },
+        frameRate: { ideal: 30, max: 30 },
+      },
+    });
+    expect(boundedCameraConstraints({ video: false })).toEqual({ video: false });
+  });
+
+  it("recognizes iOS and iPad desktop user agents for the WebKit workaround", () => {
+    expect(isIosWebKit("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", 5)).toBe(true);
+    expect(isIosWebKit("Mozilla/5.0 (Macintosh; Intel Mac OS X) Safari/605.1.15", 5)).toBe(true);
+    expect(isIosWebKit("Mozilla/5.0 (Macintosh; Intel Mac OS X) Safari/605.1.15", 0)).toBe(false);
+    expect(isIosWebKit("Mozilla/5.0 (Linux; Android 15) Chrome/140", 5)).toBe(false);
+  });
+
   it("places the plane exactly on the marker without a parallax offset", () => {
     expect(markerPlaneGeometry({ width: 1200, height: 1600 })).toEqual({ width: 1, height: 4 / 3, z: 0 });
     expect(markerPlaneGeometry({ width: 1600, height: 1200 })).toEqual({ width: 1, height: 0.75, z: 0 });
@@ -101,5 +123,22 @@ describe("public AR alignment contract", () => {
     finishStart?.();
     await started;
     expect(video.style.zIndex).toBe("0");
+  });
+
+  it("does not leave the viewer stuck while tracker startup is stalled", async () => {
+    vi.useFakeTimers();
+    try {
+      const video = document.createElement("video");
+      const started = startMindArWithVisibleCamera(
+        { video, renderer: {}, start: () => new Promise<void>(() => undefined) },
+        25,
+      );
+      const rejection = expect(started).rejects.toMatchObject({ name: "TimeoutError" });
+
+      await vi.advanceTimersByTimeAsync(25);
+      await rejection;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

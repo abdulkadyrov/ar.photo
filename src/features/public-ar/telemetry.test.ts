@@ -69,6 +69,7 @@ describe("public AR telemetry", () => {
 
   it("maps browser failures to bounded error codes", () => {
     expect(viewerErrorCode(new DOMException("denied", "NotAllowedError"))).toBe("camera_permission_denied");
+    expect(viewerErrorCode(new DOMException("slow", "TimeoutError"))).toBe("tracking_timeout");
     expect(viewerErrorCode(new Error("private detail"))).toBe("tracking_failed");
   });
 });

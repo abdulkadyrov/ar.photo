@@ -52,11 +52,11 @@ import type { PublicArSession } from "../public-ar/mindArAdapter";
 import { compilePrototypeMarker, readPrototypeMarkerDimensions } from "./compileMarker";
 import { usePrototypeSnapshot } from "./usePrototypeSnapshot";
 
-const AR_CALIBRATION_KEY = "ar-photo-calibration-v1";
+const AR_CALIBRATION_KEY = "ar-photo-calibration-v2";
 const DEFAULT_AR_CALIBRATION = {
-  dx: -0.18,
+  dx: 0,
   dy: 0,
-  scale: 1.04,
+  scale: 1,
   center: false,
 };
 
