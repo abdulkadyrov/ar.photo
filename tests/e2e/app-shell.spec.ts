@@ -274,41 +274,21 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
     }
     return canvas.toDataURL("image/png").split(",")[1];
   });
-  await page.locator('input[type="file"]').setInputFiles({
+  const workflowFileInputs = page.locator('input[type="file"]');
+  await workflowFileInputs.nth(0).setInputFiles({
     name: "workflow-marker.png",
     mimeType: "image/png",
     buffer: Buffer.from(markerBase64, "base64"),
   });
   await expect(page.getByText("Маркер загружен", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Продолжить" }).click();
-
-  await page.getByRole("button", { name: "Анализировать маркер" }).click();
-  await expect(page.getByText(/\/100$/).first()).toBeVisible();
-  const riskConfirmation = page.getByText("Я понимаю риск потери распознавания", { exact: false });
-  if (await riskConfirmation.isVisible()) await riskConfirmation.click();
-  await page.getByRole("button", { name: "Продолжить" }).click();
-
-  await page.locator('input[type="file"]').setInputFiles("test-assets/fixtures/h264-aac.mp4");
+  await workflowFileInputs.nth(1).setInputFiles("test-assets/fixtures/h264-aac.mp4");
   await expect(page.getByText("Видео загружено", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Продолжить" }).click();
-  await page.getByRole("button", { name: "Запустить обработку" }).click();
+  await page.getByRole("button", { name: "Обработать и продолжить" }).click();
 
   await expect(page.getByRole("heading", { name: "Все артефакты готовы" })).toBeVisible();
-  await page.getByRole("button", { name: "Продолжить" }).click();
-  for (const label of [
-    "Выбрана правильная печатная фотография",
-    "Видео и звук соответствуют фотографии",
-    "Поведение при потере маркера подтверждено",
-  ]) {
-    await page.getByText(label, { exact: true }).click();
-  }
-  await page.getByRole("button", { name: "Проверка завершена" }).click();
-
   await expect(page.getByRole("heading", { name: "AR-работа готова к публикации" })).toBeVisible();
-  await page.getByRole("link", { name: "Опубликовать и создать QR" }).click();
-  await expect(page.getByRole("heading", { name: "Портрет Алексея" })).toBeVisible();
   await page.getByRole("button", { name: "Опубликовать и создать QR" }).click();
-  await expect(page.getByText("AR-работа опубликована", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Портрет Алексея" })).toBeVisible();
   await expect(page.getByTestId("qr-preview")).toBeVisible();
 
   const initialPublicUrl = await page.getByTestId("public-qr-url").textContent();

@@ -1,6 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Check,
@@ -24,6 +23,7 @@ import { useAuth } from "../auth/authContext";
 import { getCatalogRepository } from "../catalog/catalogRepository";
 import { getMediaRepository } from "../media/mediaRepository";
 import { markerAccept, prepareMediaFile, videoAccept } from "../media/mediaValidation";
+import { resolvePublicBaseUrl } from "../qr/qrDesign";
 import { getArItemRepository } from "./arItemRepository";
 import { analyzeMarkerFile, type MarkerQualityResult } from "./markerQuality";
 
@@ -31,17 +31,7 @@ const catalogRepository = getCatalogRepository();
 const mediaRepository = getMediaRepository();
 const arItemRepository = getArItemRepository();
 
-const wizardSteps = [
-  "Проект",
-  "Описание",
-  "Маркер",
-  "Качество",
-  "Видео",
-  "Поведение",
-  "Обработка",
-  "Тест",
-  "Публикация",
-] as const;
+const wizardSteps = ["Проект", "Описание", "Фото, видео и поведение", "Публикация"] as const;
 
 const statusLabels = {
   draft: "Черновик",
@@ -167,7 +157,10 @@ function ArItemWizard() {
   const [searchParams] = useSearchParams();
   const [step, setStep] = useState(() => {
     const resumeStep = (location.state as { resumeStep?: unknown } | null)?.resumeStep;
-    return typeof resumeStep === "number" && resumeStep >= 1 && resumeStep <= 9 ? resumeStep : 1;
+    if (typeof resumeStep !== "number") return 1;
+    if (resumeStep >= 7) return 4;
+    if (resumeStep >= 3) return 3;
+    return resumeStep === 2 ? 2 : 1;
   });
   const [currentItemId, setCurrentItemId] = useState(routeItemId ?? "");
   const [projectId, setProjectId] = useState(searchParams.get("projectId") ?? "");
@@ -178,13 +171,10 @@ function ArItemWizard() {
   const [videoAssetId, setVideoAssetId] = useState("");
   const [settings, setSettings] = useState(defaultSettings);
   const [quality, setQuality] = useState<MarkerQualityResult | null>(null);
-  const [qualityAccepted, setQualityAccepted] = useState(false);
   const [uploadState, setUploadState] = useState<{ kind: "marker" | "video"; progress: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ title: string; message?: string; tone: "error" | "success" } | null>(null);
   const [overrideReason, setOverrideReason] = useState("");
-  const [testChecks, setTestChecks] = useState([false, false, false]);
-  const [previewUrls, setPreviewUrls] = useState<{ marker?: string; video?: string }>({});
   const requestId = useRef(crypto.randomUUID());
   const uploadedFiles = useRef(new Map<string, File>());
   const initializedItemId = useRef("");
@@ -208,7 +198,7 @@ function ArItemWizard() {
     queryKey: ["ar-item", accountId, currentItemId],
     queryFn: () => arItemRepository.getItem(accountId!, currentItemId),
     enabled: Boolean(accountId && currentItemId),
-    refetchInterval: step >= 7 && step <= 8 ? 3_000 : false,
+    refetchInterval: (query) => (step === 4 && query.state.data?.status === "processing" ? 3_000 : false),
   });
   const assetsQuery = useQuery({
     queryKey: ["media", "assets", accountId, projectId, groupId],
@@ -218,8 +208,8 @@ function ArItemWizard() {
   const jobsQuery = useQuery({
     queryKey: ["ar-item", "jobs", accountId, currentItemId],
     queryFn: () => arItemRepository.listJobs(accountId!, currentItemId),
-    enabled: Boolean(accountId && currentItemId && step >= 7),
-    refetchInterval: step === 7 ? 3_000 : false,
+    enabled: Boolean(accountId && currentItemId && step === 4),
+    refetchInterval: step === 4 && itemQuery.data?.status === "processing" ? 3_000 : false,
   });
 
   useEffect(() => {
@@ -239,8 +229,7 @@ function ArItemWizard() {
       audioDefault: item.audio_default as "muted" | "sound_on",
       fallbackEnabled: item.fallback_enabled,
     });
-    if (item.status === "ready" || item.status === "published") setStep(8);
-    else if (item.status === "processing" || item.status === "failed") setStep(7);
+    if (["processing", "ready", "published", "failed"].includes(item.status)) setStep(4);
   }, [itemQuery.data]);
 
   const assets = assetsQuery.data ?? [];
@@ -261,19 +250,6 @@ function ArItemWizard() {
     setVideoAssetId(item.video_asset_id);
     void queryClient.invalidateQueries({ queryKey: ["media", "assets", accountId, item.project_id, item.group_id] });
   }, [accountId, itemQuery.data, queryClient, videoAssetId]);
-
-  useEffect(() => {
-    if (step !== 8 || !selectedMarker || !selectedVideo) return;
-    let active = true;
-    void Promise.all([mediaRepository.getAssetUrl(selectedMarker), mediaRepository.getAssetUrl(selectedVideo)]).then(
-      ([marker, video]) => {
-        if (active) setPreviewUrls({ marker, video });
-      },
-    );
-    return () => {
-      active = false;
-    };
-  }, [selectedMarker, selectedVideo, step]);
 
   const showError = (error: unknown) =>
     setNotice({ title: "Действие не выполнено", message: readableError(error), tone: "error" });
@@ -343,21 +319,36 @@ function ArItemWizard() {
   };
 
   const analyzeSelectedMarker = async () => {
-    if (!selectedMarker) return;
+    if (!selectedMarker) throw new Error("Добавьте фотографию-маркер");
+    let file = uploadedFiles.current.get(selectedMarker.id);
+    if (!file) {
+      const url = await mediaRepository.getAssetUrl(selectedMarker);
+      if (!url) throw new Error("Оригинал маркера недоступен. Загрузите файл повторно.");
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Не удалось скачать маркер для анализа");
+      file = new File([await response.blob()], selectedMarker.original_file_name ?? "marker", {
+        type: selectedMarker.mime_type,
+      });
+    }
+    return analyzeMarkerFile(file);
+  };
+
+  const startProcessing = async () => {
+    if (!accountId || !currentItemId || !markerAssetId || !videoAssetId) return;
     setBusy(true);
     try {
-      let file = uploadedFiles.current.get(selectedMarker.id);
-      if (!file) {
-        const url = await mediaRepository.getAssetUrl(selectedMarker);
-        if (!url) throw new Error("Оригинал маркера недоступен. Загрузите файл повторно.");
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("Не удалось скачать маркер для анализа");
-        file = new File([await response.blob()], selectedMarker.original_file_name ?? "marker", {
-          type: selectedMarker.mime_type,
-        });
+      const markerQuality = quality ?? (await analyzeSelectedMarker());
+      setQuality(markerQuality);
+      await arItemRepository.prepare(accountId, currentItemId, { ...settings, markerAssetId, videoAssetId });
+      if (!markerQuality.suitable) {
+        await arItemRepository.overrideMarkerQuality(
+          accountId,
+          currentItemId,
+          "Пользователь выбрал автоматическую обработку фотографии",
+        );
       }
-      setQuality(await analyzeMarkerFile(file));
-      setQualityAccepted(false);
+      setStep(4);
+      await Promise.all([itemQuery.refetch(), jobsQuery.refetch()]);
     } catch (error) {
       showError(error);
     } finally {
@@ -365,20 +356,21 @@ function ArItemWizard() {
     }
   };
 
-  const startProcessing = async () => {
-    if (!accountId || !currentItemId || !markerAssetId || !videoAssetId) return;
+  const publishCurrentItem = async () => {
+    if (!accountId || !currentItemId) return;
+    if (currentItem?.status === "published") {
+      navigate(`/items/${currentItemId}/qr`);
+      return;
+    }
     setBusy(true);
     try {
-      await arItemRepository.prepare(accountId, currentItemId, { ...settings, markerAssetId, videoAssetId });
-      if (quality && !quality.suitable && qualityAccepted) {
-        await arItemRepository.overrideMarkerQuality(
-          accountId,
-          currentItemId,
-          "Пользователь подтвердил риск слабого маркера перед обработкой",
-        );
-      }
-      setStep(7);
-      await Promise.all([itemQuery.refetch(), jobsQuery.refetch()]);
+      await arItemRepository.publish(accountId, currentItemId, resolvePublicBaseUrl());
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["ar-item", accountId, currentItemId] }),
+        queryClient.invalidateQueries({ queryKey: ["ar-item", "qr", accountId, currentItemId] }),
+        queryClient.invalidateQueries({ queryKey: ["ar-items"] }),
+      ]);
+      navigate(`/items/${currentItemId}/qr`);
     } catch (error) {
       showError(error);
     } finally {
@@ -396,19 +388,10 @@ function ArItemWizard() {
     } else if (step === 2) {
       if (await saveDescription()) setStep(3);
     } else if (step === 3) {
-      if (!markerAssetId) setNotice({ title: "Добавьте фотографию-маркер", tone: "error" });
-      else setStep(4);
-    } else if (step === 4) {
-      if (!quality) setNotice({ title: "Сначала выполните анализ качества", tone: "error" });
-      else if (!quality.suitable && !qualityAccepted)
-        setNotice({ title: "Подтвердите риск слабого маркера", tone: "error" });
-      else setStep(5);
-    } else if (step === 5) {
-      if (!videoAssetId) setNotice({ title: "Добавьте видео", tone: "error" });
-      else setStep(6);
-    } else if (step === 6) await startProcessing();
-    else if (step === 7 && currentItem?.status === "ready") setStep(8);
-    else if (step === 8 && testChecks.every(Boolean)) setStep(9);
+      if (!markerAssetId) setNotice({ title: "Добавьте фотографию", tone: "error" });
+      else if (!videoAssetId) setNotice({ title: "Добавьте видео", tone: "error" });
+      else await startProcessing();
+    }
   };
 
   if (workspaceQuery.isPending || projectsQuery.isPending || (routeItemId && itemQuery.isPending)) {
@@ -424,14 +407,14 @@ function ArItemWizard() {
     );
   }
 
-  const canGoBack = step > 1 && step !== 7;
-  const nextLabel = step === 6 ? "Запустить обработку" : step === 8 ? "Проверка завершена" : "Продолжить";
+  const canGoBack = step > 1 && step < 4;
+  const nextLabel = step === 3 ? "Обработать и продолжить" : "Продолжить";
 
   return (
     <AppShell
       eyebrow="AR Item Workflow"
       title={currentItem?.title || "Новая AR-работа"}
-      description="Девять проверяемых шагов от выбора группы до готовности к публикации."
+      description="Четыре шага: выберите проект, добавьте данные, загрузите фото и видео, затем опубликуйте."
       actions={
         <Link className="btn btn-quiet" to="/items">
           <ArrowLeft size={17} /> AR-работы
@@ -443,7 +426,7 @@ function ArItemWizard() {
         <Panel>
           <div className="mb-6 flex items-start justify-between gap-4 border-b border-line pb-5">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Шаг {step} из 9</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Шаг {step} из 4</p>
               <h2 className="mt-2 text-2xl font-semibold">{wizardSteps[step - 1]}</h2>
             </div>
             {currentItem ? <ItemStatus status={currentItem.status} /> : null}
@@ -500,101 +483,87 @@ function ArItemWizard() {
           ) : null}
 
           {step === 3 ? (
-            <MediaStep
-              kind="marker"
-              assets={markers}
-              selectedId={markerAssetId}
-              uploadState={uploadState}
-              onSelect={(id) => {
-                setMarkerAssetId(id);
-                setQuality(null);
-              }}
-              onUpload={(file) => void uploadFile(file, "marker")}
-            />
+            <div className="grid gap-8">
+              <section>
+                <h3 className="mb-3 text-lg font-semibold">Фотография</h3>
+                <MediaStep
+                  kind="marker"
+                  assets={markers}
+                  selectedId={markerAssetId}
+                  uploadState={uploadState}
+                  onSelect={(id) => {
+                    setMarkerAssetId(id);
+                    setQuality(null);
+                  }}
+                  onUpload={(file) => void uploadFile(file, "marker")}
+                />
+              </section>
+              <section className="border-t border-line pt-7">
+                <h3 className="mb-3 text-lg font-semibold">Видео</h3>
+                <MediaStep
+                  kind="video"
+                  assets={videos}
+                  selectedId={videoAssetId}
+                  uploadState={uploadState}
+                  onSelect={setVideoAssetId}
+                  onUpload={(file) => void uploadFile(file, "video")}
+                />
+              </section>
+              <section className="border-t border-line pt-7">
+                <h3 className="mb-3 text-lg font-semibold">Поведение ожившего фото</h3>
+                <SettingsStep settings={settings} onChange={setSettings} />
+              </section>
+            </div>
           ) : null}
 
           {step === 4 ? (
-            <MarkerQualityStep
-              busy={busy}
-              quality={quality}
-              accepted={qualityAccepted}
-              onAccepted={setQualityAccepted}
-              onAnalyze={() => void analyzeSelectedMarker()}
-            />
+            <div className="grid gap-6">
+              <ProcessingStep
+                item={currentItem}
+                jobs={latestJobs}
+                overrideReason={overrideReason}
+                onOverrideReason={setOverrideReason}
+                onOverride={async () => {
+                  if (!accountId || !currentItemId) return;
+                  setBusy(true);
+                  try {
+                    await arItemRepository.overrideMarkerQuality(accountId, currentItemId, overrideReason);
+                    await itemQuery.refetch();
+                  } catch (error) {
+                    showError(error);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                onRetry={async () => {
+                  if (!accountId || !currentItemId) return;
+                  setBusy(true);
+                  try {
+                    await arItemRepository.retry(accountId, currentItemId);
+                    await Promise.all([itemQuery.refetch(), jobsQuery.refetch()]);
+                  } catch (error) {
+                    showError(error);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              />
+              {currentItem?.status === "ready" || currentItem?.status === "published" ? (
+                <PublicationStep
+                  busy={busy}
+                  published={currentItem.status === "published"}
+                  onPublish={publishCurrentItem}
+                />
+              ) : null}
+            </div>
           ) : null}
 
-          {step === 5 ? (
-            <MediaStep
-              kind="video"
-              assets={videos}
-              selectedId={videoAssetId}
-              uploadState={uploadState}
-              onSelect={setVideoAssetId}
-              onUpload={(file) => void uploadFile(file, "video")}
-            />
-          ) : null}
-
-          {step === 6 ? <SettingsStep settings={settings} onChange={setSettings} /> : null}
-
-          {step === 7 ? (
-            <ProcessingStep
-              item={currentItem}
-              jobs={latestJobs}
-              overrideReason={overrideReason}
-              onOverrideReason={setOverrideReason}
-              onOverride={async () => {
-                if (!accountId || !currentItemId) return;
-                setBusy(true);
-                try {
-                  await arItemRepository.overrideMarkerQuality(accountId, currentItemId, overrideReason);
-                  await itemQuery.refetch();
-                } catch (error) {
-                  showError(error);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-              onRetry={async () => {
-                if (!accountId || !currentItemId) return;
-                setBusy(true);
-                try {
-                  await arItemRepository.retry(accountId, currentItemId);
-                  await Promise.all([itemQuery.refetch(), jobsQuery.refetch()]);
-                } catch (error) {
-                  showError(error);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            />
-          ) : null}
-
-          {step === 8 ? (
-            <TestingStep
-              markerUrl={previewUrls.marker}
-              videoUrl={previewUrls.video}
-              checks={testChecks}
-              onToggle={(index) =>
-                setTestChecks((current) =>
-                  current.map((value, currentIndex) => (currentIndex === index ? !value : value)),
-                )
-              }
-            />
-          ) : null}
-
-          {step === 9 ? <PublicationStep itemId={currentItemId} /> : null}
-
-          {step < 9 ? (
+          {step < 4 ? (
             <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
               <Button variant="quiet" disabled={!canGoBack || busy} onClick={() => setStep((current) => current - 1)}>
                 <ArrowLeft size={16} /> Назад
               </Button>
-              <Button
-                disabled={
-                  busy || (step === 7 && currentItem?.status !== "ready") || (step === 8 && !testChecks.every(Boolean))
-                }
-                onClick={() => void next()}
-              >
+              <Button disabled={busy || Boolean(uploadState)} onClick={() => void next()}>
                 {busy ? <LoaderCircle className="animate-spin" size={16} /> : null}
                 {nextLabel} <ArrowRight size={16} />
               </Button>
@@ -622,7 +591,7 @@ function ArItemWizard() {
 
 function WizardProgress({ current }: { current: number }) {
   return (
-    <ol className="mt-6 grid grid-cols-3 gap-2 md:grid-cols-5 xl:grid-cols-9" aria-label="Шаги создания AR-работы">
+    <ol className="mt-6 grid grid-cols-2 gap-2 md:grid-cols-4" aria-label="Шаги создания AR-работы">
       {wizardSteps.map((label, index) => {
         const number = index + 1;
         const complete = number < current;
@@ -712,73 +681,6 @@ function MediaStep({
           </p>
         ) : null}
       </div>
-    </div>
-  );
-}
-
-function MarkerQualityStep({
-  busy,
-  quality,
-  accepted,
-  onAccepted,
-  onAnalyze,
-}: {
-  busy: boolean;
-  quality: MarkerQualityResult | null;
-  accepted: boolean;
-  onAccepted: (value: boolean) => void;
-  onAnalyze: () => void;
-}) {
-  return (
-    <div>
-      <p className="text-sm leading-6 text-muted">
-        Локальная проверка оценивает яркость, контраст, резкость, плотность признаков и энтропию. Worker повторит анализ
-        авторитетно.
-      </p>
-      <Button
-        className="mt-5"
-        disabled={busy}
-        onClick={onAnalyze}
-        icon={busy ? <LoaderCircle className="animate-spin" size={16} /> : <ScanLine size={16} />}
-      >
-        Анализировать маркер
-      </Button>
-      {quality ? (
-        <div
-          className={`mt-5 rounded-2xl border p-5 ${quality.suitable ? "border-emerald-400/30 bg-emerald-400/10" : "border-amber-300/30 bg-amber-300/10"}`}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm text-muted">Оценка качества</p>
-              <strong className="mt-1 block text-4xl">{quality.score}/100</strong>
-            </div>
-            {quality.suitable ? (
-              <CheckCircle2 className="text-emerald-300" size={34} />
-            ) : (
-              <AlertTriangle className="text-amber-200" size={34} />
-            )}
-          </div>
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
-            {Object.entries(quality.metrics).map(([key, value]) => (
-              <div key={key} className="rounded-xl bg-black/15 p-3 text-center">
-                <strong>{value}</strong>
-                <span className="mt-1 block text-[10px] uppercase text-muted">{metricLabel(key)}</span>
-              </div>
-            ))}
-          </div>
-          {!quality.suitable ? (
-            <label className="mt-5 flex items-start gap-3 text-sm leading-5">
-              <input
-                className="mt-1"
-                type="checkbox"
-                checked={accepted}
-                onChange={(event) => onAccepted(event.target.checked)}
-              />
-              <span>Я понимаю риск потери распознавания и всё равно хочу собрать AR-маркер из этой фотографии.</span>
-            </label>
-          ) : null}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -879,7 +781,7 @@ function ProcessingStep({
         <div className="mt-5 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-5">
           <CheckCircle2 className="text-emerald-300" />
           <h3 className="mt-3 text-xl font-semibold">Все артефакты готовы</h3>
-          <p className="mt-2 text-sm text-muted">Можно перейти к ручной проверке пары «маркер + видео».</p>
+          <p className="mt-2 text-sm text-muted">Фото и видео готовы. Теперь работу можно сразу опубликовать.</p>
         </div>
       ) : null}
       {item?.status === "failed" ? (
@@ -902,77 +804,24 @@ function ProcessingStep({
   );
 }
 
-function TestingStep({
-  markerUrl,
-  videoUrl,
-  checks,
-  onToggle,
-}: {
-  markerUrl?: string;
-  videoUrl?: string;
-  checks: boolean[];
-  onToggle: (index: number) => void;
-}) {
-  const labels = [
-    "Выбрана правильная печатная фотография",
-    "Видео и звук соответствуют фотографии",
-    "Поведение при потере маркера подтверждено",
-  ];
+function PublicationStep({ busy, published, onPublish }: { busy: boolean; published: boolean; onPublish: () => void }) {
   return (
-    <div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="overflow-hidden rounded-2xl border border-line bg-black/20">
-          {markerUrl ? (
-            <img alt="Предпросмотр маркера" className="aspect-[4/3] h-full w-full object-cover" src={markerUrl} />
-          ) : (
-            <PreviewPlaceholder icon={<ImageIcon />} label="Маркер" />
-          )}
-        </div>
-        <div className="overflow-hidden rounded-2xl border border-line bg-black/20">
-          {videoUrl ? (
-            <video className="aspect-[4/3] h-full w-full object-cover" controls preload="metadata" src={videoUrl} />
-          ) : (
-            <PreviewPlaceholder icon={<FileVideo2 />} label="Видео" />
-          )}
-        </div>
-      </div>
-      <div className="mt-5 grid gap-3">
-        {labels.map((label, index) => (
-          <label
-            key={label}
-            className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-4 text-sm"
-          >
-            <input className="mt-1" type="checkbox" checked={checks[index]} onChange={() => onToggle(index)} />
-            <span>{label}</span>
-          </label>
-        ))}
-      </div>
-      <Link className="btn btn-ghost mt-5" to="/viewer/test" target="_blank" rel="noreferrer">
-        <ScanLine size={16} /> Открыть техническую AR-проверку
-      </Link>
-    </div>
-  );
-}
-
-function PublicationStep({ itemId }: { itemId: string }) {
-  return (
-    <div className="py-4 text-center">
+    <div className="rounded-2xl border border-primary/30 bg-primary/10 px-5 py-8 text-center">
       <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-400/15 text-emerald-300">
         <CheckCircle2 size={34} />
       </span>
-      <h3 className="mt-5 text-2xl font-semibold">AR-работа готова к публикации</h3>
+      <h3 className="mt-5 text-2xl font-semibold">
+        {published ? "AR-работа опубликована" : "AR-работа готова к публикации"}
+      </h3>
       <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted">
-        Workflow и generated assets проверены. Следующий экран атомарно активирует public manifest и создаст QR без
-        внутренних UUID, Storage path или signed URL.
+        {published
+          ? "Откройте готовый QR-код, чтобы скачать, распечатать или проверить ожившее фото."
+          : "Одно нажатие активирует просмотр, создаст QR-код и откроет его для скачивания."}
       </p>
-      <Link className="btn btn-primary mt-5" to={`/items/${itemId}/qr`}>
-        Опубликовать и создать QR
-      </Link>
-      <div className="mt-4">
-        <Link className="text-sm font-semibold text-primary" to={`/items/${itemId}/edit`}>
-          Сохранено как готовая ревизия
-        </Link>
-      </div>
+      <Button className="mt-5" disabled={busy} onClick={onPublish}>
+        {busy ? <LoaderCircle className="animate-spin" size={16} /> : <ScanLine size={16} />}
+        {published ? "Открыть QR" : "Опубликовать и создать QR"}
+      </Button>
     </div>
   );
 }
@@ -1047,17 +896,6 @@ function ItemStatus({ status }: { status: keyof typeof statusLabels }) {
   );
 }
 
-function PreviewPlaceholder({ icon, label }: { icon: ReactNode; label: string }) {
-  return (
-    <div className="grid aspect-[4/3] place-items-center text-muted">
-      <div className="text-center">
-        <span className="metric-icon mx-auto">{icon}</span>
-        <p className="mt-2 text-xs">{label} загружается</p>
-      </div>
-    </div>
-  );
-}
-
 function ItemsLoading() {
   return (
     <AppShell title="AR-работы" description="Загружаем workflow">
@@ -1095,18 +933,6 @@ function jobStatusLabel(status: ProcessingJob["status"]) {
   return { queued: "В очереди", running: "Выполняется", succeeded: "Готово", failed: "Ошибка", cancelled: "Отменено" }[
     status
   ];
-}
-
-function metricLabel(key: string) {
-  return (
-    {
-      brightness: "яркость",
-      contrast: "контраст",
-      sharpness: "резкость",
-      featureDensity: "признаки",
-      entropy: "энтропия",
-    }[key] ?? key
-  );
 }
 
 function lostBehaviorLabel(value: ArItemSettings["markerLostBehavior"]) {
