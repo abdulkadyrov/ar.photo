@@ -126,7 +126,7 @@ function Home({ snapshot, refresh }: { snapshot: StoreSnapshot; refresh: () => P
         </header>
         <section className="grid flex-1 items-center gap-8 py-10 lg:grid-cols-[1fr_0.9fr]">
           <div className="space-y-7">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">School AR Photo</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary-soft">School AR Photo</p>
             <h1 className="max-w-3xl text-5xl font-semibold leading-tight md:text-7xl">
               Оживающие выпускные фотографии
             </h1>
@@ -415,9 +415,7 @@ function StudentCard({
   const livePhoto = snapshot.livePhotos.find((item) => item.studentId === student.id);
   const image = livePhoto ? snapshot.media.find((item) => item.id === livePhoto.imageId) : undefined;
   const video = livePhoto ? snapshot.media.find((item) => item.id === livePhoto.videoId) : undefined;
-  const tracking = livePhoto?.trackingId
-    ? snapshot.media.find((item) => item.id === livePhoto.trackingId)
-    : undefined;
+  const tracking = livePhoto?.trackingId ? snapshot.media.find((item) => item.id === livePhoto.trackingId) : undefined;
   const [draftImage, setDraftImage] = useState<{ media: Media; blob: Blob } | null>(null);
   const [draftVideo, setDraftVideo] = useState<{ media: Media; blob: Blob } | null>(null);
   const [generation, setGeneration] = useState<{ progress: number; error?: string } | null>(null);
@@ -537,8 +535,8 @@ function StudentCard({
             </span>
           </div>
           <p className="mt-2 text-xs text-muted">
-            Демо хранит AR-файлы в этом браузере. Для QR, открываемого на другом телефоне, опубликуйте работу в
-            разделе «AR-работы».
+            Демо хранит AR-файлы в этом браузере. Для QR, открываемого на другом телефоне, опубликуйте работу в разделе
+            «AR-работы».
           </p>
         </div>
       )}

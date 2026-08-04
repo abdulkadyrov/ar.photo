@@ -1,9 +1,18 @@
 import type { MarkerMetadata, MediaKind, PreparedMedia, VideoMetadata } from "../../entities/media/model";
 import { detectCoverFormat } from "../catalog/coverFile";
-import { clientVideoHardLimitBytes, optimizeVideoFile, VideoOptimizationUnavailableError } from "./videoOptimization";
+import {
+  clientVideoHardLimitBytes,
+  inspectVideoSource,
+  optimizeVideoFile,
+  VideoOptimizationUnavailableError,
+} from "./videoOptimization";
 
-export const markerAccept = "image/jpeg,image/png,image/webp";
-export const mediaAccept = `${markerAccept},video/mp4`;
+// The picker intentionally has no extension/MIME filter. The selected bytes
+// are decoded and normalized before upload, so a missing or unusual suffix
+// must not prevent the user from choosing an otherwise valid file.
+export const markerAccept = "";
+export const videoAccept = "";
+export const mediaAccept = "";
 export const markerMaxBytes = 25 * 1024 * 1024;
 export const videoMaxBytes = 500 * 1024 * 1024;
 export const markerTargetBytes = 4 * 1024 * 1024;
@@ -40,7 +49,9 @@ export class MediaValidationError extends Error {
 }
 
 export function classifyMediaFile(file: File): MediaKind {
-  return file.type === "video/mp4" ? "video" : "marker";
+  if (file.type.toLowerCase().startsWith("video/")) return "video";
+  const extension = file.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  return extension && videoExtensions.has(extension) ? "video" : "marker";
 }
 
 export async function prepareMediaFile(
@@ -49,6 +60,24 @@ export async function prepareMediaFile(
   options: PrepareMediaOptions = {},
 ): Promise<PreparedMedia> {
   return kind === "marker" ? prepareMarker(file) : prepareVideo(file, options);
+}
+
+export async function prepareUnclassifiedMediaFile(
+  file: File,
+  options: PrepareMediaOptions = {},
+): Promise<PreparedMedia> {
+  const suggestedKind = classifyMediaFile(file);
+  try {
+    return await prepareMediaFile(file, suggestedKind, options);
+  } catch (firstError) {
+    const declaredKind = file.type.toLowerCase().split("/", 1)[0];
+    if (declaredKind === "image" || declaredKind === "video") throw firstError;
+    try {
+      return await prepareMediaFile(file, suggestedKind === "marker" ? "video" : "marker", options);
+    } catch {
+      throw firstError;
+    }
+  }
 }
 
 export async function sha256Hex(blob: Blob): Promise<string> {
@@ -68,12 +97,6 @@ export function inspectMp4CodecTokens(bytes: Uint8Array): Pick<VideoMetadata, "v
 async function prepareMarker(file: File): Promise<PreparedMedia> {
   assertFileSize(file, markerMaxBytes, "Изображение-маркер должно быть не больше 25 МБ");
   const format = detectCoverFormat(new Uint8Array(await file.slice(0, 12).arrayBuffer()));
-  if (!format) {
-    throw new MediaValidationError("unsupported_type", "Поддерживаются только корректные JPEG, PNG и WebP");
-  }
-  if (file.type !== format.mime) {
-    throw new MediaValidationError("spoofed_type", "Тип файла не совпадает с содержимым изображения");
-  }
 
   const decoded = await decodeImage(file);
   try {
@@ -105,39 +128,59 @@ async function prepareMarker(file: File): Promise<PreparedMedia> {
 
 async function prepareVideo(file: File, options: PrepareMediaOptions): Promise<PreparedMedia> {
   assertFileSize(file, videoMaxBytes, "Видео должно быть не больше 500 МБ");
-  if (file.type !== "video/mp4") {
-    throw new MediaValidationError("unsupported_type", "Поддерживается только MP4-видео с H.264");
-  }
   const head = new Uint8Array(await file.slice(0, Math.min(file.size, 2 * 1024 * 1024)).arrayBuffer());
-  if (!hasMp4Signature(head)) {
-    throw new MediaValidationError("spoofed_type", "Файл не является корректным MP4");
-  }
   const tail =
     file.size > head.byteLength
       ? new Uint8Array(await file.slice(Math.max(0, file.size - 2 * 1024 * 1024)).arrayBuffer())
       : new Uint8Array();
   const codec = inspectMp4CodecTokens(concatBytes(head, tail));
-  if (!codec) {
-    throw new MediaValidationError("unsupported_codec", "Видео должно использовать кодек H.264");
-  }
-  const sourceMetadata = await decodeVideoMetadata(file, codec);
+  const inspected = await inspectVideoSource(file).catch((error) => {
+    throw new MediaValidationError(
+      "unsupported_codec",
+      error instanceof Error ? error.message : "Формат видео не поддерживается этим браузером",
+    );
+  });
+  const sourceIsCompatible =
+    hasMp4Signature(head) &&
+    inspected.videoCodec === "avc" &&
+    (inspected.audioCodec === null || inspected.audioCodec === "aac") &&
+    Boolean(codec);
+  const normalizedSource = sourceIsCompatible
+    ? new File([file], `${file.name.replace(/\.[^.]+$/, "") || "video"}.mp4`, {
+        type: "video/mp4",
+        lastModified: file.lastModified,
+      })
+    : file;
+  const sourceMetadata: DecodedVideoMetadata = {
+    width: inspected.width,
+    height: inspected.height,
+    durationSeconds: inspected.durationSeconds,
+    videoCodec: "h264",
+    audioCodec: inspected.audioCodec === null ? "none" : "aac",
+  };
   let optimized;
   try {
-    optimized = await optimizeVideoFile(file, sourceMetadata, options.onProgress);
+    optimized = await optimizeVideoFile(normalizedSource, sourceMetadata, options.onProgress, !sourceIsCompatible);
   } catch (error) {
-    if (file.size <= clientVideoHardLimitBytes && error instanceof VideoOptimizationUnavailableError) {
-      optimized = { file, strategy: "source-kept" as const };
+    if (
+      sourceIsCompatible &&
+      normalizedSource.size <= clientVideoHardLimitBytes &&
+      error instanceof VideoOptimizationUnavailableError
+    ) {
+      optimized = { file: normalizedSource, strategy: "source-kept" as const };
     } else {
       throw new MediaValidationError(
         "optimization_unavailable",
         error instanceof Error
-          ? `${error.message}. Откройте AR Photo в актуальном Chrome, Edge или Safari и повторите.`
-          : "Не удалось уменьшить видео до лимита 50 МБ",
+          ? `${error.message}. Попробуйте актуальную версию Safari, Chrome или Edge.`
+          : "Не удалось преобразовать видео в совместимый формат",
       );
     }
   }
   const optimizedMetadata =
-    optimized.file === file ? sourceMetadata : await validateOptimizedVideo(optimized.file, sourceMetadata.audioCodec);
+    optimized.strategy === "source-kept"
+      ? sourceMetadata
+      : await validateOptimizedVideo(optimized.file, sourceMetadata.audioCodec);
   const savedBytes = Math.max(0, file.size - optimized.file.size);
   const metadata: VideoMetadata = {
     ...optimizedMetadata,
@@ -147,7 +190,7 @@ async function prepareVideo(file: File, options: PrepareMediaOptions): Promise<P
       uploadBytes: optimized.file.size,
       savedBytes,
       reductionPercent: reductionPercent(file.size, optimized.file.size),
-      optimized: savedBytes > 0,
+      optimized: optimized.strategy !== "source-kept",
     },
   };
   return { file: optimized.file, kind: "video", sha256: await sha256Hex(optimized.file), metadata };
@@ -199,12 +242,12 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   });
 }
 
-async function optimizeMarkerImage(decoded: DecodedImage, format: ImageFormat, originalFile: File) {
+async function optimizeMarkerImage(decoded: DecodedImage, format: ImageFormat | null, originalFile: File) {
   const dimensions = containedDimensions(decoded.width, decoded.height, markerMaxDimension);
   const canvas = document.createElement("canvas");
   canvas.width = dimensions.width;
   canvas.height = dimensions.height;
-  const outputMime = format.mime === "image/jpeg" ? "image/jpeg" : "image/webp";
+  const outputMime = format?.mime === "image/jpeg" ? "image/jpeg" : "image/webp";
   const context = canvas.getContext("2d", { alpha: outputMime !== "image/jpeg" });
   if (!context) throw new MediaValidationError("decode_failed", "Браузер не поддерживает обработку изображения");
   context.imageSmoothingEnabled = true;
@@ -233,6 +276,8 @@ async function optimizeMarkerImage(decoded: DecodedImage, format: ImageFormat, o
     ...dimensions,
   };
 }
+
+const videoExtensions = new Set(["mp4", "mov", "m4v", "mkv", "webm", "avi", "mts", "m2ts", "3gp", "3g2", "wmv", "flv"]);
 
 function decodeVideoMetadata(
   file: File,

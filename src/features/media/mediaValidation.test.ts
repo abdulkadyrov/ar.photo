@@ -8,8 +8,10 @@ import {
 } from "./mediaValidation";
 
 describe("media validation", () => {
-  it("classifies MP4 separately from marker images", () => {
+  it("classifies videos by MIME or extension without requiring MP4", () => {
     expect(classifyMediaFile(new File(["x"], "clip.mp4", { type: "video/mp4" }))).toBe("video");
+    expect(classifyMediaFile(new File(["x"], "clip.mov", { type: "video/quicktime" }))).toBe("video");
+    expect(classifyMediaFile(new File(["x"], "clip.mkv", { type: "" }))).toBe("video");
     expect(classifyMediaFile(new File(["x"], "photo.jpg", { type: "image/jpeg" }))).toBe("marker");
   });
 
@@ -20,17 +22,10 @@ describe("media validation", () => {
     expect(inspectMp4CodecTokens(new TextEncoder().encode("....hvc1....mp4a"))).toBeNull();
   });
 
-  it("rejects a spoofed MP4 before browser decoding", async () => {
+  it("rejects a file that cannot be parsed as video", async () => {
     const file = new File(["not-an-mp4"], "clip.mp4", { type: "video/mp4" });
     await expect(prepareMediaFile(file)).rejects.toMatchObject({
-      code: "spoofed_type",
-    });
-  });
-
-  it("rejects MIME spoofing for markers", async () => {
-    const file = new File([new Uint8Array([0xff, 0xd8, 0xff])], "marker.png", { type: "image/png" });
-    await expect(prepareMediaFile(file)).rejects.toMatchObject({
-      code: "spoofed_type",
+      code: "unsupported_codec",
     });
   });
 

@@ -6,11 +6,11 @@ AR Photo использует image tracking: заранее обработан�
 
 ## Поток данных
 
-1. Пользователь загружает JPEG/PNG/WebP-маркер и MP4 H.264.
-2. Браузер декодирует файлы, проверяет сигнатуру/кодек/размер и удаляет metadata изображения повторным кодированием.
+1. Пользователь загружает фотографию и видео в формате, декодируемом его браузером.
+2. Браузер определяет содержимое независимо от расширения, нормализует фотографию в JPEG/WebP, а видео — в MP4 H.264/AAC, и удаляет metadata изображения повторным кодированием.
 3. `begin_ar_item_processing` создаёт новую immutable processing revision и четыре job: `marker_analysis`, `video_inspection`, `marker_compilation`, `thumbnail_generation`.
 4. Worker claim-ит job с lease, получает source по подписанному URL на 120 секунд и работает во временной директории.
-5. MindAR OfflineCompiler создаёт `.mind`; FFmpeg/ffprobe проверяют видео; `cwebp` создаёт poster.
+5. MindAR OfflineCompiler создаёт `.mind`; FFmpeg/ffprobe проверяют нормализованное видео; `cwebp` создаёт poster.
 6. Generated-объекты сохраняются в `generated-private` по детерминированным versioned paths с SHA-256 и `upsert: false`.
 7. Публикация разрешена только когда все job текущей revision успешны и authoritative marker/video/tracking/poster связаны с item.
 8. Публичная Edge Function возвращает минимальный manifest с signed URLs на 300 секунд; viewer обновляет его за 45 секунд до истечения.

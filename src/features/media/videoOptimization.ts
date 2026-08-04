@@ -13,8 +13,13 @@ export type VideoOptimizationResult = {
   strategy: "source-kept" | "webcodecs-h264";
 };
 
+export type InspectedVideoSource = VideoOptimizationInput & {
+  videoCodec: string;
+  audioCodec: string | null;
+};
+
 export class VideoOptimizationUnavailableError extends Error {
-  constructor(message = "Браузер не поддерживает локальное сжатие этого MP4/H.264") {
+  constructor(message = "Браузер не поддерживает преобразование этого видео") {
     super(message);
     this.name = "VideoOptimizationUnavailableError";
   }
@@ -37,12 +42,61 @@ export function shouldOptimizeVideo(file: File, metadata: VideoOptimizationInput
   );
 }
 
+export async function inspectVideoSource(file: File): Promise<InspectedVideoSource> {
+  try {
+    const { ALL_FORMATS, BlobSource, Input } = await import("mediabunny");
+    const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(file) });
+    try {
+      if (!(await input.canRead())) throw new VideoOptimizationUnavailableError("Формат видео не распознан");
+      const videoTrack = await input.getPrimaryVideoTrack();
+      if (!videoTrack) throw new VideoOptimizationUnavailableError("В файле нет видеодорожки");
+      const audioTrack = await input.getPrimaryAudioTrack();
+      const [videoCodec, audioCodec, videoDecodable, audioDecodable, width, height, metadataDuration] =
+        await Promise.all([
+          videoTrack.getCodec(),
+          audioTrack?.getCodec() ?? Promise.resolve(null),
+          videoTrack.canDecode(),
+          audioTrack?.canDecode() ?? Promise.resolve(true),
+          videoTrack.getDisplayWidth(),
+          videoTrack.getDisplayHeight(),
+          input.getDurationFromMetadata(),
+        ]);
+      if (!videoCodec || !videoDecodable) {
+        throw new VideoOptimizationUnavailableError("Видеокодек не поддерживается этим браузером");
+      }
+      if (audioTrack && (!audioCodec || !audioDecodable)) {
+        throw new VideoOptimizationUnavailableError("Аудиокодек не поддерживается этим браузером");
+      }
+      const durationSeconds = metadataDuration ?? (await input.computeDuration());
+      if (
+        !Number.isFinite(durationSeconds) ||
+        durationSeconds <= 0 ||
+        !Number.isInteger(width) ||
+        !Number.isInteger(height) ||
+        width <= 0 ||
+        height <= 0
+      ) {
+        throw new VideoOptimizationUnavailableError("Не удалось прочитать параметры видео");
+      }
+      return { width, height, durationSeconds, videoCodec, audioCodec };
+    } finally {
+      input.dispose();
+    }
+  } catch (error) {
+    if (error instanceof VideoOptimizationUnavailableError) throw error;
+    throw new VideoOptimizationUnavailableError(
+      error instanceof Error ? `Не удалось открыть видео: ${error.message}` : "Не удалось открыть видео",
+    );
+  }
+}
+
 export async function optimizeVideoFile(
   file: File,
   metadata: VideoOptimizationInput,
   onProgress?: (progress: number) => void,
+  forceTranscode = false,
 ): Promise<VideoOptimizationResult> {
-  if (!shouldOptimizeVideo(file, metadata)) return { file, strategy: "source-kept" };
+  if (!forceTranscode && !shouldOptimizeVideo(file, metadata)) return { file, strategy: "source-kept" };
 
   try {
     const { ALL_FORMATS, BlobSource, BufferTarget, Conversion, Input, Mp4OutputFormat, Output } =
@@ -92,10 +146,11 @@ export async function optimizeVideoFile(
       type: "video/mp4",
       lastModified: Date.now(),
     });
-    if (optimized.size >= file.size || optimized.size > clientVideoHardLimitBytes) {
-      if (file.size <= clientVideoHardLimitBytes) return { file, strategy: "source-kept" };
+    if (optimized.size > clientVideoHardLimitBytes) {
+      if (!forceTranscode && file.size <= clientVideoHardLimitBytes) return { file, strategy: "source-kept" };
       throw new VideoOptimizationUnavailableError("Не удалось уменьшить видео до лимита 50 МБ");
     }
+    if (!forceTranscode && optimized.size >= file.size) return { file, strategy: "source-kept" };
     onProgress?.(1);
     return { file: optimized, strategy: "webcodecs-h264" };
   } catch (error) {

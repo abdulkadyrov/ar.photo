@@ -22,7 +22,7 @@ Generated path детерминирован относительно account/ite
 
 ## Upload lifecycle
 
-1. Browser проверяет размер, declared MIME, magic bytes, decode и H.264 token.
+1. Browser определяет фото/видео по содержимому, проверяет decode и нормализует результат в JPEG/WebP или MP4 H.264/AAC.
 2. Marker повторно кодируется через canvas, удаляя EXIF/GPS/comments; SHA-256 считается уже по нормализованному файлу.
 3. `begin_media_upload` под advisory lock перепроверяет account/project/group, permission, subscription, лимиты и idempotency key.
 4. Сервер создаёт `upload_sessions` с уникальными storage path и expiry.

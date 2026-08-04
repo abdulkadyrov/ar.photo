@@ -7,7 +7,7 @@
 - React 19, TypeScript, Vite 8 и React Router;
 - TanStack Query, React Hook Form и Zod;
 - Supabase Auth, PostgreSQL 17, forced RLS и private Storage;
-- адаптивная browser-оптимизация фото и MP4/H.264, восстановимая IndexedDB-очередь и resumable TUS uploads;
+- адаптивная browser-нормализация фото и видео разных форматов в JPEG/WebP и MP4/H.264, восстановимая IndexedDB-очередь и resumable TUS uploads;
 - Node 22 processing worker с MindAR OfflineCompiler, FFmpeg/ffprobe и WebP thumbnails;
 - Vitest, Testing Library, Playwright и pgTAP;
 - MindAR + Three.js как lazy-loaded WebAR provider;

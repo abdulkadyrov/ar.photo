@@ -23,7 +23,7 @@ import { Button, ErrorState, Input, Panel, Select, Skeleton, Toast } from "../..
 import { useAuth } from "../auth/authContext";
 import { getCatalogRepository } from "../catalog/catalogRepository";
 import { getMediaRepository } from "../media/mediaRepository";
-import { markerAccept, prepareMediaFile } from "../media/mediaValidation";
+import { markerAccept, prepareMediaFile, videoAccept } from "../media/mediaValidation";
 import { getArItemRepository } from "./arItemRepository";
 import { analyzeMarkerFile, type MarkerQualityResult } from "./markerQuality";
 
@@ -138,7 +138,7 @@ export function ArItemsRoute() {
           </span>
           <h2 className="mt-4 text-2xl font-semibold">Создайте первую AR-работу</h2>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted">
-            Нужны проект, группа, фотография-маркер и H.264-видео. Мастер проверит каждый шаг.
+            Нужны проект, группа, фотография-маркер и видео. Исходные форматы будут автоматически подготовлены.
           </p>
           <Link className="btn btn-primary mt-5" to="/items/new">
             <Plus size={17} /> Начать
@@ -381,7 +381,7 @@ function ArItemWizard() {
         setNotice({ title: "Подтвердите риск слабого маркера", tone: "error" });
       else setStep(5);
     } else if (step === 5) {
-      if (!videoAssetId) setNotice({ title: "Добавьте H.264-видео", tone: "error" });
+      if (!videoAssetId) setNotice({ title: "Добавьте видео", tone: "error" });
       else setStep(6);
     } else if (step === 6) await startProcessing();
     else if (step === 7 && currentItem?.status === "ready") setStep(8);
@@ -642,14 +642,20 @@ function MediaStep({
     <div>
       <div className="rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-5 text-center">
         <span className="metric-icon mx-auto">{marker ? <ImageIcon size={22} /> : <FileVideo2 size={22} />}</span>
-        <h3 className="mt-3 font-semibold">{marker ? "JPEG, PNG или WebP до 25 МБ" : "MP4 с H.264 до 500 МБ"}</h3>
-        <p className="mt-1 text-xs text-muted">Файл проходит сигнатурную проверку и приватную resumable-загрузку.</p>
+        <h3 className="mt-3 font-semibold">
+          {marker ? "Фото любого расширения до 25 МБ" : "Видео любого расширения до 500 МБ"}
+        </h3>
+        <p className="mt-1 text-xs text-muted">
+          {marker
+            ? "Фото будет безопасно декодировано и подготовлено как AR-маркер."
+            : "Видео автоматически преобразуется в формат, совместимый с телефонами."}
+        </p>
         <label className="btn btn-ghost mt-4 cursor-pointer">
           <Upload size={16} /> {uploadState?.kind === kind ? `Загрузка ${uploadState.progress}%` : "Выбрать файл"}
           <input
             className="hidden"
             type="file"
-            accept={marker ? markerAccept : "video/mp4"}
+            accept={marker ? markerAccept : videoAccept}
             disabled={Boolean(uploadState)}
             onChange={(event) => onUpload(event.currentTarget.files?.[0])}
           />
@@ -820,8 +826,8 @@ function ProcessingStep({
     <div>
       {item?.status === "processing" ? (
         <div className="mb-4 rounded-xl border border-primary/20 bg-primary/10 p-4 text-sm leading-6 text-muted">
-          Обработка выполняется автоматически и обычно занимает несколько минут. Эту страницу можно оставить
-          открытой — статусы обновятся сами.
+          Обработка выполняется автоматически и обычно занимает несколько минут. Эту страницу можно оставить открытой —
+          статусы обновятся сами.
         </div>
       ) : null}
       <div className="grid gap-3">

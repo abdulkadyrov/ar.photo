@@ -7,7 +7,7 @@ import { useAuth } from "../auth/authContext";
 import { getCatalogRepository } from "../catalog/catalogRepository";
 import { Button, ErrorState, FileDropzone, Panel, Select, Skeleton, Toast } from "../../shared/ui";
 import { getMediaRepository, MediaRepositoryError } from "./mediaRepository";
-import { classifyMediaFile, mediaAccept, prepareMediaFile } from "./mediaValidation";
+import { classifyMediaFile, mediaAccept, prepareUnclassifiedMediaFile } from "./mediaValidation";
 import {
   listPreparedUploads,
   persistPreparedUpload,
@@ -161,7 +161,7 @@ export function MediaUploadRoute() {
 
   const validateItem = async (item: QueueItem) => {
     try {
-      const prepared = await prepareMediaFile(item.sourceFile, classifyMediaFile(item.sourceFile), {
+      const prepared = await prepareUnclassifiedMediaFile(item.sourceFile, {
         onProgress: (progress) => patchQueue(item.id, { progress: Math.round(progress * 100) }),
       });
       const previewUrl = URL.createObjectURL(prepared.file);
@@ -342,7 +342,7 @@ export function MediaUploadRoute() {
             <FileDropzone
               accept={mediaAccept}
               disabled={uploadDisabled}
-              hint="Фото уменьшаются до 2560 px и очищаются от EXIF. Большие MP4/H.264 сжимаются локально до загрузки."
+              hint="Фото любого расширения нормализуются и очищаются от EXIF. Видео автоматически преобразуются в MP4/H.264."
               onPick={addFiles}
             />
           </div>
@@ -431,7 +431,7 @@ function UploadQueueCard({
   onRetry: () => void;
   onRemove: () => void;
 }) {
-  const isVideo = item.prepared?.kind === "video" || item.sourceFile.type === "video/mp4";
+  const isVideo = item.prepared?.kind === "video" || classifyMediaFile(item.sourceFile) === "video";
   return (
     <article className="rounded-2xl border border-line bg-white/[0.025] p-3">
       <div className="flex items-start gap-3">
@@ -536,7 +536,12 @@ function StatusIcon({ status }: { status: QueueStatus }) {
 function MetadataLine({ prepared }: { prepared: PreparedMedia }) {
   const dimensions = `${prepared.metadata.width}×${prepared.metadata.height}`;
   const optimization = prepared.metadata.optimization;
-  const savings = optimization.optimized ? ` · меньше на ${optimization.reductionPercent}%` : " · уже оптимально";
+  const savings =
+    optimization.savedBytes > 0
+      ? ` · меньше на ${optimization.reductionPercent}%`
+      : optimization.optimized
+        ? " · преобразовано"
+        : " · уже оптимально";
   const details =
     prepared.kind === "video"
       ? `${dimensions} · ${prepared.metadata.durationSeconds.toFixed(1)} сек · H.264/${prepared.metadata.audioCodec === "aac" ? "AAC" : "без аудио"}${savings}`

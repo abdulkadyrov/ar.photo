@@ -232,9 +232,12 @@ test("validates and uploads a marker through the resumable media queue", async (
   await h264Queue.getByRole("button", { name: "Загрузить" }).click();
   await expect(h264Queue.getByText("загружено", { exact: false })).toBeVisible();
 
-  await fileInput.setInputFiles("public/test-assets/test.mp4");
-  const hevcQueue = page.getByRole("article").filter({ hasText: "test.mp4" });
-  await expect(hevcQueue.getByText("Видео должно использовать кодек H.264", { exact: true })).toBeVisible();
+  await fileInput.setInputFiles("test-assets/fixtures/vp8-opus.webm");
+  const convertedQueue = page.getByRole("article").filter({ hasText: "vp8-opus.webm" });
+  await expect(convertedQueue.getByText("H.264/AAC", { exact: false })).toBeVisible();
+  await expect(convertedQueue.getByText("преобразовано", { exact: false })).toBeVisible();
+  await convertedQueue.getByRole("button", { name: "Загрузить" }).click();
+  await expect(convertedQueue.getByText("загружено", { exact: false })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

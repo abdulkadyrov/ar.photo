@@ -35,7 +35,7 @@
 - [ ] Group создан и связан с правильным project.
 - [ ] AR item wizard создаёт item.
 - [ ] JPEG/PNG/WebP marker загружен resumable flow; progress/cancel/retry работают.
-- [ ] MP4 H.264 загружен; unsupported codec/oversize получают понятный отказ.
+- [ ] MOV/HEVC или другой поддерживаемый исходник преобразован и загружен как MP4 H.264/AAC; недекодируемый файл получает понятный отказ.
 - [ ] Processing проходит analysis, inspection, compilation и poster ровно для текущей revision.
 - [ ] Test-before-publish использует правильные marker/video.
 - [ ] Publish создаёт стабильный public slug; QR не содержит UUID/PII/signed URL.
