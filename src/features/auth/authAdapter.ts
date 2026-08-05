@@ -2,9 +2,12 @@ import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "../../shared/api/supabase";
 import { getPublicRuntimeConfig } from "../../shared/config/env";
 
+type SupabaseBrowserClient = NonNullable<ReturnType<typeof getSupabaseBrowserClient>>;
+
 export type AuthUser = {
   id: string;
   email: string;
+  isAnonymous: boolean;
 };
 
 export type AuthSession = {
@@ -31,14 +34,26 @@ export interface AuthAdapter {
   onAuthStateChange(listener: (session: AuthSession | null) => void): () => void;
 }
 
-class SupabaseAuthAdapter implements AuthAdapter {
+export class SupabaseAuthAdapter implements AuthAdapter {
   readonly mode = "supabase" as const;
-  private readonly client = getSupabaseBrowserClient()!;
+
+  constructor(private readonly client: SupabaseBrowserClient = getSupabaseBrowserClient()!) {}
 
   async getSession() {
     const { data, error } = await this.client.auth.getSession();
     if (error) throw error;
-    return this.prepareSession(data.session);
+    if (data.session) return this.prepareSession(data.session);
+
+    const anonymous = await this.client.auth.signInAnonymously({
+      options: {
+        data: {
+          registration_source: "guest_test",
+          full_name: "Гость",
+        },
+      },
+    });
+    if (anonymous.error) throw anonymous.error;
+    return this.prepareSession(anonymous.data.session);
   }
 
   async signIn(email: string, password: string) {
@@ -97,7 +112,10 @@ class SupabaseAuthAdapter implements AuthAdapter {
 
   private async prepareSession(session: Session | null) {
     if (!session) return null;
-    if (session.user.user_metadata.registration_source === "self_service") {
+    if (session.user.is_anonymous) {
+      const { error } = await this.client.rpc("bootstrap_guest_account");
+      if (error) throw error;
+    } else if (session.user.user_metadata.registration_source === "self_service") {
       const { error } = await this.client.rpc("bootstrap_self_service_account");
       if (error) throw error;
     }
@@ -117,7 +135,9 @@ export class DemoAuthAdapter implements AuthAdapter {
 
     try {
       const session = JSON.parse(raw) as AuthSession;
-      return session.user?.id && session.user.email ? session : null;
+      return session.user?.id && session.user.email
+        ? { user: { ...session.user, isAnonymous: session.user.isAnonymous === true } }
+        : null;
     } catch {
       window.localStorage.removeItem(DEMO_SESSION_KEY);
       return null;
@@ -130,6 +150,7 @@ export class DemoAuthAdapter implements AuthAdapter {
       user: {
         id: `demo-${crypto.randomUUID()}`,
         email: email.trim().toLowerCase(),
+        isAnonymous: false,
       },
     };
     window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(session));
@@ -224,9 +245,14 @@ function configurationError() {
 }
 
 function mapSession(session: Session | null): AuthSession | null {
-  const email = session?.user.email;
-  if (!session || !email) return null;
-  return { user: { id: session.user.id, email } };
+  if (!session) return null;
+  return {
+    user: {
+      id: session.user.id,
+      email: session.user.email ?? "Гостевой режим",
+      isAnonymous: session.user.is_anonymous === true,
+    },
+  };
 }
 
 function ensureTrailingSlash(value: string) {

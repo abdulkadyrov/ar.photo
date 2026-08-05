@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ProtectedRoute } from "../../features/auth/AuthProvider";
 import { RouteErrorBoundary } from "../../shared/errors/RouteErrorBoundary";
 import { getPublicRuntimeConfig } from "../../shared/config/env";
@@ -7,6 +7,9 @@ import { getRouterBasename } from "./routerBase";
 
 const PrototypeHomeRoute = lazy(() =>
   import("../../features/prototype/PrototypeApp").then((module) => ({ default: module.PrototypeHomeRoute })),
+);
+const QuickStartRoute = lazy(() =>
+  import("../../features/quick-start/QuickStartPage").then((module) => ({ default: module.QuickStartRoute })),
 );
 const PrototypeDashboardRoute = lazy(() =>
   import("../../features/prototype/PrototypeApp").then((module) => ({ default: module.PrototypeDashboardRoute })),
@@ -98,15 +101,19 @@ function RoutedContent() {
   const location = useLocation();
   const runtime = getPublicRuntimeConfig();
   const configurationIndependent = location.pathname === "/privacy" || location.pathname === "/unsupported";
+  const quickStartEnabled = runtime.authMode === "supabase";
   if (runtime.authMode === "unconfigured" && !configurationIndependent) return <RuntimeConfigurationUnavailable />;
   return (
     <RouteErrorBoundary resetKey={location.key}>
       <Suspense fallback={<RouteLoading />}>
         <Routes>
-          <Route path="/" element={<PrototypeHomeRoute />} />
-          <Route path="/login" element={<LoginRoute />} />
-          <Route path="/register" element={<RegisterRoute />} />
-          <Route path="/reset-password" element={<ResetPasswordRoute />} />
+          <Route path="/" element={quickStartEnabled ? <QuickStartRoute /> : <PrototypeHomeRoute />} />
+          <Route path="/login" element={quickStartEnabled ? <Navigate replace to="/" /> : <LoginRoute />} />
+          <Route path="/register" element={quickStartEnabled ? <Navigate replace to="/" /> : <RegisterRoute />} />
+          <Route
+            path="/reset-password"
+            element={quickStartEnabled ? <Navigate replace to="/" /> : <ResetPasswordRoute />}
+          />
           <Route path="/update-password" element={<Protected element={<UpdatePasswordRoute />} />} />
           <Route path="/dashboard" element={<Protected element={<PrototypeDashboardRoute />} />} />
           <Route path="/projects" element={<Protected element={<ProjectsRoute />} />} />

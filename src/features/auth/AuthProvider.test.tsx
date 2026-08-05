@@ -62,7 +62,9 @@ describe("auth session states", () => {
   });
 
   it("removes protected content when a session expires", async () => {
-    const adapter = new FakeAuthAdapter({ user: { id: "user-1", email: "user@example.com" } });
+    const adapter = new FakeAuthAdapter({
+      user: { id: "user-1", email: "user@example.com", isAnonymous: false },
+    });
     renderProtected(adapter);
 
     expect(await screen.findByText("Private dashboard")).toBeVisible();

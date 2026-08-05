@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DemoAuthAdapter, UnconfiguredAuthAdapter } from "./authAdapter";
+import type { Session } from "@supabase/supabase-js";
+import type { getSupabaseBrowserClient } from "../../shared/api/supabase";
+import { DemoAuthAdapter, SupabaseAuthAdapter, UnconfiguredAuthAdapter } from "./authAdapter";
+
+type SupabaseBrowserClient = NonNullable<ReturnType<typeof getSupabaseBrowserClient>>;
 
 describe("demo auth adapter", () => {
   beforeEach(() => {
@@ -64,5 +68,34 @@ describe("unconfigured auth adapter", () => {
         password: "correct horse battery staple",
       }),
     ).rejects.toThrow(/not configured/i);
+  });
+});
+
+describe("supabase guest auth adapter", () => {
+  it("creates and bootstraps an isolated anonymous session when no login exists", async () => {
+    const session = {
+      user: {
+        id: "00000000-0000-4000-8000-000000000040",
+        email: undefined,
+        is_anonymous: true,
+        user_metadata: { registration_source: "guest_test" },
+      },
+    } as unknown as Session;
+    const getSession = vi.fn().mockResolvedValue({ data: { session: null }, error: null });
+    const signInAnonymously = vi.fn().mockResolvedValue({ data: { session }, error: null });
+    const rpc = vi.fn().mockResolvedValue({ data: {}, error: null });
+    const adapter = new SupabaseAuthAdapter({ auth: { getSession, signInAnonymously }, rpc } as unknown as SupabaseBrowserClient);
+
+    await expect(adapter.getSession()).resolves.toEqual({
+      user: {
+        id: session.user.id,
+        email: "Гостевой режим",
+        isAnonymous: true,
+      },
+    });
+    expect(signInAnonymously).toHaveBeenCalledWith({
+      options: { data: { registration_source: "guest_test", full_name: "Гость" } },
+    });
+    expect(rpc).toHaveBeenCalledWith("bootstrap_guest_account");
   });
 });

@@ -1114,6 +1114,33 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      bootstrap_guest_account: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          closed_at: string | null;
+          created_at: string;
+          id: string;
+          logo_path: string | null;
+          name: string;
+          owner_user_id: string;
+          settings: Json;
+          slug: string;
+          status: Database["public"]["Enums"]["account_status"];
+          storage_used_bytes: number;
+          timezone: string;
+          updated_at: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "accounts";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      bootstrap_quick_start_workspace: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
       admin_authorize_password_reset: {
         Args: {
           p_reason: string;
