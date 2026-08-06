@@ -62,7 +62,7 @@ set search_path = ''
 as $$
 declare
   target_member public.account_members;
-  target_profile public.profiles;
+  target_profile_role public.profile_role;
   target_account public.accounts;
 begin
   perform private.require_admin_mfa();
@@ -73,20 +73,25 @@ begin
     raise exception 'Superadmin cannot delete own identity' using errcode = '22023';
   end if;
 
-  select member, profile into target_member, target_profile
+  select member.* into target_member
   from public.account_members member
-  join public.profiles profile on profile.id = member.user_id
   where member.account_id = p_target_account_id
     and member.user_id = p_target_user_id
-  for update of member, profile;
+  for update;
   if not found then raise exception 'Account user not found' using errcode = '23503'; end if;
+
+  select profile.role into target_profile_role
+  from public.profiles profile
+  where profile.id = p_target_user_id
+  for update;
+  if not found then raise exception 'User profile not found' using errcode = '23503'; end if;
 
   select account.* into target_account
   from public.accounts account
   where account.id = p_target_account_id
   for update;
   if not found then raise exception 'Account not found' using errcode = '23503'; end if;
-  if target_profile.role = 'superadmin' then
+  if target_profile_role = 'superadmin' then
     raise exception 'Superadmin identity cannot be deleted' using errcode = '22023';
   end if;
   if target_account.owner_user_id = p_target_user_id then
