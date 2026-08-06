@@ -22,7 +22,6 @@ import { QRCodeSVG } from "qrcode.react";
 import type { ArItem, QrCode as QrCodeRecord } from "../../entities/ar-item/model";
 import { Button, Input } from "../../shared/ui";
 import { getArItemRepository } from "../ar-items/arItemRepository";
-import { analyzeMarkerFile } from "../ar-items/markerQuality";
 import { useAuth } from "../auth/authContext";
 import { getMediaRepository } from "../media/mediaRepository";
 import { markerAccept, prepareMediaFile, videoAccept } from "../media/mediaValidation";
@@ -145,10 +144,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
     const controller = new AbortController();
     uploadController.current = controller;
     try {
-      const [preparedMarker, markerQuality] = await Promise.all([
-        prepareMediaFile(markerFile, "marker"),
-        analyzeMarkerFile(markerFile),
-      ]);
+      const preparedMarker = await prepareMediaFile(markerFile, "marker");
       const preparedVideo = await prepareMediaFile(videoFile, "video", {
         onProgress: (progress) => setStageProgress(Math.round(progress * 0.35)),
       });
@@ -199,12 +195,21 @@ function QuickCreatePage({ userId }: { userId: string }) {
       setItemId(item.id);
       setStage("processing");
       setStageProgress(0);
-      if (!markerQuality.suitable) {
+      try {
         await arItemRepository.overrideMarkerQuality(
           workspace.accountId,
           item.id,
-          "Быстрое создание: пользователь подтвердил продолжение обработки фотографии",
+          "Быстрое создание: пользователь запустил автоматическую обработку и подтвердил продолжение с выбранной фотографией",
         );
+      } catch (overrideError) {
+        // Analysis can finish between prepare() and this RPC. A strong marker
+        // no longer needs an override; a successfully persisted override also
+        // makes a lost RPC response safe to continue.
+        const latestItem = await arItemRepository.getItem(workspace.accountId, item.id);
+        const overrideSatisfied =
+          Boolean(latestItem.marker_quality_overridden_at) ||
+          (latestItem.marker_quality_score !== null && latestItem.marker_quality_score >= 60);
+        if (!overrideSatisfied) throw overrideError;
       }
     } catch (submitError) {
       showError(submitError);

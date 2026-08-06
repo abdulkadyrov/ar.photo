@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  adaptivePoseAlpha,
   boundedCameraConstraints,
   configureSrgbVideoOutput,
   coverTextureTransform,
@@ -115,21 +114,13 @@ describe("public AR alignment contract", () => {
     });
   });
 
-  it("uses a bounded smoothing and visibility hysteresis profile", () => {
+  it("uses the proven stable smoothing and visibility hysteresis profile", () => {
     expect(publicArTrackingConfig).toEqual({
       filterMinCF: 0.001,
-      filterBeta: 350,
-      warmupTolerance: 3,
-      missTolerance: 6,
+      filterBeta: 20,
+      warmupTolerance: 7,
+      missTolerance: 10,
     });
-    expect(publicArTrackingConfig.filterBeta).toBeLessThan(1_000);
-  });
-
-  it("damps tiny pose noise but catches up immediately after a large camera move", () => {
-    expect(adaptivePoseAlpha(0)).toBe(0.1);
-    expect(adaptivePoseAlpha(0.01)).toBeGreaterThan(0.1);
-    expect(adaptivePoseAlpha(0.01)).toBeLessThan(0.5);
-    expect(adaptivePoseAlpha(0.12)).toBe(1);
   });
 
   it("keeps the camera video visible below transparent AR renderers", () => {

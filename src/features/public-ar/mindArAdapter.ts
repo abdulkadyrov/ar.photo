@@ -7,9 +7,9 @@ export type PublicArTrackingState = "searching" | "tracking";
 
 export const publicArTrackingConfig = Object.freeze({
   filterMinCF: 0.001,
-  filterBeta: 350,
-  warmupTolerance: 3,
-  missTolerance: 6,
+  filterBeta: 20,
+  warmupTolerance: 7,
+  missTolerance: 10,
 });
 
 export const publicArCameraConstraints = Object.freeze({
@@ -121,15 +121,6 @@ export type PublicArSession = {
   stop(): void;
 };
 
-export function adaptivePoseAlpha(relativeMotion: number) {
-  if (!Number.isFinite(relativeMotion) || relativeMotion < 0) return 1;
-  if (relativeMotion <= 0.0015) return 0.1;
-  if (relativeMotion >= 0.12) return 1;
-  const normalized = (relativeMotion - 0.0015) / (0.12 - 0.0015);
-  const eased = normalized * normalized * (3 - 2 * normalized);
-  return 0.1 + eased * 0.78;
-}
-
 export function isIosWebKit(userAgent = navigator.userAgent, maxTouchPoints = navigator.maxTouchPoints) {
   return /iphone|ipad|ipod/i.test(userAgent) || (/macintosh/i.test(userAgent) && maxTouchPoints > 1);
 }
@@ -201,12 +192,10 @@ export async function startPublicMindAr(options: {
   plane.frustumCulled = false;
   plane.renderOrder = 1;
   const anchor = mindar.addAnchor(0);
-  const stabilizedGroup = new Three.Group();
-  stabilizedGroup.matrixAutoUpdate = false;
-  stabilizedGroup.visible = false;
-  stabilizedGroup.add(plane);
-  scene.add(stabilizedGroup);
-  const poseStabilizer = createAdaptivePoseStabilizer(Three, stabilizedGroup.matrix);
+  // Keep the video attached to MindAR's own anchor. The anchor matrix is
+  // updated every render frame; copying it from onTargetUpdate made the plane
+  // lag behind during side-to-side movement and close camera approaches.
+  anchor.group.add(plane);
 
   const fitVideoToMarker = () => {
     if (!video.videoWidth || !video.videoHeight) return;
@@ -237,14 +226,13 @@ export async function startPublicMindAr(options: {
   video.addEventListener("error", playbackError);
   anchor.onTargetFound = () => {
     targetVisible = true;
-    poseStabilizer.reset(anchor.group.matrix);
-    stabilizedGroup.visible = true;
+    anchor.group.visible = true;
     onTrackingState("tracking");
     if (manifest.behavior.autoplay) video.play().catch(() => undefined);
   };
   anchor.onTargetLost = () => {
     targetVisible = false;
-    stabilizedGroup.visible = false;
+    anchor.group.visible = false;
     onTrackingState("searching");
     if (manifest.behavior.markerLost === "pause_hide") video.pause();
     if (manifest.behavior.markerLost === "stop_reset") {
@@ -252,11 +240,6 @@ export async function startPublicMindAr(options: {
       video.currentTime = 0;
     }
   };
-  anchor.onTargetUpdate = () => {
-    if (!targetVisible) return;
-    poseStabilizer.update(anchor.group.matrix);
-  };
-
   const visibility = () => {
     if (document.hidden) {
       video.pause();
@@ -298,7 +281,6 @@ export async function startPublicMindAr(options: {
     texture.dispose();
     geometry.dispose();
     material.dispose();
-    scene.remove(stabilizedGroup);
     URL.revokeObjectURL(trackingAssetUrl);
     container.replaceChildren();
     throw error;
@@ -346,7 +328,6 @@ export async function startPublicMindAr(options: {
       texture.dispose();
       geometry.dispose();
       material.dispose();
-      scene.remove(stabilizedGroup);
       URL.revokeObjectURL(trackingAssetUrl);
       container.replaceChildren();
     },
@@ -393,47 +374,6 @@ function configurePlaybackVideo(video: HTMLVideoElement, manifest: PublicArManif
     video.src = manifest.assets.videoUrl;
     video.load();
   }
-}
-
-function createAdaptivePoseStabilizer(Three: typeof ThreeModule, output: ThreeModule.Matrix4) {
-  const position = new Three.Vector3();
-  const rotation = new Three.Quaternion();
-  const scale = new Three.Vector3();
-  const targetPosition = new Three.Vector3();
-  const targetRotation = new Three.Quaternion();
-  const targetScale = new Three.Vector3();
-  let initialized = false;
-
-  const reset = (target: ThreeModule.Matrix4) => {
-    target.decompose(position, rotation, scale);
-    output.compose(position, rotation, scale);
-    initialized = true;
-  };
-
-  return {
-    reset,
-    update(target: ThreeModule.Matrix4) {
-      if (!initialized) {
-        reset(target);
-        return;
-      }
-      target.decompose(targetPosition, targetRotation, targetScale);
-      const referenceScale = Math.max(1, (Math.abs(scale.x) + Math.abs(scale.y) + Math.abs(scale.z)) / 3);
-      const translationMotion = position.distanceTo(targetPosition) / referenceScale;
-      const rotationMotion = rotation.angleTo(targetRotation) / (Math.PI / 3);
-      const scaleMotion =
-        Math.max(
-          Math.abs(targetScale.x - scale.x),
-          Math.abs(targetScale.y - scale.y),
-          Math.abs(targetScale.z - scale.z),
-        ) / referenceScale;
-      const alpha = adaptivePoseAlpha(Math.max(translationMotion, rotationMotion, scaleMotion));
-      position.lerp(targetPosition, alpha);
-      rotation.slerp(targetRotation, alpha);
-      scale.lerp(targetScale, alpha);
-      output.compose(position, rotation, scale);
-    },
-  };
 }
 
 function stopMindAr(mindar: {

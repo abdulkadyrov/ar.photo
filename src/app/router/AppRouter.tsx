@@ -45,9 +45,6 @@ const QrPublicationRoute = lazy(() =>
 const PrototypeViewerRoute = lazy(() =>
   import("../../features/prototype/PrototypeApp").then((module) => ({ default: module.PrototypeViewerRoute })),
 );
-const PrototypeTestViewerRoute = lazy(() =>
-  import("../../features/prototype/PrototypeApp").then((module) => ({ default: module.PrototypeTestViewerRoute })),
-);
 const PublicArViewerRoute = lazy(() =>
   import("../../features/public-ar/PublicArViewerPage").then((module) => ({ default: module.PublicArViewerRoute })),
 );
@@ -138,7 +135,7 @@ function RoutedContent() {
           <Route path="/settings/team" element={<Protected element={<TeamRoute />} />} />
           <Route path="/settings/security" element={<Protected element={<SecurityRoute />} />} />
           <Route path="/project/:projectId" element={<Protected element={<PrototypeProjectRoute />} />} />
-          <Route path="/viewer/test" element={<Protected element={<PrototypeTestViewerRoute />} />} />
+          <Route path="/viewer/test" element={<Navigate replace to="/camera" />} />
           <Route path="/viewer/:livePhotoId" element={<PrototypeViewerRoute />} />
           <Route path="/ar/:publicSlug" element={<PublicArViewerRoute />} />
           <Route path="/privacy" element={<PublicArPrivacyRoute />} />

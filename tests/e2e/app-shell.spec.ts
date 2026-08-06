@@ -115,14 +115,14 @@ test("registers with email and password through the explicit signup route", asyn
   await expect(page.getByRole("heading", { name: "Главная", exact: true })).toBeVisible();
 });
 
-test("keeps the protected MindAR regression route available without a camera grant", async ({ page }) => {
+test("redirects the legacy test viewer to the production QR camera", async ({ page }) => {
   await page.goto("./viewer/test");
   await expect(page).toHaveURL(/\/ar\.photo\/login$/);
   await signInToDemo(page);
   await page.goto("./viewer/test");
 
-  await expect(page.getByText("Test Viewer", { exact: true })).toBeVisible();
-  await expect(page.getByAltText("test target")).toBeVisible();
+  await expect(page).toHaveURL(/\/ar\.photo\/camera$/);
+  await expect(page.getByRole("heading", { name: "Сканируйте QR-код" })).toBeVisible();
 });
 
 test("keeps the public AR viewer camera-explicit with a no-camera fallback", async ({ page }) => {
