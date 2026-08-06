@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadPublicManifest, manifestRefreshDelay, PublicManifestError } from "./publicManifest";
+import { initialArMuted, loadPublicManifest, manifestRefreshDelay, PublicManifestError } from "./publicManifest";
 
 describe("public AR manifest client", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -12,6 +12,17 @@ describe("public AR manifest client", () => {
     expect(manifest.marker).toEqual({ width: 2742, height: 1542, aspectRatio: 2742 / 1542 });
     expect(manifest.assets.trackingAssetUrl).toContain("test.mind");
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("starts with sound after the user launches an audio-enabled item", async () => {
+    const manifest = await loadPublicManifest("demo");
+    expect(initialArMuted(manifest)).toBe(true);
+    expect(
+      initialArMuted({
+        ...manifest,
+        behavior: { ...manifest.behavior, audioDefault: "user_enabled" },
+      }),
+    ).toBe(false);
   });
 
   it("does not invent public content for an unknown demo slug", async () => {

@@ -63,11 +63,14 @@ declare module "mind-ar/src/image-target/compiler.js" {
 declare module "three" {
   export class VideoTexture {
     constructor(video: HTMLVideoElement);
+    colorSpace: string;
     repeat: { set: (x: number, y: number) => void };
     offset: { set: (x: number, y: number) => void };
     needsUpdate: boolean;
     dispose(): void;
   }
+
+  export const SRGBColorSpace: string;
 
   export class PlaneGeometry {
     constructor(width: number, height: number);

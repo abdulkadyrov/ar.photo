@@ -226,7 +226,7 @@ function ArItemWizard() {
       autoplay: item.autoplay,
       loopVideo: item.loop_video,
       markerLostBehavior: item.marker_lost_behavior,
-      audioDefault: item.audio_default as "muted" | "sound_on",
+      audioDefault: item.audio_default as "muted" | "user_enabled",
       fallbackEnabled: item.fallback_enabled,
     });
     if (["processing", "ready", "published", "failed"].includes(item.status)) setStep(4);
@@ -716,10 +716,10 @@ function SettingsStep({ settings, onChange }: { settings: ArItemSettings; onChan
       <Select
         label="Звук по умолчанию"
         value={settings.audioDefault}
-        onChange={(event) => onChange({ ...settings, audioDefault: event.target.value as "muted" | "sound_on" })}
+        onChange={(event) => onChange({ ...settings, audioDefault: event.target.value as "muted" | "user_enabled" })}
         options={[
           { value: "muted", label: "Выключен — совместимо с autoplay" },
-          { value: "sound_on", label: "Включён после действия пользователя" },
+          { value: "user_enabled", label: "Включён после действия пользователя" },
         ]}
       />
       <div className="rounded-xl border border-line bg-white/[0.025] p-4 text-sm leading-6 text-muted">

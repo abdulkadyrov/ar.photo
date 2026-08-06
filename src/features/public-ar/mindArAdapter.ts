@@ -6,9 +6,9 @@ export type PublicArTrackingState = "searching" | "tracking";
 
 export const publicArTrackingConfig = Object.freeze({
   filterMinCF: 0.001,
-  filterBeta: 100,
-  warmupTolerance: 5,
-  missTolerance: 5,
+  filterBeta: 20,
+  warmupTolerance: 7,
+  missTolerance: 10,
 });
 
 export const publicArCameraConstraints = Object.freeze({
@@ -96,12 +96,6 @@ export async function startPublicMindAr(options: {
   onTrackingState(state: PublicArTrackingState): void;
   onPlaybackEvent(event: PublicArAnalyticsEvent, valueSeconds?: number | null, errorCode?: string | null): void;
 }): Promise<PublicArSession> {
-  const [{ MindARThree }, THREE, trackingAsset] = await Promise.all([
-    import("mind-ar/dist/mindar-image-three.prod.js"),
-    import("three"),
-    fetchTrackingAsset(options.manifest.assets.trackingAssetUrl),
-  ]);
-  const Three = THREE as typeof ThreeModule;
   const { container, manifest, onTrackingState, onPlaybackEvent } = options;
   const video = document.createElement("video");
   video.loop = manifest.behavior.loop;
@@ -110,13 +104,31 @@ export async function startPublicMindAr(options: {
   if (options.muted) video.setAttribute("muted", "");
   video.autoplay = false;
   video.playsInline = true;
-  video.preload = "metadata";
+  video.preload = "auto";
   video.crossOrigin = "anonymous";
   video.disablePictureInPicture = true;
   video.setAttribute("webkit-playsinline", "");
-  // Safari evaluates autoplay eligibility as soon as the media source is set.
+  // Entered directly from the «Начать AR» click. Starting the same element
+  // before the first await preserves Safari's audio permission; pause it as
+  // soon as playback becomes available so the video still begins on marker.
   video.src = manifest.assets.videoUrl;
   video.load();
+  if (!options.muted) {
+    void video
+      .play()
+      .then(() => {
+        video.pause();
+        video.currentTime = 0;
+      })
+      .catch(() => undefined);
+  }
+
+  const [{ MindARThree }, THREE, trackingAsset] = await Promise.all([
+    import("mind-ar/dist/mindar-image-three.prod.js"),
+    import("three"),
+    fetchTrackingAsset(options.manifest.assets.trackingAssetUrl),
+  ]);
+  const Three = THREE as typeof ThreeModule;
 
   const trackingAssetUrl = URL.createObjectURL(trackingAsset);
 
@@ -133,6 +145,7 @@ export async function startPublicMindAr(options: {
   renderer.setPixelRatio?.(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setClearColor(0x000000, 0);
   const texture = new Three.VideoTexture(video);
+  texture.colorSpace = Three.SRGBColorSpace;
   let activeMarker: MarkerDimensions = manifest.marker;
   let markerGeometry = markerPlaneGeometry(activeMarker);
   // The unit plane is scaled after the .mind dataset loads. This lets the

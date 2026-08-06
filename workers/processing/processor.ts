@@ -22,6 +22,7 @@ import {
   type ProcessingInput,
   type ProcessingJob,
 } from "./jobContract.js";
+import { buildVideoFilter, parseVideoColorMetadata } from "./videoTranscode.js";
 
 type WorkerClient = SupabaseClient<Database>;
 
@@ -34,6 +35,14 @@ const command = (executable: string, args: string[], timeout: number) =>
   });
 
 const sha256 = (value: Uint8Array) => createHash("sha256").update(value).digest("hex");
+let zscaleSupport: Promise<boolean> | undefined;
+
+function supportsZscale() {
+  zscaleSupport ??= command("ffmpeg", ["-hide_banner", "-filters"], 30_000)
+    .then((output) => /\bzscale\b/.test(output))
+    .catch(() => false);
+  return zscaleSupport;
+}
 
 async function reportProgress(client: WorkerClient, job: ProcessingJob, workerId: string, progress: number) {
   const { error } = await client.rpc("report_processing_progress", {
@@ -172,6 +181,22 @@ async function generateThumbnail(sourcePath: string, outputPath: string) {
 
 async function transcodeVideo(sourcePath: string, outputPath: string) {
   try {
+    const colorProbe = await command(
+      "ffprobe",
+      [
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=color_range,color_space,color_transfer,color_primaries",
+        "-of",
+        "json",
+        sourcePath,
+      ],
+      2 * 60 * 1000,
+    );
+    const videoFilter = buildVideoFilter(parseVideoColorMetadata(colorProbe), await supportsZscale());
     await command(
       "ffmpeg",
       [
@@ -185,15 +210,23 @@ async function transcodeVideo(sourcePath: string, outputPath: string) {
         "-map",
         "0:a:0?",
         "-vf",
-        "scale='if(gt(iw,ih),min(1920,iw),-2)':'if(gt(iw,ih),-2,min(1920,ih))'",
+        videoFilter,
         "-c:v",
         "libx264",
         "-preset",
         "medium",
         "-crf",
-        "22",
+        "18",
         "-pix_fmt",
         "yuv420p",
+        "-color_range",
+        "tv",
+        "-colorspace",
+        "bt709",
+        "-color_trc",
+        "bt709",
+        "-color_primaries",
+        "bt709",
         "-c:a",
         "aac",
         "-b:a",

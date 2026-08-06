@@ -20,7 +20,7 @@ export type ArItemSettings = {
   autoplay: boolean;
   loopVideo: boolean;
   markerLostBehavior: MarkerLostBehavior;
-  audioDefault: "muted" | "sound_on";
+  audioDefault: "muted" | "user_enabled";
   fallbackEnabled: boolean;
 };
 

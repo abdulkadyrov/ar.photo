@@ -171,7 +171,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
         autoplay: true,
         loopVideo: true,
         markerLostBehavior: "pause_hide",
-        audioDefault: "muted",
+        audioDefault: "user_enabled",
         fallbackEnabled: true,
       });
       setItemId(item.id);

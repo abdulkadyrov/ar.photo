@@ -46,6 +46,10 @@ export class PublicManifestError extends Error {
   }
 }
 
+export function initialArMuted(manifest: PublicArManifest) {
+  return manifest.behavior.audioDefault !== "user_enabled";
+}
+
 export async function loadPublicManifest(publicSlug: string, signal?: AbortSignal): Promise<PublicArManifest> {
   const config = getPublicRuntimeConfig();
   if (!config.supabaseUrl || !config.supabasePublishableKey) {

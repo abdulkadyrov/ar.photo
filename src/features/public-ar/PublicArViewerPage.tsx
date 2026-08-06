@@ -3,13 +3,14 @@ import { AlertTriangle, Camera, Expand, Play, RotateCcw, ScanLine, ShieldCheck, 
 import { Link, useParams } from "react-router-dom";
 import { Button } from "../../shared/ui";
 import {
+  initialArMuted,
   isManifestFresh,
   loadPublicManifest,
   manifestRefreshDelay,
   PublicManifestError,
   type PublicArManifest,
 } from "./publicManifest";
-import type { PublicArSession, PublicArTrackingState } from "./mindArAdapter";
+import { startPublicMindAr, type PublicArSession, type PublicArTrackingState } from "./mindArAdapter";
 import { capabilityMessage, classifyViewerError, detectViewerCapabilities } from "./viewerCapabilities";
 import { createPublicArTelemetry, videoMilestones, viewerErrorCode } from "./telemetry";
 
@@ -42,7 +43,8 @@ export function PublicArViewerRoute() {
       setManifest(null);
       setMode("loading");
       refreshManifest(controller.signal)
-        .then(() => {
+        .then((next) => {
+          setMuted(initialArMuted(next));
           telemetry.track("page_open");
           setMode("intro");
         })
@@ -87,7 +89,6 @@ export function PublicArViewerRoute() {
     sessionRef.current = null;
     try {
       const current = isManifestFresh(manifest) ? manifest : await refreshManifest();
-      const { startPublicMindAr } = await import("./mindArAdapter");
       sessionRef.current = await startPublicMindAr({
         container: containerRef.current,
         manifest: current,
@@ -302,7 +303,7 @@ export function PublicArUnsupportedRoute() {
 function ViewerControl({ label, icon, onClick }: { label: string; icon: React.ReactNode; onClick: () => void }) {
   return (
     <button
-      className="grid min-h-14 place-items-center gap-1 rounded-2xl bg-white/92 px-2 py-2 text-xs font-semibold text-slate-950"
+      className="grid min-h-14 place-items-center gap-1 rounded-2xl border border-white/20 bg-white px-2 py-2 text-xs font-semibold text-slate-950 shadow-lg"
       onClick={onClick}
     >
       {icon}

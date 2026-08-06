@@ -76,11 +76,11 @@ describe("public AR alignment contract", () => {
   it("uses a bounded smoothing and visibility hysteresis profile", () => {
     expect(publicArTrackingConfig).toEqual({
       filterMinCF: 0.001,
-      filterBeta: 100,
-      warmupTolerance: 5,
-      missTolerance: 5,
+      filterBeta: 20,
+      warmupTolerance: 7,
+      missTolerance: 10,
     });
-    expect(publicArTrackingConfig.filterBeta).toBeLessThan(1000);
+    expect(publicArTrackingConfig.filterBeta).toBeLessThan(100);
   });
 
   it("keeps the camera video visible below transparent AR renderers", () => {
