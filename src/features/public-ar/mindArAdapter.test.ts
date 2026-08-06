@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   boundedCameraConstraints,
+  configureSrgbVideoOutput,
   coverTextureTransform,
+  installMindArColorCompatibility,
   isIosWebKit,
   keepCameraVisible,
   markerPlaneGeometry,
@@ -11,6 +13,45 @@ import {
 } from "./mindArAdapter";
 
 describe("public AR alignment contract", () => {
+  it("bridges MindAR's legacy renderer encoding to the current Three.js color space", () => {
+    class Renderer {
+      outputColorSpace = "linear-srgb";
+
+      get outputEncoding() {
+        return 3000;
+      }
+
+      set outputEncoding(_encoding: number) {
+        this.outputColorSpace = "legacy-write";
+      }
+    }
+    const Three = {
+      WebGLRenderer: Renderer,
+      sRGBEncoding: 3001,
+      LinearEncoding: 3000,
+      SRGBColorSpace: "srgb",
+      LinearSRGBColorSpace: "linear-srgb",
+    };
+
+    expect(installMindArColorCompatibility(Three)).toBe(true);
+    expect(installMindArColorCompatibility(Three)).toBe(false);
+    const renderer = new Renderer();
+    renderer.outputEncoding = Three.sRGBEncoding;
+
+    expect(renderer.outputColorSpace).toBe(Three.SRGBColorSpace);
+    expect(renderer.outputEncoding).toBe(Three.sRGBEncoding);
+  });
+
+  it("keeps decoded video input and WebGL output in the same sRGB space", () => {
+    const renderer = { outputColorSpace: "" };
+    const texture = { colorSpace: "" };
+
+    configureSrgbVideoOutput(renderer, texture, "srgb");
+
+    expect(renderer.outputColorSpace).toBe("srgb");
+    expect(texture.colorSpace).toBe("srgb");
+  });
+
   it("bounds camera capture work on mobile devices", () => {
     expect(boundedCameraConstraints({ audio: false, video: { facingMode: "environment" } })).toEqual({
       audio: false,

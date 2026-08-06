@@ -28,6 +28,7 @@ declare module "mind-ar/dist/mindar-image-three.prod.js" {
     video?: HTMLVideoElement;
     renderer: {
       domElement?: HTMLCanvasElement;
+      outputColorSpace: string;
       setAnimationLoop: (callback: (() => void) | null) => void;
       render: (scene: unknown, camera: unknown) => void;
       setClearColor: (color: number, alpha?: number) => void;
@@ -61,6 +62,12 @@ declare module "mind-ar/src/image-target/compiler.js" {
 }
 
 declare module "three" {
+  export class WebGLRenderer {
+    outputColorSpace: string;
+  }
+
+  export const sRGBEncoding: number;
+  export const LinearEncoding: number;
   export class VideoTexture {
     constructor(video: HTMLVideoElement);
     colorSpace: string;
@@ -71,6 +78,7 @@ declare module "three" {
   }
 
   export const SRGBColorSpace: string;
+  export const LinearSRGBColorSpace: string;
 
   export class PlaneGeometry {
     constructor(width: number, height: number);

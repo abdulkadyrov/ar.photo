@@ -21,6 +21,48 @@ export const PUBLIC_AR_START_TIMEOUT_MS = 45_000;
 
 export type MarkerDimensions = { width: number; height: number };
 
+type ColorManagedRenderer = { outputColorSpace: string };
+type ColorManagedTexture = { colorSpace: string };
+type LegacyThreeColorModule = {
+  WebGLRenderer: { prototype: object };
+  sRGBEncoding: number;
+  LinearEncoding: number;
+  SRGBColorSpace: string;
+  LinearSRGBColorSpace: string;
+};
+
+const mindArColorBridge = Symbol.for("ar-photo.mind-ar-color-bridge");
+
+export function installMindArColorCompatibility(Three: LegacyThreeColorModule) {
+  const prototype = Three.WebGLRenderer.prototype as object & { [mindArColorBridge]?: boolean };
+  if (prototype[mindArColorBridge]) return false;
+  const legacyDescriptor = Object.getOwnPropertyDescriptor(prototype, "outputEncoding");
+  if (!legacyDescriptor?.configurable) return false;
+
+  Object.defineProperty(prototype, "outputEncoding", {
+    configurable: true,
+    enumerable: legacyDescriptor.enumerable,
+    get(this: ColorManagedRenderer) {
+      return this.outputColorSpace === Three.SRGBColorSpace ? Three.sRGBEncoding : Three.LinearEncoding;
+    },
+    set(this: ColorManagedRenderer, encoding: number) {
+      this.outputColorSpace =
+        encoding === Three.sRGBEncoding ? Three.SRGBColorSpace : Three.LinearSRGBColorSpace;
+    },
+  });
+  Object.defineProperty(prototype, mindArColorBridge, { configurable: true, value: true });
+  return true;
+}
+
+export function configureSrgbVideoOutput(
+  renderer: ColorManagedRenderer,
+  texture: ColorManagedTexture,
+  srgbColorSpace: string,
+) {
+  renderer.outputColorSpace = srgbColorSpace;
+  texture.colorSpace = srgbColorSpace;
+}
+
 export function resolveMarkerDimensions(
   manifestMarker: MarkerDimensions,
   trackingDimensions?: readonly (readonly [number, number])[],
@@ -130,6 +172,11 @@ export async function startPublicMindAr(options: {
   ]);
   const Three = THREE as typeof ThreeModule;
 
+  // MindAR 1.2.5 still writes the removed Three.js `outputEncoding` property.
+  // Bridge that write to the current color-space API before MindAR creates its
+  // renderer, then explicitly keep both renderer output and video input in sRGB.
+  installMindArColorCompatibility(Three);
+
   const trackingAssetUrl = URL.createObjectURL(trackingAsset);
 
   const mindar = new MindARThree({
@@ -145,7 +192,7 @@ export async function startPublicMindAr(options: {
   renderer.setPixelRatio?.(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setClearColor(0x000000, 0);
   const texture = new Three.VideoTexture(video);
-  texture.colorSpace = Three.SRGBColorSpace;
+  configureSrgbVideoOutput(renderer, texture, Three.SRGBColorSpace);
   let activeMarker: MarkerDimensions = manifest.marker;
   let markerGeometry = markerPlaneGeometry(activeMarker);
   // The unit plane is scaled after the .mind dataset loads. This lets the
