@@ -5,6 +5,7 @@ import {
   ArchiveRestore,
   ArrowDown,
   ArrowLeft,
+  ArrowRight,
   ArrowUp,
   CalendarDays,
   ChevronLeft,
@@ -493,7 +494,12 @@ export function ProjectDetailsRoute() {
       {!workspace.canWrite ? <WorkspaceReadOnlyNotice workspace={workspace} /> : null}
       <section className="mt-6 grid gap-4 sm:grid-cols-3">
         <ProjectMetric icon={<Layers3 size={19} />} label="Группы" value={groupsQuery.data?.length ?? 0} />
-        <ProjectMetric icon={<Image size={19} />} label="AR-работы" value={arItemsQuery.data?.length ?? 0} />
+        <ProjectMetric
+          icon={<Image size={19} />}
+          label="AR-работы"
+          value={arItemsQuery.data?.length ?? 0}
+          to={`/items?projectId=${encodeURIComponent(project.id)}`}
+        />
         <ProjectMetric icon={<CalendarDays size={19} />} label="Обновлён" value={formatShortDate(project.updated_at)} />
       </section>
       <div className="mt-6 flex gap-2 border-b border-line" role="tablist" aria-label="Разделы проекта">
@@ -1330,16 +1336,43 @@ function Pagination({
   );
 }
 
-function ProjectMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string | number }) {
+function ProjectMetric({
+  icon,
+  label,
+  value,
+  to,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string | number;
+  to?: string;
+}) {
+  const content = (
+    <div className="flex items-center gap-3">
+      <span className="metric-icon">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-muted">{label}</p>
+        <strong className="mt-1 block text-lg">{value}</strong>
+      </div>
+      {to ? <ArrowRight aria-hidden="true" className="text-muted transition group-hover:translate-x-0.5 group-hover:text-primary" size={19} /> : null}
+    </div>
+  );
+
+  if (to) {
+    return (
+      <Link
+        aria-label={`Открыть ${label.toLocaleLowerCase("ru-RU")} проекта: ${value}`}
+        className="surface-card group min-w-0 rounded-card border border-line p-4 shadow-soft transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        to={to}
+      >
+        {content}
+      </Link>
+    );
+  }
+
   return (
     <Panel>
-      <div className="flex items-center gap-3">
-        <span className="metric-icon">{icon}</span>
-        <div>
-          <p className="text-xs text-muted">{label}</p>
-          <strong className="mt-1 block text-lg">{value}</strong>
-        </div>
-      </div>
+      {content}
     </Panel>
   );
 }

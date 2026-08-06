@@ -61,13 +61,15 @@ const defaultSettings: ArItemSettings = {
 
 export function ArItemsRoute() {
   const auth = useAuth();
+  const [searchParams] = useSearchParams();
+  const projectId = searchParams.get("projectId")?.trim() || undefined;
   const workspaceQuery = useQuery({
     queryKey: ["catalog", "workspace", auth.session!.user.id],
     queryFn: () => catalogRepository.getWorkspace(auth.session!.user.id),
   });
   const itemsQuery = useQuery({
-    queryKey: ["ar-items", workspaceQuery.data?.accountId],
-    queryFn: () => arItemRepository.listItems(workspaceQuery.data!.accountId),
+    queryKey: ["ar-items", workspaceQuery.data?.accountId, projectId ?? "all"],
+    queryFn: () => arItemRepository.listItems(workspaceQuery.data!.accountId, projectId),
     enabled: Boolean(workspaceQuery.data?.accountId),
   });
 
@@ -86,11 +88,22 @@ export function ArItemsRoute() {
     <AppShell
       eyebrow={workspaceQuery.data.accountName}
       title="AR-работы"
-      description="Создавайте связь маркера и видео, следите за обработкой и проверяйте результат до публикации."
+      description={
+        projectId
+          ? "Все черновики, обрабатываемые и готовые AR-работы выбранного проекта."
+          : "Создавайте связь маркера и видео, следите за обработкой и проверяйте результат до публикации."
+      }
       actions={
-        <Link className="btn btn-primary" to="/items/new">
-          <Plus size={17} /> Новая AR-работа
-        </Link>
+        <>
+          {projectId ? (
+            <Link className="btn btn-quiet" to={`/projects/${encodeURIComponent(projectId)}`}>
+              <ArrowLeft size={17} /> Проект
+            </Link>
+          ) : null}
+          <Link className="btn btn-primary" to={projectId ? `/items/new?projectId=${encodeURIComponent(projectId)}` : "/items/new"}>
+            <Plus size={17} /> Новая AR-работа
+          </Link>
+        </>
       }
     >
       {itemsQuery.data.length ? (
