@@ -39,7 +39,7 @@ if (dashboardFiles.some((file) => file.includes("mindar") || file.includes("thre
 
 const cssFiles = manifest[appEntry].css ?? [];
 const cssBytes = cssFiles.reduce((total, file) => total + statSync(join("dist", file)).size, 0);
-assertWithin("Initial CSS", cssBytes, 40 * 1024);
+assertWithin("Initial CSS", cssBytes, 48 * 1024);
 
 for (const [key, chunk] of entries) {
   const lowerKey = key.toLowerCase();

@@ -1,19 +1,26 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArrowRightLeft,
   Check,
+  CheckCircle2,
+  Copy,
   Download,
   ExternalLink,
   FileVideo2,
   ImagePlus,
+  LockKeyhole,
   LoaderCircle,
+  QrCode,
   RefreshCw,
+  ScanLine,
+  ShieldCheck,
   Sparkles,
   Upload,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import type { ArItem, ProcessingJob, QrCode as QrCodeRecord } from "../../entities/ar-item/model";
-import { Button, Input, Panel } from "../../shared/ui";
+import { Button, Input } from "../../shared/ui";
 import { getArItemRepository } from "../ar-items/arItemRepository";
 import { analyzeMarkerFile } from "../ar-items/markerQuality";
 import { useAuth } from "../auth/authContext";
@@ -26,14 +33,7 @@ const mediaRepository = getMediaRepository();
 const arItemRepository = getArItemRepository();
 
 type QuickStage =
-  | "form"
-  | "preparing"
-  | "uploading-marker"
-  | "uploading-video"
-  | "processing"
-  | "publishing"
-  | "done"
-  | "error";
+  "form" | "preparing" | "uploading-marker" | "uploading-video" | "processing" | "publishing" | "done" | "error";
 
 const jobLabels: Partial<Record<ProcessingJob["type"], string>> = {
   marker_analysis: "Проверяем фотографию",
@@ -98,6 +98,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
   });
 
   const markerPreview = useObjectUrl(markerFile);
+  const videoPreview = useObjectUrl(videoFile);
   const itemFailed = itemQuery.data?.status === "failed";
   const visibleStage: QuickStage = itemFailed ? "error" : stage;
   const processing = !["form", "done", "error"].includes(visibleStage);
@@ -105,7 +106,9 @@ function QuickCreatePage({ userId }: { userId: string }) {
   const jobs = jobsQuery.data ?? [];
   const runningJob = jobs.find((job) => job.status === "running") ?? jobs.find((job) => job.status === "queued");
   const processingProgress = jobs.length
-    ? Math.round(jobs.reduce((total, job) => total + (job.status === "succeeded" ? 100 : job.progress), 0) / jobs.length)
+    ? Math.round(
+        jobs.reduce((total, job) => total + (job.status === "succeeded" ? 100 : job.progress), 0) / jobs.length,
+      )
     : 5;
 
   function showError(cause: unknown) {
@@ -251,7 +254,9 @@ function QuickCreatePage({ userId }: { userId: string }) {
       }
       await delay(2_500);
     }
-    throw new Error("Обработка занимает слишком много времени. Нажмите «Повторить обработку» — загружать файлы заново не нужно.");
+    throw new Error(
+      "Обработка занимает слишком много времени. Нажмите «Повторить обработку» — загружать файлы заново не нужно.",
+    );
   };
 
   if (workspaceQuery.isPending) {
@@ -272,89 +277,97 @@ function QuickCreatePage({ userId }: { userId: string }) {
   }
 
   if (visibleStage === "done" && result) {
-    return <QuickResult title={title} qr={result} onReset={reset} />;
+    return (
+      <QuickResult
+        title={title}
+        markerPreview={markerPreview}
+        videoPreview={videoPreview}
+        qr={result}
+        onReset={reset}
+      />
+    );
   }
 
   const status = quickStatus(visibleStage, stageProgress, processingProgress, runningJob);
   return (
-    <main className="min-h-[100dvh] bg-background px-4 py-5 text-ink sm:px-6 sm:py-10">
-      <div className="mx-auto w-full max-w-3xl">
-        <header className="mb-6 text-center sm:mb-8">
-          <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-primary/15 text-primary">
-            <Sparkles size={28} />
+    <QuickShell
+      currentStep={visibleStage === "form" ? 1 : 2}
+      eyebrow={visibleStage === "form" ? "Новый AR-момент" : "Обработка запущена"}
+      title={visibleStage === "form" ? "Оживите фотографию" : "Создаём ваше AR-фото"}
+      description={
+        visibleStage === "form"
+          ? "Добавьте фотографию и видео — точный target.mind, совместимый ролик и QR-код мы подготовим автоматически."
+          : "Файлы уже у нас. Можно не закрывать страницу: результат появится здесь автоматически."
+      }
+    >
+      <section className="quick-create-card" aria-label="Создание AR-фото">
+        <label className="quick-title-field">
+          <span>Название</span>
+          <Input
+            value={title}
+            onValueChange={setTitle}
+            placeholder="Например, Наш семейный момент"
+            maxLength={160}
+            disabled={processing || Boolean(itemId)}
+          />
+        </label>
+
+        <div className="quick-media-pair">
+          <MediaPicker
+            key={`marker-${pickerVersion}`}
+            kind="marker"
+            file={markerFile}
+            previewUrl={markerPreview}
+            disabled={processing || Boolean(itemId)}
+            onPick={setMarkerFile}
+          />
+          <span className="quick-media-link" aria-hidden="true">
+            <ArrowRightLeft size={20} />
           </span>
-          <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-primary">AR Photo · тест</p>
-          <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Оживите фотографию</h1>
-          <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted">
-            Без регистрации, проектов и групп. Добавьте название, фотографию и видео — остальное сделаем автоматически.
-          </p>
-        </header>
+          <MediaPicker
+            key={`video-${pickerVersion}`}
+            kind="video"
+            file={videoFile}
+            previewUrl={videoPreview}
+            disabled={processing || Boolean(itemId)}
+            onPick={setVideoFile}
+          />
+        </div>
 
-        <Panel className="p-5 sm:p-7">
-          <div className="grid gap-6">
-            <label className="grid gap-2 text-sm font-semibold">
-              Название
-              <Input
-                value={title}
-                onValueChange={setTitle}
-                placeholder="Например, Семейная фотография"
-                maxLength={160}
-                disabled={processing || Boolean(itemId)}
-              />
-            </label>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <MediaPicker
-                key={`marker-${pickerVersion}`}
-                kind="marker"
-                file={markerFile}
-                previewUrl={markerPreview}
-                disabled={processing || Boolean(itemId)}
-                onPick={setMarkerFile}
-              />
-              <MediaPicker
-                key={`video-${pickerVersion}`}
-                kind="video"
-                file={videoFile}
-                disabled={processing || Boolean(itemId)}
-                onPick={setVideoFile}
-              />
-            </div>
-
-            {visibleStage !== "form" && visibleStage !== "error" ? <ProgressStatus {...status} /> : null}
-            {visibleStage === "error" ? (
-              <div className="rounded-2xl border border-rose-400/25 bg-rose-400/10 p-4 text-sm leading-6 text-rose-100" role="alert">
-                {error || "Обработка не завершилась. Нажмите «Повторить обработку» — загружать файлы заново не нужно."}
-              </div>
-            ) : null}
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              {visibleStage === "error" && itemId ? (
-                <Button full onClick={() => void retryProcessing()}>
-                  <RefreshCw size={17} /> Повторить обработку
-                </Button>
-              ) : (
-                <Button full disabled={!canSubmit} onClick={() => void submit()}>
-                  {processing ? <LoaderCircle className="animate-spin" size={18} /> : <Sparkles size={18} />}
-                  {processing ? "Создаём AR…" : "Оживить фото"}
-                </Button>
-              )}
-              <Button full variant="quiet" disabled={processing} onClick={reset}>
-                Очистить
-              </Button>
-            </div>
+        {visibleStage !== "form" && visibleStage !== "error" ? <ProgressStatus {...status} /> : null}
+        {visibleStage === "error" ? (
+          <div className="quick-error" role="alert">
+            <strong>Обработка остановилась</strong>
+            <span>{error || "Нажмите «Повторить обработку» — загружать файлы заново не нужно."}</span>
           </div>
-        </Panel>
+        ) : null}
 
-        <p className="mt-5 text-center text-xs leading-5 text-muted">
-          Файлы доступны только вашей гостевой сессии. Готовая публичная ссылка содержит случайный защищённый идентификатор.
-        </p>
+        <div className="quick-form-actions">
+          {visibleStage === "error" && itemId ? (
+            <Button full onClick={() => void retryProcessing()}>
+              <RefreshCw size={18} /> Повторить обработку
+            </Button>
+          ) : (
+            <Button full disabled={!canSubmit} onClick={() => void submit()}>
+              {processing ? <LoaderCircle className="animate-spin" size={19} /> : <Sparkles size={19} />}
+              {processing ? "Создаём AR…" : "Оживить фото"}
+            </Button>
+          )}
+          <Button full variant="quiet" disabled={processing} onClick={reset}>
+            Очистить
+          </Button>
+        </div>
+      </section>
+
+      <div className="quick-privacy-note">
+        <ShieldCheck size={17} />
+        <span>Файлы доступны только вашей гостевой сессии. Публичная ссылка защищена случайным идентификатором.</span>
       </div>
-    </main>
+    </QuickShell>
   );
 }
 
-function MediaPicker({
+export function MediaPicker({
   kind,
   file,
   previewUrl,
@@ -370,28 +383,64 @@ function MediaPicker({
   const marker = kind === "marker";
   return (
     <label
-      className={`group relative grid min-h-56 overflow-hidden rounded-2xl border border-dashed p-4 transition ${
-        disabled ? "cursor-not-allowed opacity-65" : "cursor-pointer hover:border-primary hover:bg-primary/5"
-      } ${file ? "border-emerald-400/45 bg-emerald-400/5" : "border-line bg-black/10"}`}
+      className={`quick-media-picker ${file ? "quick-media-picker-ready" : ""} ${disabled ? "quick-media-picker-disabled" : ""}`}
     >
-      {marker && previewUrl ? (
-        <img className="absolute inset-0 h-full w-full object-cover opacity-35" src={previewUrl} alt="" />
-      ) : null}
-      <span className="relative z-10 m-auto grid place-items-center text-center">
-        <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white/10 text-primary">
-          {file ? <Check size={27} /> : marker ? <ImagePlus size={27} /> : <FileVideo2 size={27} />}
+      <span className="quick-media-picker-heading">
+        <span>
+          <small>{marker ? "Маркер" : "Контент"}</small>
+          <strong>{marker ? "Фотография" : "Видео"}</strong>
         </span>
-        <strong className="mt-4">{marker ? "Фотография" : "Видео"}</strong>
-        <span className="mt-2 max-w-56 break-words text-xs leading-5 text-muted">
-          {file ? `${file.name} · ${formatBytes(file.size)}` : marker ? "Выберите фотографию-маркер" : "Выберите видео для воспроизведения"}
-        </span>
-        {!file ? (
-          <span className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-xs font-semibold">
-            <Upload size={15} /> Добавить файл
+        {file ? (
+          <span className="quick-added-badge">
+            <Check size={13} /> Добавлено
           </span>
         ) : null}
       </span>
+
+      <span className="quick-media-preview">
+        {previewUrl ? (
+          marker ? (
+            <img src={previewUrl} alt={`Предпросмотр фотографии ${file?.name ?? ""}`} />
+          ) : (
+            <video
+              src={previewUrl}
+              muted
+              playsInline
+              preload="metadata"
+              aria-label={`Предпросмотр видео ${file?.name ?? ""}`}
+            />
+          )
+        ) : (
+          <span className="quick-media-empty">
+            <span className="quick-media-icon">{marker ? <ImagePlus size={29} /> : <FileVideo2 size={29} />}</span>
+            <strong>{marker ? "Выберите фотографию" : "Выберите видео"}</strong>
+            <span>{marker ? "JPG, PNG или WebP" : "MP4, MOV или WebM"}</span>
+          </span>
+        )}
+
+        {file ? (
+          <span className="quick-media-file">
+            <span>
+              <strong>{file.name}</strong>
+              <small>{formatBytes(file.size)}</small>
+            </span>
+            <span className="quick-replace-file">
+              <Upload size={15} /> Заменить
+            </span>
+          </span>
+        ) : (
+          <span className="quick-pick-file">
+            <Upload size={16} /> Добавить файл
+          </span>
+        )}
+      </span>
+
+      <span className="quick-media-hint">
+        <LockKeyhole size={14} />
+        <span>{marker ? "Чёткое фото без бликов даст лучший трекинг" : "Звук и цвет сохранятся после обработки"}</span>
+      </span>
       <input
+        aria-label={marker ? "Выбрать фотографию-маркер" : "Выбрать видео"}
         className="sr-only"
         type="file"
         accept={marker ? markerAccept : videoAccept}
@@ -403,25 +452,41 @@ function MediaPicker({
 }
 
 function ProgressStatus({ label, detail, progress }: { label: string; detail: string; progress: number }) {
+  const boundedProgress = Math.max(0, Math.min(100, progress));
   return (
-    <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4" role="status" aria-live="polite">
-      <div className="flex items-start gap-3">
-        <LoaderCircle className="mt-0.5 shrink-0 animate-spin text-primary" size={20} />
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold">{label}</p>
-          <p className="mt-1 text-xs leading-5 text-muted">{detail}</p>
+    <div className="quick-progress" role="status" aria-live="polite">
+      <div className="quick-progress-copy">
+        <span className="quick-progress-spinner">
+          <LoaderCircle className="animate-spin" size={21} />
+        </span>
+        <div>
+          <p>{label}</p>
+          <span>{detail}</span>
         </div>
-        <span className="text-sm font-semibold text-primary">{Math.max(0, Math.min(100, progress))}%</span>
+        <strong>{boundedProgress}%</strong>
       </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
-        <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${Math.max(3, progress)}%` }} />
+      <div className="quick-progress-track" aria-hidden="true">
+        <span style={{ width: `${Math.max(3, boundedProgress)}%` }} />
       </div>
     </div>
   );
 }
 
-function QuickResult({ title, qr, onReset }: { title: string; qr: QrCodeRecord; onReset(): void }) {
+export function QuickResult({
+  title,
+  markerPreview,
+  videoPreview,
+  qr,
+  onReset,
+}: {
+  title: string;
+  markerPreview?: string;
+  videoPreview?: string;
+  qr: QrCodeRecord;
+  onReset(): void;
+}) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const [copied, setCopied] = useState(false);
   const downloadQr = () => {
     if (!svgRef.current) return;
     const source = new XMLSerializer().serializeToString(svgRef.current);
@@ -432,53 +497,231 @@ function QuickResult({ title, qr, onReset }: { title: string; qr: QrCodeRecord; 
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
   };
+  const copyUrl = async () => {
+    await navigator.clipboard.writeText(qr.public_url);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 2_000);
+  };
   return (
-    <main className="grid min-h-[100dvh] place-items-center bg-background px-4 py-8 text-ink">
-      <Panel className="w-full max-w-xl p-6 text-center sm:p-8">
-        <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-400/15 text-emerald-300">
-          <Check size={28} />
-        </span>
-        <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">Готово</p>
-        <h1 className="mt-2 text-3xl font-semibold">{title}</h1>
-        <p className="mt-3 text-sm leading-6 text-muted">QR-код уже опубликован. Откройте его на другом устройстве и наведите камеру на фотографию.</p>
-        <div className="mx-auto mt-6 w-full max-w-[340px] rounded-3xl bg-white p-4">
-          <QRCodeSVG ref={svgRef} value={qr.public_url} size={320} level="H" marginSize={4} className="h-auto w-full" title={`QR: ${title}`} />
-        </div>
-        <p className="mt-5 break-all font-mono text-xs leading-5 text-muted">{qr.public_url}</p>
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          <Button variant="ghost" onClick={downloadQr}>
-            <Download size={17} /> Скачать QR
-          </Button>
-          <Button variant="ghost" onClick={() => window.open(qr.public_url, "_blank", "noopener,noreferrer")}>
-            <ExternalLink size={17} /> Открыть
-          </Button>
-          <Button onClick={onReset}>
-            <Sparkles size={17} /> Создать ещё
-          </Button>
-        </div>
-      </Panel>
+    <QuickShell
+      currentStep={3}
+      eyebrow="Готово к просмотру"
+      title="Всё готово"
+      description="Фотография ожила. Скачайте QR-код или сразу откройте AR, чтобы проверить результат."
+    >
+      <div className="quick-result-grid">
+        <section className="quick-result-card quick-result-media" aria-labelledby="quick-result-title">
+          <div className="quick-result-card-heading">
+            <div>
+              <span className="quick-section-label">Ваш AR-момент</span>
+              <h2 id="quick-result-title">{title}</h2>
+            </div>
+            <span className="quick-ready-badge">
+              <CheckCircle2 size={16} /> Готово к просмотру
+            </span>
+          </div>
+
+          <div className="quick-result-previews">
+            <figure>
+              <figcaption>Маркер</figcaption>
+              <div className="quick-result-preview">
+                {markerPreview ? (
+                  <img src={markerPreview} alt={`Фотография-маркер ${title}`} />
+                ) : (
+                  <ImagePlus size={34} />
+                )}
+              </div>
+            </figure>
+            <figure>
+              <figcaption>Видео</figcaption>
+              <div className="quick-result-preview">
+                {videoPreview ? (
+                  <video src={videoPreview} controls playsInline preload="metadata" aria-label={`Видео для ${title}`} />
+                ) : (
+                  <FileVideo2 size={34} />
+                )}
+              </div>
+            </figure>
+          </div>
+
+          <div className="quick-result-instruction">
+            <ScanLine size={20} />
+            <div>
+              <strong>Как проверить</strong>
+              <span>Откройте AR на телефоне, разрешите камеру и наведите её на фотографию целиком.</span>
+            </div>
+          </div>
+        </section>
+
+        <aside className="quick-result-card quick-qr-card" aria-label="QR-код AR-фото">
+          <span className="quick-qr-icon">
+            <QrCode size={21} />
+          </span>
+          <h2>Ваш QR-код</h2>
+          <p>Он уже опубликован и ведёт прямо в камеру AR Photo.</p>
+          <div className="quick-qr-canvas">
+            <QRCodeSVG
+              ref={svgRef}
+              value={qr.public_url}
+              size={320}
+              level="H"
+              marginSize={4}
+              className="h-auto w-full"
+              title={`QR: ${title}`}
+            />
+            <span className="quick-qr-brand" aria-hidden="true">
+              <Sparkles size={18} />
+            </span>
+          </div>
+
+          <div className="quick-public-url">
+            <span>{qr.public_url}</span>
+            <button aria-label="Копировать публичную ссылку" onClick={() => void copyUrl()} type="button">
+              {copied ? <Check size={16} /> : <Copy size={16} />}
+            </button>
+          </div>
+          <span className="quick-copy-status" aria-live="polite">
+            {copied ? "Ссылка скопирована" : " "}
+          </span>
+
+          <div className="quick-result-actions">
+            <Button
+              className="quick-open-ar"
+              onClick={() => window.open(qr.public_url, "_blank", "noopener,noreferrer")}
+            >
+              <ExternalLink size={18} /> Открыть AR
+            </Button>
+            <Button variant="ghost" onClick={downloadQr}>
+              <Download size={18} /> Скачать QR
+            </Button>
+          </div>
+        </aside>
+      </div>
+
+      <Button className="quick-create-more" variant="quiet" onClick={onReset}>
+        <Sparkles size={17} /> Создать ещё
+      </Button>
+    </QuickShell>
+  );
+}
+
+function QuickShell({
+  currentStep,
+  eyebrow,
+  title,
+  description,
+  children,
+}: {
+  currentStep: 1 | 2 | 3;
+  eyebrow: string;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <main className="quick-flow">
+      <QuickHeader />
+      <div className="quick-flow-content">
+        <QuickStepper currentStep={currentStep} />
+        <header className="quick-page-heading">
+          <span>{eyebrow}</span>
+          <h1>{title}</h1>
+          <p>{description}</p>
+        </header>
+        {children}
+      </div>
+      <footer className="quick-footer">
+        <span>AR Photo · тестовый режим</span>
+        <span>Фото превращается в воспоминание, которое можно услышать</span>
+      </footer>
     </main>
+  );
+}
+
+function QuickHeader() {
+  return (
+    <header className="quick-header">
+      <div className="quick-brand" aria-label="AR Photo">
+        <span className="quick-brand-symbol">
+          <ScanLine size={24} />
+          <Sparkles size={13} />
+        </span>
+        <strong>AR Photo</strong>
+      </div>
+      <div className="quick-header-badges">
+        <span>
+          <ShieldCheck size={15} /> Без регистрации
+        </span>
+        <span className="quick-test-badge">Тестовый режим</span>
+      </div>
+    </header>
+  );
+}
+
+export function QuickStepper({ currentStep }: { currentStep: 1 | 2 | 3 }) {
+  const steps = ["Добавьте файлы", "Создаём AR", "Получите QR"];
+  return (
+    <nav className="quick-stepper" aria-label="Этапы создания AR-фото">
+      <ol>
+        {steps.map((label, index) => {
+          const number = (index + 1) as 1 | 2 | 3;
+          const completed = number < currentStep || currentStep === 3;
+          const active = number === currentStep;
+          return (
+            <li
+              aria-current={active ? "step" : undefined}
+              className={`${active ? "quick-step-active" : ""} ${completed ? "quick-step-complete" : ""}`}
+              key={label}
+            >
+              <span className="quick-step-number" aria-hidden="true">
+                {completed ? <Check size={15} /> : number}
+              </span>
+              <span>
+                <small>Шаг {number}</small>
+                <strong>{label}</strong>
+              </span>
+              {number < 3 ? <i aria-hidden="true" /> : null}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
   );
 }
 
 function CenteredState({ title, text, action }: { title: string; text: string; action?: React.ReactNode }) {
   return (
-    <main className="grid min-h-[100dvh] place-items-center bg-background px-5 text-ink">
-      <Panel className="w-full max-w-md p-6 text-center">
-        <LoaderCircle className="mx-auto animate-spin text-primary" size={30} />
-        <h1 className="mt-5 text-2xl font-semibold">{title}</h1>
-        <p className="mt-2 text-sm leading-6 text-muted">{text}</p>
-        {action ? <div className="mt-5 flex justify-center">{action}</div> : null}
-      </Panel>
+    <main className="quick-flow quick-centered-flow">
+      <QuickHeader />
+      <section className="quick-centered-card" role="status">
+        <span className="quick-progress-spinner">
+          <LoaderCircle className="animate-spin" size={24} />
+        </span>
+        <h1>{title}</h1>
+        <p>{text}</p>
+        {action ? <div className="quick-centered-action">{action}</div> : null}
+      </section>
     </main>
   );
 }
 
 function quickStatus(stage: QuickStage, stageProgress: number, processingProgress: number, job?: ProcessingJob) {
-  if (stage === "preparing") return { label: "Подготавливаем файлы", detail: "Проверяем форматы и оптимизируем видео", progress: stageProgress };
-  if (stage === "uploading-marker") return { label: "Загружаем фотографию", detail: "Безопасно передаём подготовленный маркер", progress: stageProgress };
-  if (stage === "uploading-video") return { label: "Загружаем видео", detail: "Большой файл может загружаться несколько минут", progress: stageProgress };
-  if (stage === "publishing") return { label: "Создаём QR-код", detail: "Публикуем защищённую AR-ссылку", progress: 96 };
+  if (stage === "preparing")
+    return { label: "Подготавливаем файлы", detail: "Проверяем форматы и оптимизируем видео", progress: stageProgress };
+  if (stage === "uploading-marker")
+    return {
+      label: "Загружаем фотографию",
+      detail: "Безопасно передаём подготовленный маркер",
+      progress: stageProgress,
+    };
+  if (stage === "uploading-video")
+    return {
+      label: "Загружаем видео",
+      detail: "Большой файл может загружаться несколько минут",
+      progress: stageProgress,
+    };
+  if (stage === "publishing")
+    return { label: "Создаём QR-код", detail: "Публикуем защищённую AR-ссылку", progress: 96 };
   return {
     label: job ? (jobLabels[job.type] ?? "Обрабатываем AR-фото") : "Запускаем обработку",
     detail: "Создаём target.mind, превью и совместимое видео",
@@ -488,9 +731,12 @@ function quickStatus(stage: QuickStage, stageProgress: number, processingProgres
 
 function useObjectUrl(file?: File) {
   const url = useMemo(() => (file ? URL.createObjectURL(file) : undefined), [file]);
-  useEffect(() => () => {
-    if (url) URL.revokeObjectURL(url);
-  }, [url]);
+  useEffect(
+    () => () => {
+      if (url) URL.revokeObjectURL(url);
+    },
+    [url],
+  );
   return url;
 }
 
@@ -508,7 +754,13 @@ function formatBytes(bytes: number) {
 }
 
 function safeFileName(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-zа-я0-9]+/gi, "-").replace(/^-+|-+$/g, "") || "ar-photo";
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-zа-я0-9]+/gi, "-")
+      .replace(/^-+|-+$/g, "") || "ar-photo"
+  );
 }
 
 function readableError(error: unknown) {
