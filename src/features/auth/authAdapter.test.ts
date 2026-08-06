@@ -71,8 +71,17 @@ describe("unconfigured auth adapter", () => {
   });
 });
 
-describe("supabase guest auth adapter", () => {
-  it("creates and bootstraps an isolated anonymous session when no login exists", async () => {
+describe("supabase explicit auth adapter", () => {
+  it("does not create an anonymous session when no login exists", async () => {
+    const getSession = vi.fn().mockResolvedValue({ data: { session: null }, error: null });
+    const signOut = vi.fn();
+    const adapter = new SupabaseAuthAdapter({ auth: { getSession, signOut } } as unknown as SupabaseBrowserClient);
+
+    await expect(adapter.getSession()).resolves.toBeNull();
+    expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it("clears a legacy anonymous browser session instead of opening the cabinet", async () => {
     const session = {
       user: {
         id: "00000000-0000-4000-8000-000000000040",
@@ -81,21 +90,11 @@ describe("supabase guest auth adapter", () => {
         user_metadata: { registration_source: "guest_test" },
       },
     } as unknown as Session;
-    const getSession = vi.fn().mockResolvedValue({ data: { session: null }, error: null });
-    const signInAnonymously = vi.fn().mockResolvedValue({ data: { session }, error: null });
-    const rpc = vi.fn().mockResolvedValue({ data: {}, error: null });
-    const adapter = new SupabaseAuthAdapter({ auth: { getSession, signInAnonymously }, rpc } as unknown as SupabaseBrowserClient);
+    const getSession = vi.fn().mockResolvedValue({ data: { session }, error: null });
+    const signOut = vi.fn().mockResolvedValue({ error: null });
+    const adapter = new SupabaseAuthAdapter({ auth: { getSession, signOut } } as unknown as SupabaseBrowserClient);
 
-    await expect(adapter.getSession()).resolves.toEqual({
-      user: {
-        id: session.user.id,
-        email: "Гостевой режим",
-        isAnonymous: true,
-      },
-    });
-    expect(signInAnonymously).toHaveBeenCalledWith({
-      options: { data: { registration_source: "guest_test", full_name: "Гость" } },
-    });
-    expect(rpc).toHaveBeenCalledWith("bootstrap_guest_account");
+    await expect(adapter.getSession()).resolves.toBeNull();
+    expect(signOut).toHaveBeenCalledWith({ scope: "local" });
   });
 });

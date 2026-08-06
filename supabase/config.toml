@@ -100,6 +100,13 @@ verify_jwt = true
 import_map = "./functions/admin-reset-password/deno.json"
 entrypoint = "./functions/admin-reset-password/index.ts"
 
+[functions.admin-delete-user]
+enabled = true
+# Permanent Auth deletion is server-side only and requires superadmin + aal2 + an audited RPC authorization.
+verify_jwt = true
+import_map = "./functions/admin-delete-user/deno.json"
+entrypoint = "./functions/admin-delete-user/index.ts"
+
 [functions.cleanup-stale-uploads]
 enabled = true
 # This endpoint is invoked by a scheduler with a dedicated 32+ byte secret.

@@ -8,12 +8,12 @@ Production требует отдельно управляемые frontend host/
 
 ## Environments
 
-| Среда      | Данные                                    | Назначение                      | Допустимые интеграции                              |
-| ---------- | ----------------------------------------- | ------------------------------- | -------------------------------------------------- |
-| Local      | synthetic seed                            | разработка, pgTAP, worker smoke | local Supabase/Docker                              |
-| Hosted beta | тестовые/пилотные                        | публичный QR и Supabase rehearsal | GitHub Pages + hosted Supabase                    |
-| Staging    | synthetic/anonymized                      | полный hosted rehearsal         | отдельный Supabase project/worker/domain           |
-| Production | реальные клиентские данные после approval | клиентский сервис               | отдельные project, secrets, domain, alerts/backups |
+| Среда       | Данные                                    | Назначение                        | Допустимые интеграции                              |
+| ----------- | ----------------------------------------- | --------------------------------- | -------------------------------------------------- |
+| Local       | synthetic seed                            | разработка, pgTAP, worker smoke   | local Supabase/Docker                              |
+| Hosted beta | тестовые/пилотные                         | публичный QR и Supabase rehearsal | GitHub Pages + hosted Supabase                     |
+| Staging     | synthetic/anonymized                      | полный hosted rehearsal           | отдельный Supabase project/worker/domain           |
+| Production  | реальные клиентские данные после approval | клиентский сервис                 | отдельные project, secrets, domain, alerts/backups |
 
 Demo mode остаётся только для локальных и автоматизированных тестов и не публикуется в Pages workflow.
 
@@ -96,6 +96,7 @@ supabase db push --dry-run
 supabase db push
 supabase functions deploy admin-create-user
 supabase functions deploy admin-reset-password
+supabase functions deploy admin-delete-user
 supabase functions deploy cleanup-stale-uploads
 supabase functions deploy public-ar-manifest
 supabase functions deploy public-ar-analytics

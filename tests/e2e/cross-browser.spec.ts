@@ -13,7 +13,7 @@ test("opens the protected workspace with responsive navigation", async ({ page }
   await page.goto("./dashboard");
   await signInToDemo(page);
 
-  await expect(page.getByRole("heading", { name: "Добро пожаловать в AR Photo" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Главная", exact: true })).toBeVisible();
   const mobile = (page.viewportSize()?.width ?? 1_280) < 768;
   await expect(
     page.getByRole("navigation", { name: mobile ? "Мобильная навигация" : "Основная навигация" }),
@@ -54,9 +54,9 @@ test("renders the MFA-gated admin console without leaking layout width", async (
   await signInToDemo(page);
   await page.goto("./admin");
 
-  await expect(page.getByRole("heading", { name: "Admin", exact: true })).toBeVisible();
-  await expect(page.getByText("MFA VERIFIED", { exact: false })).toBeVisible();
-  await page.getByRole("button", { name: "Audit", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Admin audit" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Супер-админ", exact: true })).toBeVisible();
+  await expect(page.getByText("MFA подтверждена", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "История действий", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "История действий" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });

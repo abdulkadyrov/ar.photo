@@ -5,6 +5,7 @@ artifacts/
 coverage/
 playwright-report/
 test-results/
+tmp/
 supabase/.temp/
 *.tsbuildinfo
 .DS_Store

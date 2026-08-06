@@ -1,39 +1,30 @@
+import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import {
-  BarChart3,
+  Camera,
   FolderKanban,
+  Headphones,
   House,
-  Images,
-  Layers3,
   LogOut,
-  QrCode,
-  ScanLine,
+  Plus,
   Settings,
   ShieldCheck,
   Sparkles,
-  Users,
-  WandSparkles,
+  UserRound,
 } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
+import { getAdminRepository } from "../../features/admin/adminRepository";
 import { useAuth } from "../../features/auth/authContext";
+
+const adminRepository = getAdminRepository();
 
 const navigation = [
   { to: "/dashboard", label: "Главная", icon: House, end: true },
-  { to: "/projects", label: "Проекты", icon: FolderKanban },
-  { to: "/groups", label: "Группы", icon: Layers3 },
-  { to: "/media", label: "Медиа", icon: Images },
-  { to: "/items", label: "AR-работы", icon: WandSparkles },
-  { to: "/viewer/test", label: "AR-проверка", icon: ScanLine },
-  { to: "/qr-codes", label: "QR-коды", icon: QrCode },
-  { to: "/analytics", label: "Аналитика", icon: BarChart3 },
-  { to: "/admin", label: "Admin", icon: ShieldCheck },
-  { to: "/settings/team", label: "Команда", icon: Users },
-  { to: "/settings", label: "Настройки", icon: Settings },
+  { to: "/projects", label: "Мои проекты", icon: FolderKanban },
+  { to: "/create", label: "Добавить фото", icon: Plus },
+  { to: "/viewer/test", label: "AR-камера", icon: Camera },
+  { to: "/support", label: "Поддержка", icon: Headphones },
 ] as const;
-
-const mobileNavigation = navigation.filter((item) =>
-  ["/dashboard", "/projects", "/items", "/analytics", "/settings"].includes(item.to),
-);
 
 export function AppShell({
   eyebrow,
@@ -49,20 +40,35 @@ export function AppShell({
   children: ReactNode;
 }) {
   const auth = useAuth();
+  const adminAccess = useQuery({
+    queryKey: ["admin", "navigation-access", auth.session?.user.id],
+    queryFn: () => adminRepository.getAccess(),
+    enabled: Boolean(auth.session) && auth.mode === "supabase",
+    retry: false,
+    staleTime: 5 * 60_000,
+  });
+  const email = auth.session?.user.email ?? "AR Photo";
+  const adminVisible =
+    auth.mode === "demo" ? email.toLocaleLowerCase("ru").startsWith("admin") : adminAccess.data?.isSuperadmin;
 
   return (
     <div className="app-shell min-h-screen bg-background text-ink">
       <aside className="app-sidebar hidden lg:flex">
-        <NavLink className="brand-mark" to="/">
+        <Link className="brand-mark" to="/dashboard">
           <span className="brand-symbol">
             <Sparkles size={20} />
           </span>
           <span>
             <strong>AR</strong> Photo
           </span>
-        </NavLink>
+        </Link>
 
-        <nav aria-label="Основная навигация" className="mt-8 grid gap-1.5">
+        <Link className="sidebar-create" to="/create">
+          <Plus size={17} /> Создать AR-фото
+        </Link>
+
+        <nav aria-label="Основная навигация" className="sidebar-navigation">
+          <p className="sidebar-caption">Рабочее пространство</p>
           {navigation.map((item) => {
             const Icon = item.icon;
             return (
@@ -77,48 +83,47 @@ export function AppShell({
               </NavLink>
             );
           })}
+          {adminVisible ? (
+            <>
+              <p className="sidebar-caption sidebar-admin-caption">Управление</p>
+              <NavLink
+                className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`}
+                to="/admin"
+              >
+                <ShieldCheck size={18} />
+                <span>Супер-админ</span>
+              </NavLink>
+            </>
+          ) : null}
         </nav>
 
-        <div className="mt-auto rounded-2xl border border-line bg-white/[0.025] p-4">
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/15 font-semibold uppercase text-primary-soft">
-              {auth.session?.user.email.slice(0, 2) ?? "AR"}
+        <div className="sidebar-account">
+          <Link className="sidebar-settings-link" to="/settings">
+            <Settings size={17} /> Настройки
+          </Link>
+          <div className="sidebar-user-row">
+            <span className="sidebar-avatar">
+              <UserRound size={18} />
             </span>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{auth.session?.user.email ?? "AR Photo"}</p>
-              <p className="truncate text-xs text-muted">
-                {auth.mode === "demo" ? "Demo workspace" : auth.mode === "supabase" ? "Supabase session" : "Offline"}
-              </p>
+              <p>{email}</p>
+              <span>{auth.mode === "demo" ? "Демо-кабинет" : "Личный кабинет"}</span>
             </div>
-          </div>
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <span className="inline-flex rounded-full bg-primary/15 px-2 py-1 text-[11px] font-semibold text-primary">
-              {auth.mode === "demo" ? "DEMO" : auth.mode === "supabase" ? "ONLINE" : "OFFLINE"}
-            </span>
-            <button
-              aria-label="Выйти"
-              className="grid h-9 w-9 place-items-center rounded-xl text-muted transition hover:bg-white/[0.05] hover:text-ink"
-              onClick={() => void auth.signOut()}
-              title="Выйти"
-            >
+            <button aria-label="Выйти" onClick={() => void auth.signOut()} title="Выйти">
               <LogOut size={17} />
             </button>
           </div>
         </div>
       </aside>
 
-      <div className="app-content pb-24 lg:pb-8">
+      <div className="app-content pb-24 lg:pb-10">
         <header className="app-topbar">
           <div>
-            {eyebrow ? (
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary-soft">{eyebrow}</p>
-            ) : null}
-            <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">{title}</h1>
-            {description ? (
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted md:text-base">{description}</p>
-            ) : null}
+            {eyebrow ? <p className="app-eyebrow">{eyebrow}</p> : null}
+            <h1>{title}</h1>
+            {description ? <p className="app-description">{description}</p> : null}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="app-topbar-actions">
             {actions}
             <button
               aria-label="Выйти"
@@ -134,17 +139,22 @@ export function AppShell({
       </div>
 
       <nav aria-label="Мобильная навигация" className="mobile-nav lg:hidden">
-        {mobileNavigation.map((item) => {
+        {navigation.map((item) => {
           const Icon = item.icon;
+          const create = item.to === "/create";
           return (
             <NavLink
               key={item.to}
-              className={({ isActive }) => `mobile-nav-link ${isActive ? "mobile-nav-link-active" : ""}`}
+              className={({ isActive }) =>
+                `mobile-nav-link ${create ? "mobile-nav-create" : ""} ${isActive ? "mobile-nav-link-active" : ""}`
+              }
               end={"end" in item ? item.end : undefined}
               to={item.to}
             >
-              <Icon size={19} />
-              <span>{item.label === "AR-проверка" ? "AR" : item.label}</span>
+              <span className={create ? "mobile-create-icon" : ""}>
+                <Icon size={create ? 22 : 19} />
+              </span>
+              <span>{create ? "Создать" : item.label === "Мои проекты" ? "Проекты" : item.label}</span>
             </NavLink>
           );
         })}

@@ -5,24 +5,25 @@ async function signInToDemo(page: Page) {
   await page.getByRole("button", { name: "Войти" }).click();
 }
 
-test("opens the AR Photo prototype shell", async ({ page }) => {
+test("opens the explicit authentication screen", async ({ page }) => {
   await page.goto("./");
-
-  await expect(page.getByRole("heading", { name: "Оживающие выпускные фотографии" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Открыть проекты" })).toBeVisible();
-});
-
-test("navigates through the new router and keeps local project creation working", async ({ page }) => {
-  await page.goto("./");
-  await page.getByRole("button", { name: "Открыть проекты" }).click();
 
   await expect(page).toHaveURL(/\/ar\.photo\/login$/);
+  await expect(page.getByRole("heading", { name: "Добро пожаловать" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Войти" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Зарегистрироваться" })).toBeVisible();
+});
+
+test("navigates through the protected router and opens quick creation", async ({ page }) => {
+  await page.goto("./");
   await signInToDemo(page);
   await expect(page).toHaveURL(/\/ar\.photo\/dashboard$/);
-  await page.getByPlaceholder("Например, Выпускной 2026").fill("Router smoke test");
-  await page.getByRole("button", { name: "Новый проект" }).click();
-
-  await expect(page.getByRole("heading", { name: "Router smoke test" })).toBeVisible();
+  await page.getByRole("link", { name: "Создать AR-фото" }).first().click();
+  await expect(page).toHaveURL(/\/ar\.photo\/create$/);
+  await expect(page.getByRole("heading", { name: "Оживите фотографию" })).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Этапы создания AR-фото" }).getByText("Шаг 1", { exact: true }),
+  ).toBeVisible();
 });
 
 test("renders the responsive SaaS navigation", async ({ page }) => {
@@ -31,7 +32,7 @@ test("renders the responsive SaaS navigation", async ({ page }) => {
   await signInToDemo(page);
 
   await expect(page.getByRole("navigation", { name: "Основная навигация" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Добро пожаловать в AR Photo" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Главная", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -59,10 +60,13 @@ test("registers with email and password through the explicit signup route", asyn
   await page.getByRole("button", { name: "Зарегистрироваться" }).click();
 
   await expect(page).toHaveURL(/\/ar\.photo\/dashboard$/);
-  await expect(page.getByRole("heading", { name: "Добро пожаловать в AR Photo" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Главная", exact: true })).toBeVisible();
 });
 
-test("keeps the public MindAR regression route available without a camera grant", async ({ page }) => {
+test("keeps the protected MindAR regression route available without a camera grant", async ({ page }) => {
+  await page.goto("./viewer/test");
+  await expect(page).toHaveURL(/\/ar\.photo\/login$/);
+  await signInToDemo(page);
   await page.goto("./viewer/test");
 
   await expect(page.getByText("Test Viewer", { exact: true })).toBeVisible();
@@ -108,7 +112,7 @@ test("creates a production project and group without duplicate submissions", asy
   await page.goto("./projects");
   await signInToDemo(page);
 
-  await expect(page.getByRole("heading", { name: "Проекты", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Мои проекты", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Создать проект" }).first().click();
   const projectDialog = page.getByRole("dialog", { name: "Новый проект" });
   await projectDialog.getByPlaceholder("Например, Выпускной 2027").fill("Выпускной 2027 — Школа №25");
@@ -159,7 +163,7 @@ test("creates a production project and group without duplicate submissions", asy
   await moveDialog.getByRole("button", { name: "Перенести", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Учителя" })).toHaveCount(0);
 
-  await page.getByRole("link", { name: "Группы", exact: true }).first().click();
+  await page.goto("./groups");
   await expect(page.getByRole("heading", { name: "Группы", exact: true })).toBeVisible();
   await expect(page.getByText("Учителя", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -178,7 +182,7 @@ test("validates and uploads a marker through the resumable media queue", async (
   const groupDialog = page.getByRole("dialog", { name: "Новая группа" });
   await groupDialog.getByPlaceholder("Например, 11А класс").fill("Media upload group");
   await groupDialog.getByRole("button", { name: "Создать группу" }).click();
-  await page.getByRole("link", { name: "Медиа", exact: true }).click();
+  await page.goto("./media");
 
   await expect(page.getByRole("heading", { name: "Медиа", exact: true })).toBeVisible();
   await expect(page.getByText("Демо-режим", { exact: false })).toBeVisible();
@@ -244,7 +248,7 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   await groupDialog.getByPlaceholder("Например, 11А класс").fill("AR workflow group");
   await groupDialog.getByRole("button", { name: "Создать группу" }).click();
 
-  await page.getByRole("link", { name: "AR-работы", exact: true }).click();
+  await page.goto("./items");
   await page.getByRole("link", { name: "Новая AR-работа" }).click();
   await page.getByRole("combobox", { name: "Проект", exact: true }).selectOption({ label: "AR workflow project" });
   await page.getByRole("combobox", { name: "Группа", exact: true }).selectOption({ label: "AR workflow group" });
@@ -256,8 +260,8 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
 
   const markerBase64 = await page.evaluate(() => {
     const canvas = document.createElement("canvas");
-    canvas.width = 320;
-    canvas.height = 240;
+    canvas.width = 640;
+    canvas.height = 480;
     const context = canvas.getContext("2d")!;
     for (let y = 0; y < canvas.height; y += 4) {
       for (let x = 0; x < canvas.width; x += 4) {
@@ -356,7 +360,7 @@ test("shows subscription usage and manages team permissions within the tariff", 
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(
-    page.getByRole("navigation", { name: "Мобильная навигация" }).getByRole("link", { name: "Настройки" }),
+    page.getByRole("navigation", { name: "Мобильная навигация" }).getByRole("link", { name: "Поддержка" }),
   ).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
@@ -384,7 +388,7 @@ test("filters privacy-safe analytics across every scope and date mode", async ({
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(
-    page.getByRole("navigation", { name: "Мобильная навигация" }).getByRole("link", { name: "Аналитика" }),
+    page.getByRole("navigation", { name: "Мобильная навигация" }).getByRole("link", { name: "Проекты" }),
   ).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
@@ -393,31 +397,53 @@ test("runs MFA-gated admin support and dangerous operations with reason capture"
   await page.goto("./admin");
   await signInToDemo(page);
 
-  await expect(page.getByRole("heading", { name: "Admin", exact: true })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Admin overview" })).toBeVisible();
-  await expect(page.getByText("MFA verified", { exact: false }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Супер-админ", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Сводка супер-админа" })).toBeVisible();
+  await expect(page.getByText("MFA подтверждена", { exact: false }).first()).toBeVisible();
   const adminNavigation = page.getByRole("navigation", { name: "Разделы admin-панели" });
   await expect(adminNavigation.getByRole("button")).toHaveCount(10);
 
-  await adminNavigation.getByRole("button", { name: "Accounts" }).click();
+  await adminNavigation.getByRole("button", { name: "Аккаунты" }).click();
   const alphaAccount = page.getByRole("article").filter({ hasText: "Alpha Studio" });
   await alphaAccount.getByRole("button", { name: "Открыть с причиной" }).click();
   const supportDialog = page.getByRole("dialog", { name: "Support access: Alpha Studio" });
   await expect(supportDialog.getByRole("button", { name: "Открыть аккаунт" })).toBeDisabled();
   await supportDialog.getByLabel("Причина обращения").fill("Диагностика обращения клиента SUPPORT-1042");
   await supportDialog.getByRole("button", { name: "Открыть аккаунт" }).click();
-  await expect(page.getByRole("heading", { name: "Users · Alpha Studio" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Пользователи · Alpha Studio" })).toBeVisible();
   await expect(page.getByText("Иван Иванов", { exact: true })).toBeVisible();
   await expect(page.locator("body")).not.toContainText("encrypted_password");
 
-  await page.getByRole("button", { name: "Отправить сброс" }).first().click();
+  await page.getByRole("button", { name: "Сбросить пароль" }).first().click();
   const resetDialog = page.getByRole("dialog", { name: /Отправить сброс/ });
   await resetDialog.getByLabel("Причина").fill("Подтверждённый запрос клиента SUPPORT-1042");
   await resetDialog.getByLabel("Введите СБРОС").fill("СБРОС");
   await resetDialog.getByRole("button", { name: "Подтвердить" }).click();
   await expect(page.getByText("Операция выполнена", { exact: true })).toBeVisible();
 
-  await adminNavigation.getByRole("button", { name: "AR Items" }).click();
+  const editor = page.getByRole("article").filter({ hasText: "Алина Магомедова" });
+  await editor.getByRole("button", { name: "Заблокировать" }).click();
+  const blockDialog = page.getByRole("dialog", { name: "Заблокировать Алина Магомедова?" });
+  await blockDialog.getByLabel("Причина").fill("Временная блокировка по обращению SECURITY-205");
+  await blockDialog.getByLabel("Введите ЗАБЛОКИРОВАТЬ").fill("ЗАБЛОКИРОВАТЬ");
+  await blockDialog.getByRole("button", { name: "Подтвердить" }).click();
+  await expect(editor.getByText("Заблокирован", { exact: true })).toBeVisible();
+
+  await editor.getByRole("button", { name: "Разблокировать" }).click();
+  const unblockDialog = page.getByRole("dialog", { name: "Разблокировать Алина Магомедова?" });
+  await unblockDialog.getByLabel("Причина").fill("Проверка завершена по обращению SECURITY-205");
+  await unblockDialog.getByLabel("Введите РАЗБЛОКИРОВАТЬ").fill("РАЗБЛОКИРОВАТЬ");
+  await unblockDialog.getByRole("button", { name: "Подтвердить" }).click();
+  await expect(editor.getByText("Активен", { exact: true })).toBeVisible();
+
+  await editor.getByRole("button", { name: "Удалить" }).click();
+  const deleteDialog = page.getByRole("dialog", { name: "Безвозвратно удалить Алина Магомедова?" });
+  await deleteDialog.getByLabel("Причина").fill("Удаление по подтверждённому запросу владельца OWNER-812");
+  await deleteDialog.getByLabel("Введите УДАЛИТЬ").fill("УДАЛИТЬ");
+  await deleteDialog.getByRole("button", { name: "Подтвердить" }).click();
+  await expect(page.getByText("Алина Магомедова", { exact: true })).toHaveCount(0);
+
+  await adminNavigation.getByRole("button", { name: "Проекты и AR" }).click();
   await page.getByLabel("Поиск проектов и AR-работ").fill("Выпускной");
   await page.getByRole("button", { name: "Найти" }).click();
   const publishedItem = page.getByRole("article").filter({ hasText: "Алексей Иванов" });
@@ -428,7 +454,7 @@ test("runs MFA-gated admin support and dangerous operations with reason capture"
   await itemDialog.getByRole("button", { name: "Подтвердить" }).click();
   await expect(publishedItem.getByText("suspended", { exact: true })).toBeVisible();
 
-  await adminNavigation.getByRole("button", { name: "Errors" }).click();
+  await adminNavigation.getByRole("button", { name: "Ошибки" }).click();
   await page.getByRole("button", { name: "Повторить задачу" }).first().click();
   const retryDialog = page.getByRole("dialog", { name: /Повторить processing/ });
   await retryDialog.getByLabel("Причина").fill("Повтор после диагностики безопасной ошибки");
@@ -436,9 +462,12 @@ test("runs MFA-gated admin support and dangerous operations with reason capture"
   await retryDialog.getByRole("button", { name: "Подтвердить" }).click();
   await expect(page.getByRole("button", { name: "Повторить задачу" })).toHaveCount(1);
 
-  await adminNavigation.getByRole("button", { name: "Audit" }).click();
+  await adminNavigation.getByRole("button", { name: "История действий" }).click();
   await expect(page.getByText("admin.processing.retry", { exact: true })).toBeVisible();
   await expect(page.getByText("admin.password_reset.request", { exact: true })).toBeVisible();
+  await expect(page.getByText("admin.user.suspend", { exact: true })).toBeVisible();
+  await expect(page.getByText("admin.user.activate", { exact: true })).toBeVisible();
+  await expect(page.getByText("admin.user.delete.authorized", { exact: true })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -447,13 +476,13 @@ test("runs MFA-gated admin support and dangerous operations with reason capture"
 test("keeps PWA caching static-only and restores the last visited shell offline", async ({ page, context }) => {
   await page.goto("./dashboard");
   await signInToDemo(page);
-  await expect(page.getByRole("heading", { name: "Добро пожаловать в AR Photo" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Главная", exact: true })).toBeVisible();
 
   await page.evaluate(async () => navigator.serviceWorker.ready);
   await page.reload();
   await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Добро пожаловать в AR Photo" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Главная", exact: true })).toBeVisible();
   await page.reload();
 
   const cacheState = await page.evaluate(async () => {
@@ -479,6 +508,6 @@ test("keeps PWA caching static-only and restores the last visited shell offline"
 
   await context.setOffline(true);
   await page.reload({ waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: "Добро пожаловать в AR Photo" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Главная", exact: true })).toBeVisible();
   await context.setOffline(false);
 });

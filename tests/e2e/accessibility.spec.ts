@@ -30,7 +30,7 @@ test("keeps critical public and protected surfaces free of serious WCAG violatio
   await expectNoSeriousAccessibilityViolations(page, "dashboard");
 
   await page.goto("./admin");
-  await expect(page.getByRole("heading", { name: "Admin", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Супер-админ", exact: true })).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page, "admin");
 
   await page.goto("./ar/demo");

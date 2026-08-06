@@ -175,6 +175,8 @@ Data API GRANT и RLS тестируются отдельно: отсутств�
 - При direct signup `Confirm email` отключается в hosted Auth configuration; reset и optional confirmation fallback используют только allowlisted redirect URLs.
 - Суперадмин создаёт пользователя через server-only Admin API только после active-role и `aal2` проверки; пользователю отправляется invitation без временного пароля.
 - Password reset — только account-scoped recovery delivery: email разрешается server-side, password/token/link не возвращаются администратору.
+- Блокировка/разблокировка пользователя выполняется MFA-protected RPC, синхронно меняет profile и account membership и пишет обязательную причину в private audit.
+- Полное удаление пользователя выполняет только `admin-delete-user`: browser передаёт UUID, причину и точное `УДАЛИТЬ`, RPC запрещает self/superadmin/account owner/last owner, а service-role Auth delete остаётся внутри Edge runtime.
 - Suspended account/member проверяется на каждом privileged request, не только при login.
 - JWT claims могут устаревать; critical operations перепроверяют database state.
 - Перед блокировкой пользователя активные sessions отзываются, насколько позволяет выбранная конфигурация.

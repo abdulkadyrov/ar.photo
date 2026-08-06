@@ -1,18 +1,16 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ProtectedRoute } from "../../features/auth/AuthProvider";
+import { useAuth } from "../../features/auth/authContext";
 import { RouteErrorBoundary } from "../../shared/errors/RouteErrorBoundary";
 import { getPublicRuntimeConfig } from "../../shared/config/env";
 import { getRouterBasename } from "./routerBase";
 
-const PrototypeHomeRoute = lazy(() =>
-  import("../../features/prototype/PrototypeApp").then((module) => ({ default: module.PrototypeHomeRoute })),
-);
 const QuickStartRoute = lazy(() =>
   import("../../features/quick-start/QuickStartPage").then((module) => ({ default: module.QuickStartRoute })),
 );
-const PrototypeDashboardRoute = lazy(() =>
-  import("../../features/prototype/PrototypeApp").then((module) => ({ default: module.PrototypeDashboardRoute })),
+const DashboardRoute = lazy(() =>
+  import("../../features/dashboard/DashboardPage").then((module) => ({ default: module.DashboardRoute })),
 );
 const PrototypeProjectRoute = lazy(() =>
   import("../../features/prototype/PrototypeApp").then((module) => ({ default: module.PrototypeProjectRoute })),
@@ -88,6 +86,9 @@ const AnalyticsRoute = lazy(() =>
 const AdminRoute = lazy(() =>
   import("../../features/admin/AdminPage").then((module) => ({ default: module.AdminRoute })),
 );
+const SupportRoute = lazy(() =>
+  import("../../features/support/SupportPage").then((module) => ({ default: module.SupportRoute })),
+);
 
 export function AppRouter() {
   return (
@@ -101,21 +102,18 @@ function RoutedContent() {
   const location = useLocation();
   const runtime = getPublicRuntimeConfig();
   const configurationIndependent = location.pathname === "/privacy" || location.pathname === "/unsupported";
-  const quickStartEnabled = runtime.authMode === "supabase";
   if (runtime.authMode === "unconfigured" && !configurationIndependent) return <RuntimeConfigurationUnavailable />;
   return (
     <RouteErrorBoundary resetKey={location.key}>
       <Suspense fallback={<RouteLoading />}>
         <Routes>
-          <Route path="/" element={quickStartEnabled ? <QuickStartRoute /> : <PrototypeHomeRoute />} />
-          <Route path="/login" element={quickStartEnabled ? <Navigate replace to="/" /> : <LoginRoute />} />
-          <Route path="/register" element={quickStartEnabled ? <Navigate replace to="/" /> : <RegisterRoute />} />
-          <Route
-            path="/reset-password"
-            element={quickStartEnabled ? <Navigate replace to="/" /> : <ResetPasswordRoute />}
-          />
+          <Route path="/" element={<RootRoute />} />
+          <Route path="/login" element={<LoginRoute />} />
+          <Route path="/register" element={<RegisterRoute />} />
+          <Route path="/reset-password" element={<ResetPasswordRoute />} />
           <Route path="/update-password" element={<Protected element={<UpdatePasswordRoute />} />} />
-          <Route path="/dashboard" element={<Protected element={<PrototypeDashboardRoute />} />} />
+          <Route path="/dashboard" element={<Protected element={<DashboardRoute />} />} />
+          <Route path="/create" element={<Protected element={<QuickStartRoute />} />} />
           <Route path="/projects" element={<Protected element={<ProjectsRoute />} />} />
           <Route path="/projects/:projectId" element={<Protected element={<ProjectDetailsRoute />} />} />
           <Route path="/groups" element={<Protected element={<GroupsRoute />} />} />
@@ -127,11 +125,12 @@ function RoutedContent() {
           <Route path="/qr-codes" element={<Protected element={<QrCodesRoute />} />} />
           <Route path="/analytics" element={<Protected element={<AnalyticsRoute />} />} />
           <Route path="/admin" element={<Protected element={<AdminRoute />} />} />
+          <Route path="/support" element={<Protected element={<SupportRoute />} />} />
           <Route path="/settings" element={<Protected element={<SettingsRoute />} />} />
           <Route path="/settings/subscription" element={<Protected element={<SubscriptionRoute />} />} />
           <Route path="/settings/team" element={<Protected element={<TeamRoute />} />} />
           <Route path="/project/:projectId" element={<Protected element={<PrototypeProjectRoute />} />} />
-          <Route path="/viewer/test" element={<PrototypeTestViewerRoute />} />
+          <Route path="/viewer/test" element={<Protected element={<PrototypeTestViewerRoute />} />} />
           <Route path="/viewer/:livePhotoId" element={<PrototypeViewerRoute />} />
           <Route path="/ar/:publicSlug" element={<PublicArViewerRoute />} />
           <Route path="/privacy" element={<PublicArPrivacyRoute />} />
@@ -141,6 +140,12 @@ function RoutedContent() {
       </Suspense>
     </RouteErrorBoundary>
   );
+}
+
+function RootRoute() {
+  const auth = useAuth();
+  if (auth.status === "loading") return <RouteLoading />;
+  return <Navigate replace to={auth.session ? "/dashboard" : "/login"} />;
 }
 
 function RuntimeConfigurationUnavailable() {

@@ -38,13 +38,13 @@ type QuickStage =
 export function QuickStartRoute() {
   const auth = useAuth();
   if (auth.status === "loading") {
-    return <CenteredState title="Подготавливаем тестовый режим…" text="Регистрация не требуется" />;
+    return <CenteredState title="Подготавливаем создание…" text="Проверяем рабочее пространство" />;
   }
   if (!auth.session) {
     return (
       <CenteredState
-        title="Не удалось открыть тестовый режим"
-        text="Обновите страницу — AR Photo попробует создать новую гостевую сессию."
+        title="Войдите, чтобы создать AR-фото"
+        text="Создание и готовые QR-коды сохраняются в вашем личном кабинете."
         action={
           <Button onClick={() => window.location.reload()}>
             <RefreshCw size={17} /> Повторить
@@ -72,7 +72,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
 
   const workspaceQuery = useQuery({
     queryKey: ["quick-start", "workspace", userId],
-    queryFn: getQuickStartWorkspace,
+    queryFn: () => getQuickStartWorkspace(userId),
     staleTime: Number.POSITIVE_INFINITY,
   });
   const itemQuery = useQuery({
@@ -161,7 +161,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
         await arItemRepository.overrideMarkerQuality(
           workspace.accountId,
           item.id,
-          "Автоматический тестовый режим: пользователь выбрал продолжить обработку фотографии",
+          "Быстрое создание: пользователь подтвердил продолжение обработки фотографии",
         );
       }
       await waitForResult(workspace, item.id);
@@ -237,12 +237,12 @@ function QuickCreatePage({ userId }: { userId: string }) {
   };
 
   if (workspaceQuery.isPending) {
-    return <CenteredState title="Открываем тестовый режим…" text="Создаём изолированное рабочее пространство" />;
+    return <CenteredState title="Открываем создание…" text="Готовим ваше рабочее пространство" />;
   }
   if (workspaceQuery.error) {
     return (
       <CenteredState
-        title="Тестовый режим пока недоступен"
+        title="Создание пока недоступно"
         text={readableError(workspaceQuery.error)}
         action={
           <Button onClick={() => void workspaceQuery.refetch()}>
@@ -338,7 +338,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
 
       <div className="quick-privacy-note">
         <ShieldCheck size={17} />
-        <span>Файлы доступны только вашей гостевой сессии. Публичная ссылка защищена случайным идентификатором.</span>
+        <span>Файлы доступны только вашему аккаунту. Публичная ссылка защищена случайным идентификатором.</span>
       </div>
     </QuickShell>
   );
@@ -604,7 +604,7 @@ function QuickShell({
         {children}
       </div>
       <footer className="quick-footer">
-        <span>AR Photo · тестовый режим</span>
+        <span>AR Photo · личный кабинет</span>
         <span>Фото превращается в воспоминание, которое можно услышать</span>
       </footer>
     </main>
@@ -614,18 +614,18 @@ function QuickShell({
 function QuickHeader() {
   return (
     <header className="quick-header">
-      <div className="quick-brand" aria-label="AR Photo">
+      <a className="quick-brand" aria-label="AR Photo — на главную" href={`${import.meta.env.BASE_URL}dashboard`}>
         <span className="quick-brand-symbol">
           <ScanLine size={24} />
           <Sparkles size={13} />
         </span>
         <strong>AR Photo</strong>
-      </div>
+      </a>
       <div className="quick-header-badges">
         <span>
-          <ShieldCheck size={15} /> Без регистрации
+          <ShieldCheck size={15} /> Защищено
         </span>
-        <span className="quick-test-badge">Тестовый режим</span>
+        <span className="quick-test-badge">Личный кабинет</span>
       </div>
     </header>
   );

@@ -58,7 +58,7 @@ export function LoginRoute() {
   return (
     <AuthLayout title="Добро пожаловать" description="Войдите в защищённое пространство AR Photo.">
       {auth.mode === "demo" ? (
-        <div className="mb-5 rounded-2xl border border-primary/20 bg-primary/10 p-3 text-sm leading-5 text-[#b8afff]">
+        <div className="mb-5 rounded-2xl border border-primary/20 bg-primary/10 p-3 text-sm leading-5 text-[#5140b8]">
           Локальный demo-режим: используйте предзаполненный email и любой пароль от 8 символов.
         </div>
       ) : null}
@@ -187,7 +187,7 @@ export function RegisterRoute() {
             <span>Я подтверждаю право использовать загружаемые фотографии и видео.</span>
           </label>
           {errors.termsAccepted ? (
-            <p className="text-xs font-medium text-rose-300">{errors.termsAccepted.message}</p>
+            <p className="text-xs font-medium text-rose-700">{errors.termsAccepted.message}</p>
           ) : null}
           {formError ? <FormNotice tone="error">{formError}</FormNotice> : null}
           <Button
@@ -371,7 +371,7 @@ function AuthField({
         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">{icon}</span>
         <input {...props} {...inputProps} className="field-control auth-field-control" aria-invalid={Boolean(error)} />
       </span>
-      {error ? <span className="mt-1.5 block text-xs font-medium text-rose-300">{error.message}</span> : null}
+      {error ? <span className="mt-1.5 block text-xs font-medium text-rose-700">{error.message}</span> : null}
     </label>
   );
 }
@@ -379,7 +379,7 @@ function AuthField({
 function FormNotice({ tone, children }: { tone: "error" | "success"; children: ReactNode }) {
   return (
     <div
-      className={`rounded-xl border p-3 text-sm leading-5 ${tone === "error" ? "border-rose-400/20 bg-rose-400/10 text-rose-200" : "border-emerald-400/20 bg-emerald-400/10 text-emerald-200"}`}
+      className={`rounded-xl border p-3 text-sm leading-5 ${tone === "error" ? "border-rose-400/30 bg-rose-50 text-rose-800" : "border-emerald-400/30 bg-emerald-50 text-emerald-800"}`}
       role={tone === "error" ? "alert" : "status"}
     >
       {children}

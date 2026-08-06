@@ -2,7 +2,7 @@
 
 ## 1. Область документа
 
-Документ описывает применённую PostgreSQL/Supabase схему этапов 2–11. Этап 11 не изменял schema, а закрепил clean-database/release evidence и operational runbooks. Источник истины — последовательные SQL-миграции в `supabase/migrations`; CI разворачивает их с нуля на PostgreSQL 17, выполняет seed, lint и 323 pgTAP assertions.
+Документ описывает применённую PostgreSQL/Supabase схему этапов 2–11 и последующее продуктовое обновление кабинета. Этап 11 не изменял schema, а закрепил clean-database/release evidence и operational runbooks. Источник истины — последовательные SQL-миграции в `supabase/migrations`; CI разворачивает их с нуля на PostgreSQL 17, выполняет seed, lint и 384 pgTAP assertions.
 
 Все UUID генерируются сервером. Все timestamps — `timestamptz`. Денормализованный `account_id` используется на tenant-bound таблицах для простых и быстрых RLS policies, но всегда устанавливается/проверяется доверенной server logic.
 
@@ -204,7 +204,7 @@ Create project/group/AR item, add member, upload finalize и publish выпол�
 
 Analytics ingestion доступен только service role: `record_public_ar_event` сам разрешает опубликованный item, upsert-ит session и идемпотентно записывает milestone; `consume_public_analytics_rate_limit` атомарно считает только salted hash buckets. Authenticated dashboard получает исключительно aggregate JSON через `get_analytics_summary` после permission/scope проверки. `purge_analytics_before` — service-only bounded batch delete с запретом удалять данные моложе 30 дней.
 
-Admin contract разделён на минимальный `get_admin_access`, MFA-gated operational reads и trusted mutations. `private.require_admin_mfa` требует active `superadmin` и `aal2`; `admin_get_account_detail` дополнительно требует reason и создаёт support audit. Account/status/subscription/plan/content/settings/retry/reset/create functions повторяют authorization внутри transaction и создают private audit. Старые прямые browser grants на `admin_create_account` и `admin_update_subscription` отозваны. Ни один database contract не принимает и не возвращает password/hash/recovery credential.
+Admin contract разделён на минимальный `get_admin_access`, MFA-gated operational reads и trusted mutations. `private.require_admin_mfa` требует active `superadmin` и `aal2`; `admin_get_account_detail` дополнительно требует reason и создаёт support audit. Account/status/subscription/plan/content/settings/retry/reset/create functions повторяют authorization внутри transaction и создают private audit. `admin_set_user_active` синхронно меняет active-state профиля и membership, а `admin_authorize_user_deletion` блокирует self/superadmin/account owner/last owner, требует точное `УДАЛИТЬ` и деактивирует пользователя до server-side Auth удаления. Старые прямые browser grants на `admin_create_account` и `admin_update_subscription` отозваны. Ни один database contract не принимает и не возвращает password/hash/recovery credential.
 
 ## 7. RLS matrix
 

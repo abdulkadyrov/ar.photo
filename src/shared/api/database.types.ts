@@ -1149,6 +1149,15 @@ export type Database = {
         };
         Returns: Json;
       };
+      admin_authorize_user_deletion: {
+        Args: {
+          p_confirmation: string;
+          p_reason: string;
+          p_target_account_id: string;
+          p_target_user_id: string;
+        };
+        Returns: Json;
+      };
       admin_create_account: {
         Args: {
           p_account_name: string;
@@ -1307,6 +1316,15 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      admin_set_user_active: {
+        Args: {
+          p_active: boolean;
+          p_reason: string;
+          p_target_account_id: string;
+          p_target_user_id: string;
+        };
+        Returns: Json;
       };
       admin_set_ar_item_suspended: {
         Args: {

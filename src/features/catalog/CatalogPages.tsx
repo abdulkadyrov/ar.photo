@@ -132,7 +132,7 @@ export function ProjectsRoute() {
   return (
     <AppShell
       eyebrow={workspace.accountName}
-      title="Проекты"
+      title="Мои проекты"
       description="Создавайте коллекции, управляйте группами и отслеживайте готовность AR-материалов."
       actions={
         <Button disabled={!workspace.canWrite} onClick={() => setCreating(true)} icon={<Plus size={18} />}>
@@ -324,7 +324,7 @@ export function GroupsRoute() {
                   project.groups.map((group) => (
                     <div
                       key={group.id}
-                      className="flex items-center gap-3 rounded-2xl border border-line bg-white/[0.025] px-3 py-3"
+                      className="flex items-center gap-3 rounded-2xl border border-line bg-white px-3 py-3"
                     >
                       <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
                         <Layers3 size={17} />
@@ -1346,7 +1346,7 @@ function FormField({ label, error, children }: { label: string; error?: string; 
     <label className="block text-sm font-semibold">
       <span>{label}</span>
       <span className="mt-2 block">{children}</span>
-      {error ? <span className="mt-1.5 block text-xs text-rose-300">{error}</span> : null}
+      {error ? <span className="mt-1.5 block text-xs text-rose-700">{error}</span> : null}
     </label>
   );
 }
@@ -1361,9 +1361,9 @@ function InlineError({ children }: { children: ReactNode }) {
 
 function StatusPill({ children, tone }: { children: ReactNode; tone: "success" | "muted" | "danger" }) {
   const toneClass = {
-    success: "bg-emerald-400/10 text-emerald-300",
-    muted: "bg-white/[0.06] text-muted",
-    danger: "bg-rose-400/10 text-rose-300",
+    success: "bg-emerald-50 text-emerald-700",
+    muted: "bg-stone-100 text-muted",
+    danger: "bg-rose-50 text-rose-700",
   }[tone];
   return <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${toneClass}`}>{children}</span>;
 }

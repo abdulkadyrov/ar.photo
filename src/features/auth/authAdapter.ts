@@ -42,18 +42,12 @@ export class SupabaseAuthAdapter implements AuthAdapter {
   async getSession() {
     const { data, error } = await this.client.auth.getSession();
     if (error) throw error;
-    if (data.session) return this.prepareSession(data.session);
-
-    const anonymous = await this.client.auth.signInAnonymously({
-      options: {
-        data: {
-          registration_source: "guest_test",
-          full_name: "Гость",
-        },
-      },
-    });
-    if (anonymous.error) throw anonymous.error;
-    return this.prepareSession(anonymous.data.session);
+    if (!data.session) return null;
+    if (data.session.user.is_anonymous) {
+      await this.client.auth.signOut({ scope: "local" });
+      return null;
+    }
+    return this.prepareSession(data.session);
   }
 
   async signIn(email: string, password: string) {
@@ -112,10 +106,8 @@ export class SupabaseAuthAdapter implements AuthAdapter {
 
   private async prepareSession(session: Session | null) {
     if (!session) return null;
-    if (session.user.is_anonymous) {
-      const { error } = await this.client.rpc("bootstrap_guest_account");
-      if (error) throw error;
-    } else if (session.user.user_metadata.registration_source === "self_service") {
+    if (session.user.is_anonymous) return null;
+    if (session.user.user_metadata.registration_source === "self_service") {
       const { error } = await this.client.rpc("bootstrap_self_service_account");
       if (error) throw error;
     }

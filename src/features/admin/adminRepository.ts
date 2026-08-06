@@ -49,6 +49,8 @@ export interface AdminRepository {
   createAccount(input: CreateAdminAccountInput): Promise<void>;
   updateSubscription(accountId: string, input: SubscriptionAdminInput): Promise<void>;
   setAccountStatus(accountId: string, status: "active" | "suspended", reason: string): Promise<void>;
+  setUserActive(accountId: string, userId: string, active: boolean, reason: string): Promise<void>;
+  deleteUser(accountId: string, userId: string, confirmation: "УДАЛИТЬ", reason: string): Promise<void>;
   setItemSuspended(accountId: string, itemId: string, suspended: boolean, reason: string): Promise<void>;
   retryProcessingJob(accountId: string, jobId: number, reason: string): Promise<void>;
   upsertPlan(input: AdminPlanInput): Promise<void>;
@@ -145,6 +147,28 @@ export class SupabaseAdminRepository implements AdminRepository {
     if (error) throw mapAdminError(error);
   }
 
+  async setUserActive(accountId: string, userId: string, active: boolean, rawReason: string) {
+    const { error } = await this.client.rpc("admin_set_user_active", {
+      p_target_account_id: accountId,
+      p_target_user_id: userId,
+      p_active: active,
+      p_reason: adminReasonSchema.parse(rawReason),
+    });
+    if (error) throw mapAdminError(error);
+  }
+
+  async deleteUser(accountId: string, userId: string, confirmation: "УДАЛИТЬ", rawReason: string) {
+    const { error } = await this.client.functions.invoke("admin-delete-user", {
+      body: {
+        accountId,
+        userId,
+        confirmation,
+        reason: adminReasonSchema.parse(rawReason),
+      },
+    });
+    if (error) throw await mapEdgeAdminError(error);
+  }
+
   async setItemSuspended(accountId: string, itemId: string, suspended: boolean, rawReason: string) {
     const { error } = await this.client.rpc("admin_set_ar_item_suspended", {
       p_target_account_id: accountId,
@@ -228,6 +252,18 @@ async function mapEdgeAdminError(error: { code?: string; message?: string; conte
       if (payload.code === "forbidden") return new AdminError("forbidden", "Нет доступа к admin-панели");
       if (payload.code === "password_reset_not_configured") {
         return new AdminError("unexpected", "Доставка писем сброса ещё не настроена");
+      }
+      if (payload.code === "user_delete_not_allowed" || payload.code === "self_delete_forbidden") {
+        return new AdminError(
+          "invalid",
+          "Этого пользователя нельзя удалить: проверьте роль владельца и выбранный аккаунт",
+        );
+      }
+      if (payload.code === "user_delete_failed") {
+        return new AdminError(
+          "unexpected",
+          "Auth не завершил удаление. Пользователь заблокирован до повторной проверки",
+        );
       }
       if (payload.code) return new AdminError("invalid", "Сервис отклонил admin-операцию");
     } catch {

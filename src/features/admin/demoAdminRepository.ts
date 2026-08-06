@@ -171,6 +171,30 @@ export class DemoAdminRepository implements AdminRepository {
     this.audit(accountId, "admin.account.status", "accounts", accountId, reason, { status });
   }
 
+  async setUserActive(accountId: string, userId: string, active: boolean, rawReason: string) {
+    const reason = adminReasonSchema.parse(rawReason);
+    const user = this.detail(accountId).users.find((candidate) => candidate.id === userId);
+    if (!user) throw new AdminError("not_found", "Пользователь аккаунта не найден");
+    if (active && !user.acceptedAt)
+      throw new AdminError("invalid", "Ожидающее приглашение нельзя активировать вручную");
+    user.isActive = active;
+    this.audit(accountId, active ? "admin.user.activate" : "admin.user.suspend", "profiles", userId, reason, {
+      active,
+      memberRole: user.role,
+    });
+  }
+
+  async deleteUser(accountId: string, userId: string, confirmation: "УДАЛИТЬ", rawReason: string) {
+    const reason = adminReasonSchema.parse(rawReason);
+    if (confirmation !== "УДАЛИТЬ") throw new AdminError("invalid", "Введите подтверждение УДАЛИТЬ");
+    const detail = this.detail(accountId);
+    const index = detail.users.findIndex((candidate) => candidate.id === userId);
+    if (index < 0) throw new AdminError("not_found", "Пользователь аккаунта не найден");
+    if (detail.users[index].role === "owner") throw new AdminError("invalid", "Владельца аккаунта нельзя удалить");
+    detail.users.splice(index, 1);
+    this.audit(accountId, "admin.user.delete.authorized", "profiles", userId, reason);
+  }
+
   async setItemSuspended(accountId: string, itemId: string, suspended: boolean, rawReason: string) {
     const reason = adminReasonSchema.parse(rawReason);
     const item = this.state.content.find(

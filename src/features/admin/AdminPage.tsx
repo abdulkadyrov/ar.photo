@@ -13,7 +13,10 @@ import {
   RefreshCw,
   Settings,
   ShieldCheck,
+  Trash2,
+  UserCheck,
   UserPlus,
+  UserX,
   Users,
   WandSparkles,
 } from "lucide-react";
@@ -32,16 +35,16 @@ import { getAdminRepository } from "./adminRepository";
 
 const adminRepository = getAdminRepository();
 const tabs = [
-  { id: "overview", label: "Overview", icon: Activity },
-  { id: "users", label: "Users", icon: Users },
-  { id: "accounts", label: "Accounts", icon: Building2 },
-  { id: "subscriptions", label: "Subscriptions", icon: CreditCard },
-  { id: "plans", label: "Plans", icon: Boxes },
-  { id: "storage", label: "Storage", icon: HardDrive },
-  { id: "items", label: "AR Items", icon: WandSparkles },
-  { id: "errors", label: "Errors", icon: CircleAlert },
-  { id: "audit", label: "Audit", icon: ListChecks },
-  { id: "settings", label: "Settings", icon: Settings },
+  { id: "overview", label: "Обзор", icon: Activity },
+  { id: "accounts", label: "Аккаунты", icon: Building2 },
+  { id: "users", label: "Пользователь", icon: Users },
+  { id: "subscriptions", label: "Подписки", icon: CreditCard },
+  { id: "items", label: "Проекты и AR", icon: WandSparkles },
+  { id: "errors", label: "Ошибки", icon: CircleAlert },
+  { id: "audit", label: "История действий", icon: ListChecks },
+  { id: "plans", label: "Тарифы", icon: Boxes },
+  { id: "storage", label: "Хранилище", icon: HardDrive },
+  { id: "settings", label: "Настройки", icon: Settings },
 ] as const;
 type TabId = (typeof tabs)[number]["id"];
 
@@ -50,6 +53,8 @@ type ConfirmAction =
   | { kind: "item"; item: AdminContentResult; suspended: boolean }
   | { kind: "retry"; accountId: string; jobId: number; label: string }
   | { kind: "reset"; accountId: string; userId: string; label: string }
+  | { kind: "user-status"; accountId: string; userId: string; label: string; active: boolean }
+  | { kind: "user-delete"; accountId: string; userId: string; label: string }
   | { kind: "setting"; setting: AdminSetting; value: AdminSetting["value"] }
   | { kind: "subscription"; detail: AdminAccountDetail; planId: string; status: SubscriptionStatus; days: number };
 type SubscriptionStatus = "trial" | "active" | "grace_period" | "expired" | "suspended" | "cancelled";
@@ -107,6 +112,15 @@ export function AdminRoute() {
         await adminRepository.retryProcessingJob(confirmAction.accountId, confirmAction.jobId, reason);
       } else if (confirmAction.kind === "reset") {
         await adminRepository.requestPasswordReset(confirmAction.accountId, confirmAction.userId, reason);
+      } else if (confirmAction.kind === "user-status") {
+        await adminRepository.setUserActive(
+          confirmAction.accountId,
+          confirmAction.userId,
+          confirmAction.active,
+          reason,
+        );
+      } else if (confirmAction.kind === "user-delete") {
+        await adminRepository.deleteUser(confirmAction.accountId, confirmAction.userId, "УДАЛИТЬ", reason);
       } else if (confirmAction.kind === "setting") {
         await adminRepository.updateSetting(confirmAction.setting.key, confirmAction.value, reason);
       } else {
@@ -123,7 +137,25 @@ export function AdminRoute() {
       }
     },
     onSuccess: async () => {
+      const completedAction = confirmAction;
       const wasItem = confirmAction?.kind === "item";
+      if (completedAction?.kind === "user-status") {
+        setDetail((current) =>
+          current
+            ? {
+                ...current,
+                users: current.users.map((user) =>
+                  user.id === completedAction.userId ? { ...user, isActive: completedAction.active } : user,
+                ),
+              }
+            : current,
+        );
+      }
+      if (completedAction?.kind === "user-delete") {
+        setDetail((current) =>
+          current ? { ...current, users: current.users.filter((user) => user.id !== completedAction.userId) } : current,
+        );
+      }
       setToast({ title: "Операция выполнена", message: "Изменение записано в admin audit.", tone: "success" });
       closeConfirmation();
       await queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
@@ -146,8 +178,8 @@ export function AdminRoute() {
   if (!accessQuery.data?.isSuperadmin) {
     return (
       <AppShell
-        eyebrow="Protected operations"
-        title="Admin"
+        eyebrow="Защищённые операции"
+        title="Супер-админ"
         description="Доступ только для активного суперадминистратора."
       >
         <div className="mt-6">
@@ -176,9 +208,9 @@ export function AdminRoute() {
 
   return (
     <AppShell
-      eyebrow="Protected operations · MFA verified"
-      title="Admin"
-      description="Управление клиентами и инцидентами. Account-scoped support access требует причину; все изменения аудируются."
+      eyebrow="MFA подтверждена · действия аудируются"
+      title="Супер-админ"
+      description="Пользователи, подписки, проекты и системные события AR Photo в одном защищённом пространстве."
       actions={
         <Button variant="quiet" icon={<RefreshCw size={17} />} onClick={() => void snapshotQuery.refetch()}>
           Обновить
@@ -224,6 +256,12 @@ export function AdminRoute() {
         <UsersSection
           detail={detail}
           onReset={(userId, label) => openConfirm({ kind: "reset", accountId: detail!.account.id, userId, label })}
+          onStatus={(userId, label, active) =>
+            openConfirm({ kind: "user-status", accountId: detail!.account.id, userId, label, active })
+          }
+          onDelete={(userId, label) =>
+            openConfirm({ kind: "user-delete", accountId: detail!.account.id, userId, label })
+          }
         />
       ) : null}
       {tab === "subscriptions" ? (
@@ -330,7 +368,7 @@ function OverviewSection({ snapshot }: { snapshot: Awaited<ReturnType<typeof adm
   const overview = snapshot.overview;
   return (
     <>
-      <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Admin overview">
+      <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Сводка супер-админа">
         <MetricCard
           icon={<Building2 size={20} />}
           label="Аккаунты"
@@ -351,24 +389,23 @@ function OverviewSection({ snapshot }: { snapshot: Awaited<ReturnType<typeof adm
         />
         <MetricCard
           icon={<CircleAlert size={20} />}
-          label="Ошибки processing"
+          label="Ошибки обработки"
           value={overview.failedJobs}
           hint={`${overview.publishedItems} опубликовано`}
         />
       </section>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Panel>
-          <SectionTitle icon={<ShieldCheck size={19} />} title="Security boundary" />
+          <SectionTitle icon={<ShieldCheck size={19} />} title="Защита операций" />
           <p className="mt-3 text-sm leading-6 text-muted">
-            Admin data доступна только при active superadmin profile и JWT assurance level aal2. Password fields
-            отсутствуют во всех контрактах.
+            Данные доступны только активному супер-админу после MFA. Пароли и их хэши отсутствуют во всех контрактах.
           </p>
         </Panel>
         <Panel>
-          <SectionTitle icon={<FileSearch size={19} />} title="Support access" />
+          <SectionTitle icon={<FileSearch size={19} />} title="Доступ поддержки" />
           <p className="mt-3 text-sm leading-6 text-muted">
-            Открытие клиентской карточки требует причину от 10 символов. Причина, actor, account и время сохраняются в
-            private append-only audit.
+            Открытие карточки требует причину от 10 символов. Администратор, аккаунт, причина и время сохраняются в
+            неизменяемой истории действий.
           </p>
         </Panel>
       </div>
@@ -397,8 +434,8 @@ function AccountsSection({
     <Panel className="mt-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold">Accounts</h2>
-          <p className="mt-1 text-sm text-muted">Поиск, support access и безопасная приостановка.</p>
+          <h2 className="text-xl font-semibold">Аккаунты пользователей</h2>
+          <p className="mt-1 text-sm text-muted">Поиск, просмотр по указанной причине и безопасная блокировка.</p>
         </div>
         <Button icon={<UserPlus size={17} />} onClick={onCreate}>
           Создать аккаунт
@@ -423,7 +460,7 @@ function AccountsSection({
       </form>
       <div className="mt-5 grid gap-3">
         {accounts.map((account) => (
-          <article key={account.id} className="rounded-2xl border border-line bg-white/[0.025] p-4">
+          <article key={account.id} className="rounded-2xl border border-line bg-white p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="font-semibold">{account.name}</h3>
@@ -456,39 +493,70 @@ function AccountsSection({
 function UsersSection({
   detail,
   onReset,
+  onStatus,
+  onDelete,
 }: {
   detail: AdminAccountDetail | null;
   onReset: (userId: string, label: string) => void;
+  onStatus: (userId: string, label: string, active: boolean) => void;
+  onDelete: (userId: string, label: string) => void;
 }) {
   if (!detail)
     return (
-      <EmptyAdminSection title="Users" text="Откройте аккаунт в разделе Accounts и укажите причину support access." />
+      <EmptyAdminSection
+        title="Пользователь не выбран"
+        text="Откройте аккаунт в разделе «Аккаунты» и укажите причину доступа."
+      />
     );
   return (
     <Panel className="mt-6">
-      <SectionTitle icon={<Users size={19} />} title={`Users · ${detail.account.name}`} />
+      <SectionTitle icon={<Users size={19} />} title={`Пользователи · ${detail.account.name}`} />
       <p className="mt-2 text-sm text-muted">
-        Пароли и Auth hashes недоступны администратору. Можно только инициировать recovery email.
+        Пароли недоступны администратору. Можно отправить письмо сброса, заблокировать или удалить допустимого
+        пользователя.
       </p>
       <div className="mt-5 grid gap-3">
         {detail.users.map((user) => (
-          <article
-            key={user.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line p-4"
-          >
-            <div>
-              <h3 className="font-semibold">{user.fullName ?? "Без имени"}</h3>
-              <p className="mt-1 text-sm text-muted">
-                {user.emailDisplay ?? "Email скрыт"} · {user.role}
-              </p>
+          <article key={user.id} className="rounded-2xl border border-line bg-white p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-semibold">{user.fullName ?? "Без имени"}</h3>
+                  <StatusPill tone={user.isActive ? "success" : "danger"}>
+                    {user.isActive ? "Активен" : "Заблокирован"}
+                  </StatusPill>
+                </div>
+                <p className="mt-1 text-sm text-muted">
+                  {user.emailDisplay ?? "Email скрыт"} · {user.role}
+                </p>
+              </div>
             </div>
-            <Button
-              variant="quiet"
-              icon={<KeyRound size={16} />}
-              onClick={() => onReset(user.id, user.fullName ?? "пользователь")}
-            >
-              Отправить сброс
-            </Button>
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4">
+              <Button
+                variant="quiet"
+                icon={<KeyRound size={16} />}
+                onClick={() => onReset(user.id, user.fullName ?? "пользователь")}
+              >
+                Сбросить пароль
+              </Button>
+              <Button
+                variant={user.isActive ? "danger" : "quiet"}
+                icon={user.isActive ? <UserX size={16} /> : <UserCheck size={16} />}
+                onClick={() => onStatus(user.id, user.fullName ?? "пользователь", !user.isActive)}
+                disabled={!user.acceptedAt}
+              >
+                {user.isActive ? "Заблокировать" : "Разблокировать"}
+              </Button>
+              <Button
+                variant="danger"
+                icon={<Trash2 size={16} />}
+                onClick={() => onDelete(user.id, user.fullName ?? "пользователь")}
+                disabled={user.role === "owner"}
+                title={user.role === "owner" ? "Сначала назначьте другого владельца аккаунта" : "Удалить пользователя"}
+              >
+                Удалить
+              </Button>
+            </div>
           </article>
         ))}
       </div>
@@ -509,12 +577,10 @@ function SubscriptionsSection({
   const [status, setStatus] = useState<SubscriptionStatus>(detail?.subscription.status ?? "active");
   const [days, setDays] = useState("90");
   if (!detail)
-    return (
-      <EmptyAdminSection title="Subscriptions" text="Сначала откройте аккаунт через reason-captured support access." />
-    );
+    return <EmptyAdminSection title="Подписка не выбрана" text="Сначала откройте аккаунт и укажите причину доступа." />;
   return (
     <Panel className="mt-6">
-      <SectionTitle icon={<CreditCard size={19} />} title={`Subscription · ${detail.account.name}`} />
+      <SectionTitle icon={<CreditCard size={19} />} title={`Подписка · ${detail.account.name}`} />
       <div className="mt-5 grid gap-4 md:grid-cols-3">
         <Select
           label="Тариф"
@@ -535,7 +601,7 @@ function SubscriptionsSection({
       </div>
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted">
-          Custom limits:{" "}
+          Особые лимиты:{" "}
           {Object.keys(detail.subscription.customLimits).length
             ? JSON.stringify(detail.subscription.customLimits)
             : "по тарифу"}
@@ -555,7 +621,7 @@ function PlansSection({ plans, onCreate }: { plans: AdminPlan[]; onCreate: () =>
   return (
     <Panel className="mt-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <SectionTitle icon={<Boxes size={19} />} title="Plans" />
+        <SectionTitle icon={<Boxes size={19} />} title="Тарифы" />
         <Button onClick={onCreate}>Новый тариф</Button>
       </div>
       <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -564,13 +630,13 @@ function PlansSection({ plans, onCreate }: { plans: AdminPlan[]; onCreate: () =>
             <div className="flex items-center justify-between gap-3">
               <h3 className="font-semibold">{plan.name}</h3>
               <StatusPill tone={plan.isActive ? "success" : "muted"}>
-                {plan.isActive ? "active" : "inactive"}
+                {plan.isActive ? "Активен" : "Отключён"}
               </StatusPill>
             </div>
             <p className="mt-2 text-sm text-muted">
               {plan.code} · {plan.projectLimit ?? "∞"} проектов · {plan.teamLimit ?? "∞"} сотрудников
             </p>
-            <p className="mt-2 text-sm text-muted">{formatBytes(plan.storageLimitBytes ?? 0)} storage</p>
+            <p className="mt-2 text-sm text-muted">Хранилище: {formatBytes(plan.storageLimitBytes ?? 0)}</p>
           </article>
         ))}
       </div>
@@ -581,7 +647,7 @@ function PlansSection({ plans, onCreate }: { plans: AdminPlan[]; onCreate: () =>
 function StorageSection({ accounts }: { accounts: AdminAccount[] }) {
   return (
     <Panel className="mt-6">
-      <SectionTitle icon={<Database size={19} />} title="Storage" />
+      <SectionTitle icon={<Database size={19} />} title="Использование хранилища" />
       <div className="mt-5 grid gap-3">
         {accounts.map((account) => (
           <div key={account.id} className="rounded-2xl border border-line p-4">
@@ -589,7 +655,7 @@ function StorageSection({ accounts }: { accounts: AdminAccount[] }) {
               <span className="font-semibold">{account.name}</span>
               <span className="text-sm text-muted">{formatBytes(account.storageUsedBytes)}</span>
             </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-stone-100">
               <div
                 className="h-full rounded-full bg-primary"
                 style={{ width: `${Math.min(100, Math.max(3, account.storageUsedBytes / 1_073_741_824))}%` }}
@@ -621,7 +687,7 @@ function ItemsSection({
 }) {
   return (
     <Panel className="mt-6">
-      <SectionTitle icon={<WandSparkles size={19} />} title="AR Items" />
+      <SectionTitle icon={<WandSparkles size={19} />} title="Проекты и AR-работы" />
       <form
         className="mt-5 flex flex-col gap-2 sm:flex-row"
         onSubmit={(event) => {
@@ -640,7 +706,7 @@ function ItemsSection({
         </Button>
       </form>
       {error ? (
-        <p className="mt-3 text-sm text-rose-300" role="alert">
+        <p className="mt-3 text-sm text-rose-700" role="alert">
           {readableAdminError(error)}
         </p>
       ) : null}
@@ -683,7 +749,7 @@ function ErrorsSection({
 }) {
   return (
     <Panel className="mt-6">
-      <SectionTitle icon={<CircleAlert size={19} />} title="Processing errors" />
+      <SectionTitle icon={<CircleAlert size={19} />} title="Ошибки обработки" />
       <div className="mt-5 grid gap-3">
         {errors.map((error) => (
           <article key={error.id} className="rounded-2xl border border-line p-4">
@@ -713,7 +779,7 @@ function ErrorsSection({
 function AuditSection({ audit }: { audit: Awaited<ReturnType<typeof adminRepository.getSnapshot>>["audit"]["items"] }) {
   return (
     <Panel className="mt-6">
-      <SectionTitle icon={<ListChecks size={19} />} title="Admin audit" />
+      <SectionTitle icon={<ListChecks size={19} />} title="История действий" />
       <div className="mt-5 overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="text-muted">
@@ -827,7 +893,7 @@ function SupportModal({
         onChange={onReason}
       />
       {error ? (
-        <p className="mt-3 text-sm text-rose-300" role="alert">
+        <p className="mt-3 text-sm text-rose-700" role="alert">
           {readableAdminError(error)}
         </p>
       ) : null}
@@ -865,7 +931,14 @@ function ConfirmModal({
       onClose={onClose}
       actions={
         <Button
-          variant={action?.kind === "account" || action?.kind === "item" ? "danger" : "primary"}
+          variant={
+            action?.kind === "account" ||
+            action?.kind === "item" ||
+            action?.kind === "user-status" ||
+            action?.kind === "user-delete"
+              ? "danger"
+              : "primary"
+          }
           disabled={pending || reason.trim().length < 10 || confirmation !== word}
           onClick={onSubmit}
         >
@@ -878,7 +951,7 @@ function ConfirmModal({
         <LabeledInput label={`Введите ${word}`} value={confirmation} onChange={onConfirmation} />
       </div>
       {error ? (
-        <p className="mt-3 text-sm text-rose-300" role="alert">
+        <p className="mt-3 text-sm text-rose-700" role="alert">
           {readableAdminError(error)}
         </p>
       ) : null}
@@ -938,7 +1011,7 @@ function CreateAccountModal({
         </div>
       </div>
       {mutation.error ? (
-        <p className="mt-3 text-sm text-rose-300" role="alert">
+        <p className="mt-3 text-sm text-rose-700" role="alert">
           {readableAdminError(mutation.error)}
         </p>
       ) : null}
@@ -986,7 +1059,7 @@ function CreatePlanModal({ open, onClose, onSuccess }: { open: boolean; onClose:
         <LabeledInput label="Причина" value={reason} onChange={setReason} />
       </div>
       {mutation.error ? (
-        <p className="mt-3 text-sm text-rose-300" role="alert">
+        <p className="mt-3 text-sm text-rose-700" role="alert">
           {readableAdminError(mutation.error)}
         </p>
       ) : null}
@@ -1028,7 +1101,7 @@ function MfaRequired({ onVerified }: { onVerified: () => void }) {
           </Button>
         </form>
         {mutation.error ? (
-          <p className="mt-3 text-sm text-rose-300" role="alert">
+          <p className="mt-3 text-sm text-rose-700" role="alert">
             {readableAdminError(mutation.error)}
           </p>
         ) : null}
@@ -1039,7 +1112,7 @@ function MfaRequired({ onVerified }: { onVerified: () => void }) {
 
 function AdminLoading() {
   return (
-    <AppShell eyebrow="Protected operations" title="Admin" description="Проверяем MFA и загружаем operations contract.">
+    <AppShell eyebrow="Защищённые операции" title="Супер-админ" description="Проверяем MFA и загружаем данные.">
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }, (_, index) => (
           <Panel key={index}>
@@ -1053,7 +1126,7 @@ function AdminLoading() {
 }
 function AdminFailure({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   return (
-    <AppShell eyebrow="Protected operations" title="Admin" description="Безопасный operations console.">
+    <AppShell eyebrow="Защищённые операции" title="Супер-админ" description="Безопасная операционная панель.">
       <div className="mt-6">
         <ErrorState
           title="Admin-панель недоступна"
@@ -1099,16 +1172,18 @@ function LabeledInput({
 function StatusPill({ tone, children }: { tone: "success" | "danger" | "muted"; children: ReactNode }) {
   const colors =
     tone === "success"
-      ? "bg-emerald-400/10 text-emerald-300"
+      ? "bg-emerald-50 text-emerald-700"
       : tone === "danger"
-        ? "bg-rose-400/10 text-rose-300"
-        : "bg-white/[0.06] text-muted";
+        ? "bg-rose-50 text-rose-700"
+        : "bg-stone-100 text-muted";
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${colors}`}>{children}</span>;
 }
 function actionWord(action: ConfirmAction | null) {
   if (!action) return "";
   if (action.kind === "retry") return "ПОВТОРИТЬ";
   if (action.kind === "reset") return "СБРОС";
+  if (action.kind === "user-delete") return "УДАЛИТЬ";
+  if (action.kind === "user-status") return action.active ? "РАЗБЛОКИРОВАТЬ" : "ЗАБЛОКИРОВАТЬ";
   if (action.kind === "setting" || action.kind === "subscription") return "ИЗМЕНИТЬ";
   return action.kind === "account"
     ? action.nextStatus === "suspended"
@@ -1126,6 +1201,8 @@ function actionTitle(action: ConfirmAction | null) {
     return `${action.suspended ? "Приостановить" : "Восстановить"} ${action.item.arItemTitle}?`;
   if (action.kind === "retry") return `Повторить processing: ${action.label}?`;
   if (action.kind === "reset") return `Отправить сброс: ${action.label}?`;
+  if (action.kind === "user-status") return `${action.active ? "Разблокировать" : "Заблокировать"} ${action.label}?`;
+  if (action.kind === "user-delete") return `Безвозвратно удалить ${action.label}?`;
   if (action.kind === "setting") return `Изменить ${action.setting.key}?`;
   return `Изменить подписку ${action.detail.account.name}?`;
 }

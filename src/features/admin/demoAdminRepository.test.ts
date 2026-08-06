@@ -4,6 +4,7 @@ import { createDemoAdminRepository } from "./demoAdminRepository";
 
 const alphaId = "20000000-0000-4000-8000-000000000001";
 const alphaOwnerId = "10000000-0000-4000-8000-000000000010";
+const alphaEditorId = "10000000-0000-4000-8000-000000000011";
 
 describe("DemoAdminRepository", () => {
   it("returns an MFA-verified admin snapshot without password material", async () => {
@@ -98,6 +99,29 @@ describe("DemoAdminRepository", () => {
     expect((await repository.getSnapshot()).audit.items[0].action).toBe("admin.password_reset.request");
     await expect(
       repository.requestPasswordReset(alphaId, crypto.randomUUID(), "Попытка сброса чужого пользователя"),
+    ).rejects.toBeInstanceOf(AdminError);
+  });
+
+  it("blocks, restores and deletes eligible account users with audit evidence", async () => {
+    const repository = createDemoAdminRepository();
+    await repository.setUserActive(alphaId, alphaEditorId, false, "Блокировка пользователя по обращению RISK-204");
+    let detail = await repository.getAccountDetail(alphaId, "Проверка блокировки пользователя RISK-204");
+    expect(detail.users.find((user) => user.id === alphaEditorId)?.isActive).toBe(false);
+    await repository.setUserActive(alphaId, alphaEditorId, true, "Восстановление пользователя после RISK-204");
+    await repository.deleteUser(alphaId, alphaEditorId, "УДАЛИТЬ", "Удаление сотрудника по запросу владельца SUP-812");
+    detail = await repository.getAccountDetail(alphaId, "Проверка удаления пользователя SUP-812");
+    expect(detail.users.some((user) => user.id === alphaEditorId)).toBe(false);
+    const audit = (await repository.getSnapshot()).audit.items;
+    expect(audit.some((item) => item.action === "admin.user.suspend" && item.entityId === alphaEditorId)).toBe(true);
+    expect(
+      audit.some((item) => item.action === "admin.user.delete.authorized" && item.entityId === alphaEditorId),
+    ).toBe(true);
+  });
+
+  it("never deletes an account owner", async () => {
+    const repository = createDemoAdminRepository();
+    await expect(
+      repository.deleteUser(alphaId, alphaOwnerId, "УДАЛИТЬ", "Попытка удаления владельца аккаунта SUP-900"),
     ).rejects.toBeInstanceOf(AdminError);
   });
 });

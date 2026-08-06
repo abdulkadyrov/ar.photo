@@ -39,7 +39,9 @@ if (dashboardFiles.some((file) => file.includes("mindar") || file.includes("thre
 
 const cssFiles = manifest[appEntry].css ?? [];
 const cssBytes = cssFiles.reduce((total, file) => total + statSync(join("dist", file)).size, 0);
-assertWithin("Initial CSS", cssBytes, 48 * 1024);
+// The authenticated workspace now includes the shared responsive shell, auth,
+// dashboard, support and super-admin design system in one deterministic stylesheet.
+assertWithin("Initial CSS", cssBytes, 56 * 1024);
 
 for (const [key, chunk] of entries) {
   const lowerKey = key.toLowerCase();
