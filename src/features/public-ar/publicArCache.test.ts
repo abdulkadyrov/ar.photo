@@ -23,9 +23,9 @@ describe("public AR device cache", () => {
   it("downloads four logical stages and reuses blobs across signed URL refreshes", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response(new Blob(["poster"], { type: "image/webp" })))
-      .mockResolvedValueOnce(new Response(new Blob(["video"], { type: "video/mp4" })))
-      .mockResolvedValueOnce(new Response(new Blob(["mind-data"], { type: "application/octet-stream" })));
+      .mockResolvedValueOnce(assetResponse("poster", "image/webp"))
+      .mockResolvedValueOnce(assetResponse("video", "video/mp4"))
+      .mockResolvedValueOnce(assetResponse("mind-data", "application/octet-stream"));
     const steps: number[] = [];
 
     const cached = await cachePublicArProject("cache-test", manifest, (step) => steps.push(step));
@@ -54,3 +54,7 @@ describe("public AR device cache", () => {
     expect(publicArAssetFingerprint(changed)).not.toBe(publicArAssetFingerprint(manifest));
   });
 });
+
+function assetResponse(value: string, contentType: string) {
+  return new Response(new TextEncoder().encode(value), { headers: { "content-type": contentType } });
+}
