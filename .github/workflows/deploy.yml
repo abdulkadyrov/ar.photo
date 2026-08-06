@@ -6,14 +6,16 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -37,22 +39,23 @@ jobs:
         run: cp dist/index.html dist/404.html
       - name: Attach release manifest
         run: npm run release:manifest && cp artifacts/release-manifest.json dist/release-manifest.json
-      - name: Disable Jekyll processing
-        run: touch dist/.nojekyll
-      - name: Checkout Pages branch
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
-          ref: gh-pages
-          path: pages
-      - name: Publish Pages branch
-        run: |
-          rsync -a --delete --exclude=.git dist/ pages/
-          git -C pages config user.name "github-actions[bot]"
-          git -C pages config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git -C pages add --all
-          if git -C pages diff --cached --quiet; then
-            echo "Published assets are already current."
-            exit 0
-          fi
-          git -C pages commit -m "deploy: ${GITHUB_SHA}"
-          git -C pages push origin gh-pages
+          path: dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+        with:
+          # Pages deployments currently spend more than the default 10 minutes
+          # in deployment_queued before the published revision becomes visible.
+          timeout: 1800000
