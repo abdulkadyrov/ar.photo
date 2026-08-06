@@ -136,14 +136,17 @@ function QuickCreatePage({ userId }: { userId: string }) {
   }, [itemId, itemQuery.data, userId, workspaceQuery.data]);
 
   const submit = async () => {
-    const workspace = workspaceQuery.data;
-    if (!workspace || !markerFile || !videoFile || !canSubmit) return;
+    if (!workspaceQuery.data || !markerFile || !videoFile || !canSubmit) return;
     setError("");
     setStage("preparing");
     setStageProgress(0);
     const controller = new AbortController();
     uploadController.current = controller;
     try {
+      // Bootstrap again at the action boundary. The system Quick Start project
+      // may have been archived/deleted after this page first loaded; the RPC
+      // restores it and prevents uploads from targeting stale group ids.
+      const workspace = await getQuickStartWorkspace(userId);
       const preparedMarker = await prepareMediaFile(markerFile, "marker");
       const preparedVideo = await prepareMediaFile(videoFile, "video", {
         onProgress: (progress) => setStageProgress(Math.round(progress * 0.35)),
@@ -230,11 +233,11 @@ function QuickCreatePage({ userId }: { userId: string }) {
   };
 
   const retryProcessing = async () => {
-    const workspace = workspaceQuery.data;
-    if (!workspace || !itemId) return;
+    if (!workspaceQuery.data || !itemId) return;
     setError("");
     setStage("processing");
     try {
+      const workspace = await getQuickStartWorkspace(userId);
       await arItemRepository.retry(workspace.accountId, itemId);
       await itemQuery.refetch();
     } catch (retryError) {
@@ -743,6 +746,11 @@ function safeFileName(value: string) {
 
 function readableError(error: unknown) {
   if (error instanceof DOMException && error.name === "AbortError") return "Загрузка отменена";
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error) {
+    if (/active project group not found/i.test(error.message)) {
+      return "Системный проект был удалён или архивирован. Нажмите «Оживить фото» ещё раз — AR Photo восстановит его автоматически.";
+    }
+    return error.message;
+  }
   return "Не удалось завершить создание AR-фото";
 }

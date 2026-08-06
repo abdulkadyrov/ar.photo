@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(14);
+select plan(17);
 
 select is(
   (select count(*) from public.subscription_plans where code = 'guest_test' and is_active),
@@ -118,6 +118,37 @@ select is(
   (select guest_group.id::text from public.groups guest_group join public.accounts account on account.id = guest_group.account_id
     where account.owner_user_id = '10000000-0000-4000-8000-000000000040'),
   'quick start returns its group id'
+);
+
+update public.projects
+set status = 'archived', archived_at = statement_timestamp(), deleted_at = statement_timestamp()
+where account_id = (select id from public.accounts where owner_user_id = '10000000-0000-4000-8000-000000000040');
+
+update public.groups
+set archived_at = statement_timestamp(), deleted_at = statement_timestamp()
+where account_id = (select id from public.accounts where owner_user_id = '10000000-0000-4000-8000-000000000040');
+
+select lives_ok(
+  $$ select public.bootstrap_quick_start_workspace() $$,
+  'quick start heals an archived and deleted system workspace'
+);
+select ok(
+  (
+    select project.deleted_at is null and project.archived_at is null and project.status = 'draft'
+    from public.projects project
+    join public.accounts account on account.id = project.account_id
+    where account.owner_user_id = '10000000-0000-4000-8000-000000000040'
+  ),
+  'quick start restores its system project'
+);
+select ok(
+  (
+    select guest_group.deleted_at is null and guest_group.archived_at is null
+    from public.groups guest_group
+    join public.accounts account on account.id = guest_group.account_id
+    where account.owner_user_id = '10000000-0000-4000-8000-000000000040'
+  ),
+  'quick start restores its system group'
 );
 
 select * from finish();
