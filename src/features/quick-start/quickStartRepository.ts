@@ -10,8 +10,56 @@ const quickStartWorkspaceSchema = z.object({
 
 export type QuickStartWorkspace = z.infer<typeof quickStartWorkspaceSchema>;
 
+const pendingQuickStartSchema = z.object({
+  userId: z.string().min(1),
+  accountId: z.string().uuid(),
+  projectId: z.string().uuid(),
+  groupId: z.string().uuid(),
+  itemId: z.string().uuid(),
+  title: z.string().min(2).max(160),
+});
+
+export type PendingQuickStart = z.infer<typeof pendingQuickStartSchema>;
+
 export function parseQuickStartWorkspace(value: unknown): QuickStartWorkspace {
   return quickStartWorkspaceSchema.parse(value);
+}
+
+export function getPendingQuickStart(userId: string): PendingQuickStart | null {
+  try {
+    const raw = window.localStorage.getItem(pendingQuickStartKey(userId));
+    return raw ? pendingQuickStartSchema.parse(JSON.parse(raw)) : null;
+  } catch {
+    try {
+      window.localStorage.removeItem(pendingQuickStartKey(userId));
+    } catch {
+      // Storage can be unavailable in private/restricted PWA contexts.
+    }
+    return null;
+  }
+}
+
+export function savePendingQuickStart(value: PendingQuickStart) {
+  try {
+    window.localStorage.setItem(
+      pendingQuickStartKey(value.userId),
+      JSON.stringify(pendingQuickStartSchema.parse(value)),
+    );
+  } catch {
+    // Persistence improves recovery but must never stop server processing.
+  }
+}
+
+export function clearPendingQuickStart(userId: string) {
+  try {
+    window.localStorage.removeItem(pendingQuickStartKey(userId));
+  } catch {
+    // Nothing else is required when browser storage is unavailable.
+  }
+}
+
+function pendingQuickStartKey(userId: string) {
+  return `ar-photo-quick-start-pending-v1:${userId}`;
 }
 
 export async function getQuickStartWorkspace(userId: string): Promise<QuickStartWorkspace> {

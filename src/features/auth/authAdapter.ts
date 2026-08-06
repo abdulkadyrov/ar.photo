@@ -47,7 +47,10 @@ export class SupabaseAuthAdapter implements AuthAdapter {
       await this.client.auth.signOut({ scope: "local" });
       return null;
     }
-    return this.prepareSession(data.session);
+    // Restoring an existing session is a read-only operation. Repeating the
+    // self-service bootstrap here made every PWA launch depend on an unrelated
+    // database mutation and turned a transient RPC failure into a logout.
+    return mapSession(data.session);
   }
 
   async signIn(email: string, password: string) {
@@ -94,11 +97,25 @@ export class SupabaseAuthAdapter implements AuthAdapter {
   }
 
   onAuthStateChange(listener: (session: AuthSession | null) => void) {
-    const { data } = this.client.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+    const { data } = this.client.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       window.setTimeout(() => {
+        if (!session || session.user.is_anonymous) {
+          listener(null);
+          return;
+        }
+
+        // A valid local Supabase session must not disappear from the UI just
+        // because the account bootstrap RPC has a transient network/database
+        // failure. TOKEN_REFRESHED and INITIAL_SESSION already describe an
+        // established account and should never repeat that mutation.
+        if (event !== "SIGNED_IN" || session.user.user_metadata.registration_source !== "self_service") {
+          listener(mapSession(session));
+          return;
+        }
+
         void this.prepareSession(session)
           .then(listener)
-          .catch(() => listener(null));
+          .catch(() => listener(mapSession(session)));
       }, 0);
     });
     return () => data.subscription.unsubscribe();

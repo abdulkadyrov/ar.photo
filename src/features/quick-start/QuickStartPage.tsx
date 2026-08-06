@@ -27,7 +27,13 @@ import { useAuth } from "../auth/authContext";
 import { getMediaRepository } from "../media/mediaRepository";
 import { markerAccept, prepareMediaFile, videoAccept } from "../media/mediaValidation";
 import { resolvePublicBaseUrl } from "../qr/qrDesign";
-import { getQuickStartWorkspace, type QuickStartWorkspace } from "./quickStartRepository";
+import {
+  clearPendingQuickStart,
+  getPendingQuickStart,
+  getQuickStartWorkspace,
+  savePendingQuickStart,
+  type QuickStartWorkspace,
+} from "./quickStartRepository";
 
 const mediaRepository = getMediaRepository();
 const arItemRepository = getArItemRepository();
@@ -57,18 +63,20 @@ export function QuickStartRoute() {
 }
 
 function QuickCreatePage({ userId }: { userId: string }) {
-  const [title, setTitle] = useState("");
+  const restoredAttempt = useMemo(() => getPendingQuickStart(userId), [userId]);
+  const [title, setTitle] = useState(restoredAttempt?.title ?? "");
   const [markerFile, setMarkerFile] = useState<File>();
   const [videoFile, setVideoFile] = useState<File>();
-  const [stage, setStage] = useState<QuickStage>("form");
+  const [stage, setStage] = useState<QuickStage>(restoredAttempt ? "processing" : "form");
   const [, setStageProgress] = useState(0);
-  const [itemId, setItemId] = useState("");
+  const [itemId, setItemId] = useState(restoredAttempt?.itemId ?? "");
   const [result, setResult] = useState<QrCodeRecord>();
   const [error, setError] = useState("");
   const [pickerVersion, setPickerVersion] = useState(0);
   const requestId = useRef(crypto.randomUUID());
-  const activeItemId = useRef("");
+  const activeItemId = useRef(restoredAttempt?.itemId ?? "");
   const uploadController = useRef<AbortController | undefined>(undefined);
+  const finishingItemId = useRef("");
 
   const workspaceQuery = useQuery({
     queryKey: ["quick-start", "workspace", userId],
@@ -85,7 +93,8 @@ function QuickCreatePage({ userId }: { userId: string }) {
   const markerPreview = useObjectUrl(markerFile);
   const videoPreview = useObjectUrl(videoFile);
   const itemFailed = itemQuery.data?.status === "failed";
-  const visibleStage: QuickStage = itemFailed ? "error" : stage;
+  const itemLookupError = itemId ? itemQuery.error : null;
+  const visibleStage: QuickStage = itemFailed || itemLookupError ? "error" : stage;
   const processing = !["form", "done", "error"].includes(visibleStage);
   const canSubmit = Boolean(title.trim().length >= 2 && markerFile && videoFile && workspaceQuery.data && !processing);
   function showError(cause: unknown) {
@@ -99,6 +108,33 @@ function QuickCreatePage({ userId }: { userId: string }) {
     },
     [],
   );
+
+  useEffect(() => {
+    const workspace = workspaceQuery.data;
+    const item = itemQuery.data;
+    if (!workspace || !item || item.id !== itemId || finishingItemId.current === item.id) return;
+    if (item.status !== "ready" && item.status !== "published") return;
+
+    finishingItemId.current = item.id;
+    void (async () => {
+      setStage("publishing");
+      try {
+        const qr =
+          item.status === "published"
+            ? await arItemRepository.getQrCode(workspace.accountId, item.id)
+            : await arItemRepository.publish(workspace.accountId, item.id, resolvePublicBaseUrl());
+        if (!qr) throw new Error("QR-код не создан");
+        setResult(qr);
+        setStage("done");
+        clearPendingQuickStart(userId);
+      } catch (publishError) {
+        setStage("error");
+        setError(readableError(publishError));
+      } finally {
+        finishingItemId.current = "";
+      }
+    })();
+  }, [itemId, itemQuery.data, userId, workspaceQuery.data]);
 
   const submit = async () => {
     const workspace = workspaceQuery.data;
@@ -154,6 +190,12 @@ function QuickCreatePage({ userId }: { userId: string }) {
         audioDefault: "user_enabled",
         fallbackEnabled: true,
       });
+      savePendingQuickStart({
+        userId,
+        ...workspace,
+        itemId: item.id,
+        title: title.trim(),
+      });
       setItemId(item.id);
       setStage("processing");
       setStageProgress(0);
@@ -164,7 +206,6 @@ function QuickCreatePage({ userId }: { userId: string }) {
           "Быстрое создание: пользователь подтвердил продолжение обработки фотографии",
         );
       }
-      await waitForResult(workspace, item.id);
     } catch (submitError) {
       showError(submitError);
     }
@@ -191,7 +232,6 @@ function QuickCreatePage({ userId }: { userId: string }) {
     try {
       await arItemRepository.retry(workspace.accountId, itemId);
       await itemQuery.refetch();
-      await waitForResult(workspace, itemId);
     } catch (retryError) {
       showError(retryError);
     }
@@ -207,33 +247,10 @@ function QuickCreatePage({ userId }: { userId: string }) {
     setItemId("");
     setResult(undefined);
     setError("");
+    clearPendingQuickStart(userId);
     setPickerVersion((current) => current + 1);
     requestId.current = crypto.randomUUID();
     activeItemId.current = "";
-  };
-
-  const waitForResult = async (workspace: QuickStartWorkspace, targetItemId: string) => {
-    for (let attempt = 0; attempt < 240; attempt += 1) {
-      const item = await arItemRepository.getItem(workspace.accountId, targetItemId);
-      if (item.status === "failed") {
-        throw new Error("Обработка не завершилась. Нажмите «Повторить обработку» — загружать файлы заново не нужно.");
-      }
-      if (item.status === "ready" || item.status === "published") {
-        setStage("publishing");
-        const qr =
-          item.status === "published"
-            ? await arItemRepository.getQrCode(workspace.accountId, targetItemId)
-            : await arItemRepository.publish(workspace.accountId, targetItemId, resolvePublicBaseUrl());
-        if (!qr) throw new Error("QR-код не создан");
-        setResult(qr);
-        setStage("done");
-        return;
-      }
-      await delay(2_500);
-    }
-    throw new Error(
-      "Обработка занимает слишком много времени. Нажмите «Повторить обработку» — загружать файлы заново не нужно.",
-    );
   };
 
   if (workspaceQuery.isPending) {
@@ -274,7 +291,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
       description={
         visibleStage === "form"
           ? "Добавьте фотографию и видео — обработку и QR-код мы подготовим автоматически."
-          : "Пожалуйста, не закрывайте страницу. Результат появится здесь автоматически."
+          : "Можно оставить страницу открытой или вернуться позже — незавершённая работа восстановится автоматически."
       }
     >
       <section className="quick-create-card" aria-label="Создание AR-фото">
@@ -315,7 +332,11 @@ function QuickCreatePage({ userId }: { userId: string }) {
         {visibleStage === "error" ? (
           <div className="quick-error" role="alert">
             <strong>Обработка остановилась</strong>
-            <span>{error || "Нажмите «Повторить обработку» — загружать файлы заново не нужно."}</span>
+            <span>
+              {error ||
+                (itemLookupError ? readableError(itemLookupError) : undefined) ||
+                "Нажмите «Повторить обработку» — загружать файлы заново не нужно."}
+            </span>
           </div>
         ) : null}
 
@@ -698,10 +719,6 @@ function useObjectUrl(file?: File) {
 
 function percent(uploaded: number, total: number) {
   return total > 0 ? Math.round((uploaded / total) * 100) : 0;
-}
-
-function delay(milliseconds: number) {
-  return new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
 function formatBytes(bytes: number) {

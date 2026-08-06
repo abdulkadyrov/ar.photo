@@ -97,4 +97,95 @@ describe("supabase explicit auth adapter", () => {
     await expect(adapter.getSession()).resolves.toBeNull();
     expect(signOut).toHaveBeenCalledWith({ scope: "local" });
   });
+
+  it("restores an existing self-service session without a bootstrap mutation", async () => {
+    const session = {
+      user: {
+        id: "00000000-0000-4000-8000-000000000043",
+        email: "owner@example.com",
+        is_anonymous: false,
+        user_metadata: { registration_source: "self_service" },
+      },
+    } as unknown as Session;
+    const getSession = vi.fn().mockResolvedValue({ data: { session }, error: null });
+    const rpc = vi.fn().mockRejectedValue(new Error("temporary backend outage"));
+    const adapter = new SupabaseAuthAdapter({ auth: { getSession }, rpc } as unknown as SupabaseBrowserClient);
+
+    await expect(adapter.getSession()).resolves.toEqual(
+      expect.objectContaining({ user: expect.objectContaining({ email: "owner@example.com" }) }),
+    );
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("keeps an established session during token refresh without repeating account bootstrap", async () => {
+    vi.useFakeTimers();
+    const session = {
+      user: {
+        id: "00000000-0000-4000-8000-000000000041",
+        email: "owner@example.com",
+        is_anonymous: false,
+        user_metadata: { registration_source: "self_service" },
+      },
+    } as unknown as Session;
+    let authCallback: ((event: "TOKEN_REFRESHED", session: Session | null) => void) | undefined;
+    const rpc = vi.fn();
+    const unsubscribe = vi.fn();
+    const client = {
+      auth: {
+        onAuthStateChange: vi.fn((callback) => {
+          authCallback = callback;
+          return { data: { subscription: { unsubscribe } } };
+        }),
+      },
+      rpc,
+    } as unknown as SupabaseBrowserClient;
+    const adapter = new SupabaseAuthAdapter(client);
+    const listener = vi.fn();
+    const stop = adapter.onAuthStateChange(listener);
+
+    authCallback?.("TOKEN_REFRESHED", session);
+    await vi.runAllTimersAsync();
+
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({ user: expect.objectContaining({ email: "owner@example.com" }) }),
+    );
+    expect(rpc).not.toHaveBeenCalled();
+    stop();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    vi.useRealTimers();
+  });
+
+  it("does not report logout when signed-in account bootstrap has a transient failure", async () => {
+    vi.useFakeTimers();
+    const session = {
+      user: {
+        id: "00000000-0000-4000-8000-000000000042",
+        email: "owner@example.com",
+        is_anonymous: false,
+        user_metadata: { registration_source: "self_service" },
+      },
+    } as unknown as Session;
+    let authCallback: ((event: "SIGNED_IN", session: Session | null) => void) | undefined;
+    const client = {
+      auth: {
+        onAuthStateChange: vi.fn((callback) => {
+          authCallback = callback;
+          return { data: { subscription: { unsubscribe: vi.fn() } } };
+        }),
+      },
+      rpc: vi.fn().mockResolvedValue({ error: new Error("temporary backend outage") }),
+    } as unknown as SupabaseBrowserClient;
+    const adapter = new SupabaseAuthAdapter(client);
+    const listener = vi.fn();
+    adapter.onAuthStateChange(listener);
+
+    authCallback?.("SIGNED_IN", session);
+    await vi.runAllTimersAsync();
+
+    expect(listener).toHaveBeenLastCalledWith(
+      expect.objectContaining({ user: expect.objectContaining({ email: "owner@example.com" }) }),
+    );
+    expect(listener).not.toHaveBeenCalledWith(null);
+    vi.useRealTimers();
+  });
 });
