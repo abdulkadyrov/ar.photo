@@ -59,6 +59,9 @@ const PublicArUnsupportedRoute = lazy(() =>
     default: module.PublicArUnsupportedRoute,
   })),
 );
+const ArCameraEntryRoute = lazy(() =>
+  import("../../features/public-ar/ArCameraEntryPage").then((module) => ({ default: module.ArCameraEntryRoute })),
+);
 const LoginRoute = lazy(() =>
   import("../../features/auth/AuthPages").then((module) => ({ default: module.LoginRoute })),
 );
@@ -129,6 +132,7 @@ function RoutedContent() {
           <Route path="/analytics" element={<Protected element={<AnalyticsRoute />} />} />
           <Route path="/admin" element={<Protected element={<AdminRoute />} />} />
           <Route path="/support" element={<Protected element={<SupportRoute />} />} />
+          <Route path="/camera" element={<Protected element={<ArCameraEntryRoute />} />} />
           <Route path="/settings" element={<Protected element={<SettingsRoute />} />} />
           <Route path="/settings/subscription" element={<Protected element={<SubscriptionRoute />} />} />
           <Route path="/settings/team" element={<Protected element={<TeamRoute />} />} />

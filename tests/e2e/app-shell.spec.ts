@@ -37,7 +37,59 @@ test("renders the responsive SaaS navigation", async ({ page }) => {
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("navigation", { name: "Мобильная навигация" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Мобильная навигация" }).getByText("AR-камера")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("opens the production QR camera from the protected workspace", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "__entryCameraRequests", { value: 0, writable: true });
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: async () => {
+          (window as typeof window & { __entryCameraRequests: number }).__entryCameraRequests += 1;
+          throw new DOMException("denied", "NotAllowedError");
+        },
+      },
+    });
+  });
+  await page.goto("./camera");
+  await expect(page).toHaveURL(/\/ar\.photo\/login$/);
+  await signInToDemo(page);
+  await page.goto("./camera");
+
+  await expect(page.getByRole("heading", { name: "Сканируйте QR-код" })).toBeVisible();
+  expect(
+    await page.evaluate(() => (window as typeof window & { __entryCameraRequests: number }).__entryCameraRequests),
+  ).toBe(0);
+  await page.getByRole("button", { name: "Включить камеру" }).click();
+  await expect(page.getByRole("heading", { name: "Камера не запустилась" })).toBeVisible();
+  expect(
+    await page.evaluate(() => (window as typeof window & { __entryCameraRequests: number }).__entryCameraRequests),
+  ).toBe(1);
+});
+
+test("keeps mobile actions above navigation and separates the project search icon", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("./dashboard");
+  await signInToDemo(page);
+
+  const create = page.getByRole("link", { name: "Создать AR-фото" }).last();
+  const mobileNav = page.getByRole("navigation", { name: "Мобильная навигация" });
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.waitForFunction(() => window.scrollY > 0);
+  const [createBox, navBox] = await Promise.all([create.boundingBox(), mobileNav.boundingBox()]);
+  expect(createBox).not.toBeNull();
+  expect(navBox).not.toBeNull();
+  expect(createBox!.y + createBox!.height).toBeLessThanOrEqual(navBox!.y - 8);
+
+  await page.goto("./projects");
+  const search = page.getByRole("textbox", { name: "Поиск проектов" });
+  await expect(search).toBeVisible();
+  expect(
+    await search.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft)),
+  ).toBeGreaterThanOrEqual(48);
 });
 
 test("protects the workspace and clears the demo session on logout", async ({ page }) => {

@@ -22,7 +22,7 @@ const navigation = [
   { to: "/dashboard", label: "Главная", icon: House, end: true },
   { to: "/projects", label: "Мои проекты", icon: FolderKanban },
   { to: "/create", label: "Добавить фото", icon: Plus },
-  { to: "/viewer/test", label: "AR-камера", icon: Camera },
+  { to: "/camera", label: "AR-камера", icon: Camera },
   { to: "/support", label: "Поддержка", icon: Headphones },
 ] as const;
 

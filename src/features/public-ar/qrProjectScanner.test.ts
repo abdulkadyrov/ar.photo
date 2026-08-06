@@ -5,6 +5,7 @@ describe("public project QR validation", () => {
   it("extracts a public slug from hosted and base-path AR URLs", () => {
     expect(publicSlugFromQr("https://example.test/ar/photo-123")).toBe("photo-123");
     expect(publicSlugFromQr("https://example.test/ar.photo/ar/photo-123?source=qr")).toBe("photo-123");
+    expect(publicSlugFromQr("https://example.test/projects/photo-123")).toBeNull();
   });
 
   it("accepts only the QR for the currently open project", () => {

@@ -286,6 +286,7 @@ textarea:focus-visible {
   min-width: 0;
   max-width: 1580px;
   padding: 1.25rem;
+  padding-bottom: calc(8.5rem + env(safe-area-inset-bottom));
 }
 
 .app-topbar {
@@ -560,9 +561,18 @@ textarea:focus-visible {
   color: white;
 }
 
+.field-control.project-search-input {
+  padding-left: 3.15rem;
+}
+
+.project-search-icon {
+  left: 1rem;
+}
+
 @media (min-width: 640px) {
   .app-content {
     padding: 1.75rem;
+    padding-bottom: calc(8.5rem + env(safe-area-inset-bottom));
   }
 
   .app-topbar {

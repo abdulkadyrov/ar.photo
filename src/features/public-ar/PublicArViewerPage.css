@@ -49,6 +49,14 @@
   object-fit: cover;
 }
 
+.ar-camera-entry-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 25%, rgba(139, 105, 255, 0.2), transparent 32%),
+    linear-gradient(155deg, #1b1d24, #05070a 65%);
+}
+
 .ar-intro > img {
   transform: scale(1.03);
   filter: saturate(0.85);

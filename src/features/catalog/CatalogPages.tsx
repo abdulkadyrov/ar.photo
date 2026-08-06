@@ -1285,10 +1285,13 @@ function ProjectSearchForm({ initialSearch, onSearch }: { initialSearch: string;
         onSearch(value.trim());
       }}
     >
-      <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" size={17} />
+      <Search
+        className="project-search-icon pointer-events-none absolute top-1/2 -translate-y-1/2 text-muted"
+        size={18}
+      />
       <Input
         aria-label="Поиск проектов"
-        className="pl-10"
+        className="project-search-input"
         placeholder="Поиск по названию"
         value={value}
         onValueChange={setValue}

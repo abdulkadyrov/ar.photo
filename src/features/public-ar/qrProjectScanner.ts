@@ -49,7 +49,32 @@ export function waitForMatchingProjectQr(
   publicSlug: string,
   options: { signal?: AbortSignal; onMismatch?(value: string): void } = {},
 ) {
-  return new Promise<string>((resolve, reject) => {
+  return waitForQr(video, {
+    signal: options.signal,
+    accept: (value) => (matchesPublicProjectQr(value, publicSlug) ? value : null),
+    onRejected: options.onMismatch,
+  });
+}
+
+export function waitForPublicProjectQr(
+  video: HTMLVideoElement,
+  options: { signal?: AbortSignal; onInvalid?(value: string): void } = {},
+) {
+  return waitForQr(video, {
+    signal: options.signal,
+    accept: (value) => {
+      const publicSlug = publicSlugFromQr(value);
+      return publicSlug ? { publicSlug, value } : null;
+    },
+    onRejected: options.onInvalid,
+  });
+}
+
+function waitForQr<T>(
+  video: HTMLVideoElement,
+  options: { signal?: AbortSignal; accept(value: string): T | null; onRejected?(value: string): void },
+) {
+  return new Promise<T>((resolve, reject) => {
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) {
@@ -60,13 +85,13 @@ export function waitForMatchingProjectQr(
     let lastScan = 0;
     let settled = false;
 
-    const finish = (error?: unknown, value?: string) => {
+    const finish = (error?: unknown, value?: T) => {
       if (settled) return;
       settled = true;
       window.cancelAnimationFrame(animationFrame);
       options.signal?.removeEventListener("abort", abort);
       if (error) reject(error);
-      else resolve(value ?? "");
+      else resolve(value as T);
     };
     const abort = () => finish(new DOMException("QR scan cancelled", "AbortError"));
     options.signal?.addEventListener("abort", abort, { once: true });
@@ -90,8 +115,9 @@ export function waitForMatchingProjectQr(
       const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
       const result = jsQR(pixels.data, pixels.width, pixels.height, { inversionAttempts: "attemptBoth" });
       if (!result?.data) return;
-      if (matchesPublicProjectQr(result.data, publicSlug)) finish(undefined, result.data);
-      else options.onMismatch?.(result.data);
+      const accepted = options.accept(result.data);
+      if (accepted) finish(undefined, accepted);
+      else options.onRejected?.(result.data);
     };
     animationFrame = window.requestAnimationFrame(scan);
   });
