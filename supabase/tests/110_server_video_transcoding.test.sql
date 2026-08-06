@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(7);
+select plan(11);
 
 select ok(
   pg_catalog.has_function_privilege(
@@ -99,6 +99,69 @@ select is(
   ),
   'queued'::public.job_status,
   'inspection waits for the transcode to succeed'
+);
+
+select lives_ok(
+  $$
+    insert into storage.objects (bucket_id, name, metadata)
+    values (
+      'generated-private',
+      'accounts/20000000-0000-4000-8000-000000000001/projects/50000000-0000-4000-8000-000000000001/groups/60000000-0000-4000-8000-000000000001/items/70000000-0000-4000-8000-000000000001/v1/video/video.mp4',
+      '{"mimetype":"video/mp4","size":2048}'::jsonb
+    )
+  $$,
+  'worker uploads the compatible generated video'
+);
+
+select lives_ok(
+  $$
+    select public.complete_video_transcode_job(
+      (
+        select id
+        from public.processing_jobs
+        where ar_item_id = '70000000-0000-4000-8000-000000000001'
+          and type = 'video_transcode'
+          and status = 'running'
+          and locked_by = 'server-video-test-worker'
+      ),
+      'server-video-test-worker',
+      jsonb_build_object(
+        'storageBucket', 'generated-private',
+        'storagePath', 'accounts/20000000-0000-4000-8000-000000000001/projects/50000000-0000-4000-8000-000000000001/groups/60000000-0000-4000-8000-000000000001/items/70000000-0000-4000-8000-000000000001/v1/video/video.mp4',
+        'sha256', repeat('b', 64),
+        'videoCodec', 'h264',
+        'audioCodec', 'aac',
+        'durationSeconds', 12,
+        'width', 720,
+        'height', 960
+      )
+    )
+  $$,
+  'worker can finalize a generated video beside its source upload'
+);
+
+select is(
+  (
+    select count(*)
+    from public.media_assets
+    where account_id = '20000000-0000-4000-8000-000000000001'
+      and group_id = '60000000-0000-4000-8000-000000000001'
+      and kind = 'video'
+      and version = 1
+      and deleted_at is null
+  ),
+  2::bigint,
+  'the source and generated video assets coexist at one revision'
+);
+
+select is(
+  (
+    select video_path
+    from public.ar_items
+    where id = '70000000-0000-4000-8000-000000000001'
+  ),
+  'accounts/20000000-0000-4000-8000-000000000001/projects/50000000-0000-4000-8000-000000000001/groups/60000000-0000-4000-8000-000000000001/items/70000000-0000-4000-8000-000000000001/v1/video/video.mp4'::text,
+  'the AR item points at the compatible generated video'
 );
 
 select * from finish();
