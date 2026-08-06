@@ -2,7 +2,7 @@
 
 ## Статус среды
 
-GitHub Pages публикует production frontend на `https://abdulkadyrov.github.io/ar.photo/`: workflow использует обычный fail-closed `build`, получает только browser-safe Supabase variables из GitHub Actions secrets, добавляет `404.html` для прямого открытия SPA/QR маршрутов и обновляет сгенерированную ветку `gh-pages`. В GitHub Settings → Pages один раз выбрать `Deploy from a branch`, ветку `gh-pages` и каталог `/ (root)`. Попытка workflow настроить source автоматически неблокирующая, потому что GitHub может запретить эту repository-setting операцию встроенному токену. GitHub Pages не применяет Netlify-style `public/_headers`, поэтому перед обработкой реальных клиентских данных frontend нужно перенести на host/CDN с управляемыми security headers.
+GitHub Pages публикует production frontend на `https://abdulkadyrov.github.io/ar.photo/`: workflow использует обычный fail-closed `build`, получает только browser-safe Supabase variables из GitHub Actions secrets, добавляет `404.html` для прямого открытия SPA/QR маршрутов, сохраняет проверенную копию в ветке `gh-pages` и отправляет тот же artifact через официальный Pages deployment. GitHub Pages не применяет Netlify-style `public/_headers`, поэтому перед обработкой реальных клиентских данных frontend нужно перенести на host/CDN с управляемыми security headers.
 
 Production требует отдельно управляемые frontend host/CDN, Supabase project, processing worker, DNS/TLS, scheduler, secrets, monitoring и backup policy.
 
