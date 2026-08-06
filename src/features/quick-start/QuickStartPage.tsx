@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import type { ArItem, ProcessingJob, QrCode as QrCodeRecord } from "../../entities/ar-item/model";
+import type { ArItem, QrCode as QrCodeRecord } from "../../entities/ar-item/model";
 import { Button, Input } from "../../shared/ui";
 import { getArItemRepository } from "../ar-items/arItemRepository";
 import { analyzeMarkerFile } from "../ar-items/markerQuality";
@@ -34,14 +34,6 @@ const arItemRepository = getArItemRepository();
 
 type QuickStage =
   "form" | "preparing" | "uploading-marker" | "uploading-video" | "processing" | "publishing" | "done" | "error";
-
-const jobLabels: Partial<Record<ProcessingJob["type"], string>> = {
-  marker_analysis: "Проверяем фотографию",
-  video_inspection: "Проверяем видео",
-  video_transcode: "Подготавливаем видео для телефона",
-  marker_compilation: "Создаём точный target.mind",
-  thumbnail_generation: "Создаём превью",
-};
 
 export function QuickStartRoute() {
   const auth = useAuth();
@@ -69,7 +61,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
   const [markerFile, setMarkerFile] = useState<File>();
   const [videoFile, setVideoFile] = useState<File>();
   const [stage, setStage] = useState<QuickStage>("form");
-  const [stageProgress, setStageProgress] = useState(0);
+  const [, setStageProgress] = useState(0);
   const [itemId, setItemId] = useState("");
   const [result, setResult] = useState<QrCodeRecord>();
   const [error, setError] = useState("");
@@ -90,27 +82,12 @@ function QuickCreatePage({ userId }: { userId: string }) {
     refetchInterval: (query) =>
       query.state.data && ["ready", "published", "failed"].includes(query.state.data.status) ? false : 2_500,
   });
-  const jobsQuery = useQuery({
-    queryKey: ["quick-start", "jobs", workspaceQuery.data?.accountId, itemId],
-    queryFn: () => arItemRepository.listJobs(workspaceQuery.data!.accountId, itemId),
-    enabled: Boolean(workspaceQuery.data?.accountId && itemId),
-    refetchInterval: stage === "processing" ? 2_500 : false,
-  });
-
   const markerPreview = useObjectUrl(markerFile);
   const videoPreview = useObjectUrl(videoFile);
   const itemFailed = itemQuery.data?.status === "failed";
   const visibleStage: QuickStage = itemFailed ? "error" : stage;
   const processing = !["form", "done", "error"].includes(visibleStage);
   const canSubmit = Boolean(title.trim().length >= 2 && markerFile && videoFile && workspaceQuery.data && !processing);
-  const jobs = jobsQuery.data ?? [];
-  const runningJob = jobs.find((job) => job.status === "running") ?? jobs.find((job) => job.status === "queued");
-  const processingProgress = jobs.length
-    ? Math.round(
-        jobs.reduce((total, job) => total + (job.status === "succeeded" ? 100 : job.progress), 0) / jobs.length,
-      )
-    : 5;
-
   function showError(cause: unknown) {
     setStage("error");
     setError(readableError(cause));
@@ -213,7 +190,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
     setStage("processing");
     try {
       await arItemRepository.retry(workspace.accountId, itemId);
-      await Promise.all([itemQuery.refetch(), jobsQuery.refetch()]);
+      await itemQuery.refetch();
       await waitForResult(workspace, itemId);
     } catch (retryError) {
       showError(retryError);
@@ -288,7 +265,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
     );
   }
 
-  const status = quickStatus(visibleStage, stageProgress, processingProgress, runningJob);
+  const progressStep = quickProgressStep(visibleStage);
   return (
     <QuickShell
       currentStep={visibleStage === "form" ? 1 : 2}
@@ -296,8 +273,8 @@ function QuickCreatePage({ userId }: { userId: string }) {
       title={visibleStage === "form" ? "Оживите фотографию" : "Создаём ваше AR-фото"}
       description={
         visibleStage === "form"
-          ? "Добавьте фотографию и видео — точный target.mind, совместимый ролик и QR-код мы подготовим автоматически."
-          : "Файлы уже у нас. Можно не закрывать страницу: результат появится здесь автоматически."
+          ? "Добавьте фотографию и видео — обработку и QR-код мы подготовим автоматически."
+          : "Пожалуйста, не закрывайте страницу. Результат появится здесь автоматически."
       }
     >
       <section className="quick-create-card" aria-label="Создание AR-фото">
@@ -334,7 +311,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
           />
         </div>
 
-        {visibleStage !== "form" && visibleStage !== "error" ? <ProgressStatus {...status} /> : null}
+        {visibleStage !== "form" && visibleStage !== "error" ? <ProgressStatus step={progressStep} /> : null}
         {visibleStage === "error" ? (
           <div className="quick-error" role="alert">
             <strong>Обработка остановилась</strong>
@@ -451,23 +428,19 @@ export function MediaPicker({
   );
 }
 
-function ProgressStatus({ label, detail, progress }: { label: string; detail: string; progress: number }) {
-  const boundedProgress = Math.max(0, Math.min(100, progress));
+export function ProgressStatus({ step }: { step: 1 | 2 | 3 | 4 }) {
   return (
-    <div className="quick-progress" role="status" aria-live="polite">
-      <div className="quick-progress-copy">
-        <span className="quick-progress-spinner">
-          <LoaderCircle className="animate-spin" size={21} />
-        </span>
-        <div>
-          <p>{label}</p>
-          <span>{detail}</span>
-        </div>
-        <strong>{boundedProgress}%</strong>
-      </div>
-      <div className="quick-progress-track" aria-hidden="true">
-        <span style={{ width: `${Math.max(3, boundedProgress)}%` }} />
-      </div>
+    <div
+      className="quick-progress quick-progress-simple"
+      role="status"
+      aria-live="polite"
+      aria-label={`Этап ${step} из 4`}
+    >
+      <span className="quick-progress-spinner" aria-hidden="true">
+        <LoaderCircle className="animate-spin" size={21} />
+      </span>
+      <strong>{step}/4</strong>
+      <span className="sr-only">Создаём AR-фото, этап {step} из 4</span>
     </div>
   );
 }
@@ -705,28 +678,11 @@ function CenteredState({ title, text, action }: { title: string; text: string; a
   );
 }
 
-function quickStatus(stage: QuickStage, stageProgress: number, processingProgress: number, job?: ProcessingJob) {
-  if (stage === "preparing")
-    return { label: "Подготавливаем файлы", detail: "Проверяем форматы и оптимизируем видео", progress: stageProgress };
-  if (stage === "uploading-marker")
-    return {
-      label: "Загружаем фотографию",
-      detail: "Безопасно передаём подготовленный маркер",
-      progress: stageProgress,
-    };
-  if (stage === "uploading-video")
-    return {
-      label: "Загружаем видео",
-      detail: "Большой файл может загружаться несколько минут",
-      progress: stageProgress,
-    };
-  if (stage === "publishing")
-    return { label: "Создаём QR-код", detail: "Публикуем защищённую AR-ссылку", progress: 96 };
-  return {
-    label: job ? (jobLabels[job.type] ?? "Обрабатываем AR-фото") : "Запускаем обработку",
-    detail: "Создаём target.mind, превью и совместимое видео",
-    progress: processingProgress,
-  };
+function quickProgressStep(stage: QuickStage): 1 | 2 | 3 | 4 {
+  if (stage === "preparing" || stage === "uploading-marker") return 1;
+  if (stage === "uploading-video") return 2;
+  if (stage === "processing") return 3;
+  return 4;
 }
 
 function useObjectUrl(file?: File) {

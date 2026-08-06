@@ -85,20 +85,14 @@ test("keeps the public AR viewer camera-explicit with a no-camera fallback", asy
   });
   await page.goto("./ar/demo");
 
-  await expect(page.getByRole("heading", { name: "Демо AR Photo" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Начать AR" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Подробнее о камере и приватности" })).toHaveAttribute(
-    "href",
-    "/ar.photo/privacy",
-  );
+  await expect(page.getByRole("heading", { name: "Отсканируйте QR-код" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Включить камеру" })).toBeVisible();
   expect(
     await page.evaluate(() => (window as typeof window & { __arPhotoCameraRequests: number }).__arPhotoCameraRequests),
   ).toBe(0);
 
-  await page.getByRole("button", { name: "Начать AR" }).click();
-  const guide = page.getByTestId("marker-scan-guide");
-  await expect(guide).toHaveCSS("aspect-ratio", "2742 / 1542");
-  await expect(page.getByText("AR не удалось запустить", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Включить камеру" }).click();
+  await expect(page.getByRole("heading", { name: "Не удалось открыть AR" })).toBeVisible();
 
   await page.getByRole("button", { name: "Смотреть обычное видео" }).click();
   await expect(page.getByTestId("public-ar-fallback-video")).toBeVisible();

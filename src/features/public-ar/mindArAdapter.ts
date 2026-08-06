@@ -1,14 +1,15 @@
 import type * as ThreeModule from "three";
 import type { PublicArManifest } from "./publicManifest";
 import { videoMilestones, type PublicArAnalyticsEvent } from "./telemetry";
+import { createArRecordingEngine, type ArRecording, type ArRecordingEngine } from "./arRecording";
 
 export type PublicArTrackingState = "searching" | "tracking";
 
 export const publicArTrackingConfig = Object.freeze({
   filterMinCF: 0.001,
-  filterBeta: 20,
-  warmupTolerance: 7,
-  missTolerance: 10,
+  filterBeta: 350,
+  warmupTolerance: 3,
+  missTolerance: 6,
 });
 
 export const publicArCameraConstraints = Object.freeze({
@@ -46,8 +47,7 @@ export function installMindArColorCompatibility(Three: LegacyThreeColorModule) {
       return this.outputColorSpace === Three.SRGBColorSpace ? Three.sRGBEncoding : Three.LinearEncoding;
     },
     set(this: ColorManagedRenderer, encoding: number) {
-      this.outputColorSpace =
-        encoding === Three.sRGBEncoding ? Three.SRGBColorSpace : Three.LinearSRGBColorSpace;
+      this.outputColorSpace = encoding === Three.sRGBEncoding ? Three.SRGBColorSpace : Three.LinearSRGBColorSpace;
     },
   });
   Object.defineProperty(prototype, mindArColorBridge, { configurable: true, value: true });
@@ -113,10 +113,22 @@ export function coverTextureTransform(videoAspectRatio: number, markerAspectRati
 }
 
 export type PublicArSession = {
+  readonly recordingSupported: boolean;
   setMuted(muted: boolean): void;
   togglePlayback(): Promise<boolean>;
+  startRecording(): void;
+  stopRecording(): Promise<ArRecording>;
   stop(): void;
 };
+
+export function adaptivePoseAlpha(relativeMotion: number) {
+  if (!Number.isFinite(relativeMotion) || relativeMotion < 0) return 1;
+  if (relativeMotion <= 0.0015) return 0.1;
+  if (relativeMotion >= 0.12) return 1;
+  const normalized = (relativeMotion - 0.0015) / (0.12 - 0.0015);
+  const eased = normalized * normalized * (3 - 2 * normalized);
+  return 0.1 + eased * 0.78;
+}
 
 export function isIosWebKit(userAgent = navigator.userAgent, maxTouchPoints = navigator.maxTouchPoints) {
   return /iphone|ipad|ipod/i.test(userAgent) || (/macintosh/i.test(userAgent) && maxTouchPoints > 1);
@@ -135,35 +147,13 @@ export async function startPublicMindAr(options: {
   container: HTMLDivElement;
   manifest: PublicArManifest;
   muted: boolean;
+  playbackVideo?: HTMLVideoElement;
   onTrackingState(state: PublicArTrackingState): void;
   onPlaybackEvent(event: PublicArAnalyticsEvent, valueSeconds?: number | null, errorCode?: string | null): void;
 }): Promise<PublicArSession> {
   const { container, manifest, onTrackingState, onPlaybackEvent } = options;
-  const video = document.createElement("video");
-  video.loop = manifest.behavior.loop;
-  video.muted = options.muted;
-  video.defaultMuted = options.muted;
-  if (options.muted) video.setAttribute("muted", "");
-  video.autoplay = false;
-  video.playsInline = true;
-  video.preload = "auto";
-  video.crossOrigin = "anonymous";
-  video.disablePictureInPicture = true;
-  video.setAttribute("webkit-playsinline", "");
-  // Entered directly from the «Начать AR» click. Starting the same element
-  // before the first await preserves Safari's audio permission; pause it as
-  // soon as playback becomes available so the video still begins on marker.
-  video.src = manifest.assets.videoUrl;
-  video.load();
-  if (!options.muted) {
-    void video
-      .play()
-      .then(() => {
-        video.pause();
-        video.currentTime = 0;
-      })
-      .catch(() => undefined);
-  }
+  const video = options.playbackVideo ?? createPublicArPlaybackVideo(manifest, options.muted);
+  configurePlaybackVideo(video, manifest, options.muted);
 
   const [{ MindARThree }, THREE, trackingAsset] = await Promise.all([
     import("mind-ar/dist/mindar-image-three.prod.js"),
@@ -211,7 +201,12 @@ export async function startPublicMindAr(options: {
   plane.frustumCulled = false;
   plane.renderOrder = 1;
   const anchor = mindar.addAnchor(0);
-  anchor.group.add(plane);
+  const stabilizedGroup = new Three.Group();
+  stabilizedGroup.matrixAutoUpdate = false;
+  stabilizedGroup.visible = false;
+  stabilizedGroup.add(plane);
+  scene.add(stabilizedGroup);
+  const poseStabilizer = createAdaptivePoseStabilizer(Three, stabilizedGroup.matrix);
 
   const fitVideoToMarker = () => {
     if (!video.videoWidth || !video.videoHeight) return;
@@ -242,19 +237,24 @@ export async function startPublicMindAr(options: {
   video.addEventListener("error", playbackError);
   anchor.onTargetFound = () => {
     targetVisible = true;
-    anchor.group.visible = true;
+    poseStabilizer.reset(anchor.group.matrix);
+    stabilizedGroup.visible = true;
     onTrackingState("tracking");
     if (manifest.behavior.autoplay) video.play().catch(() => undefined);
   };
   anchor.onTargetLost = () => {
     targetVisible = false;
-    anchor.group.visible = false;
+    stabilizedGroup.visible = false;
     onTrackingState("searching");
     if (manifest.behavior.markerLost === "pause_hide") video.pause();
     if (manifest.behavior.markerLost === "stop_reset") {
       video.pause();
       video.currentTime = 0;
     }
+  };
+  anchor.onTargetUpdate = () => {
+    if (!targetVisible) return;
+    poseStabilizer.update(anchor.group.matrix);
   };
 
   const visibility = () => {
@@ -266,6 +266,7 @@ export async function startPublicMindAr(options: {
   };
   document.addEventListener("visibilitychange", visibility);
 
+  let recordingEngine: ArRecordingEngine | null = null;
   try {
     await startMindArWithVisibleCamera(mindar);
     activeMarker = resolveMarkerDimensions(manifest.marker, mindar.controller?.markerDimensions);
@@ -273,7 +274,17 @@ export async function startPublicMindAr(options: {
     plane.scale.set(1, markerGeometry.height, 1);
     fitVideoToMarker();
     keepCameraVisible(mindar);
-    renderer.setAnimationLoop(() => renderer.render(scene, camera));
+    if (mindar.video && renderer.domElement) {
+      recordingEngine = createArRecordingEngine({
+        cameraVideo: mindar.video,
+        rendererCanvas: renderer.domElement,
+        playbackVideo: video,
+      });
+    }
+    renderer.setAnimationLoop(() => {
+      renderer.render(scene, camera);
+      recordingEngine?.drawFrame();
+    });
     onTrackingState("searching");
   } catch (error) {
     document.removeEventListener("visibilitychange", visibility);
@@ -287,12 +298,16 @@ export async function startPublicMindAr(options: {
     texture.dispose();
     geometry.dispose();
     material.dispose();
+    scene.remove(stabilizedGroup);
     URL.revokeObjectURL(trackingAssetUrl);
     container.replaceChildren();
     throw error;
   }
 
   return {
+    get recordingSupported() {
+      return recordingEngine?.supported ?? false;
+    },
     setMuted(muted) {
       video.muted = muted;
       video.defaultMuted = muted;
@@ -307,11 +322,21 @@ export async function startPublicMindAr(options: {
       video.pause();
       return false;
     },
+    startRecording() {
+      recordingEngine?.start();
+    },
+    stopRecording() {
+      if (!recordingEngine) {
+        return Promise.reject(new DOMException("Screen recording unavailable", "NotSupportedError"));
+      }
+      return recordingEngine.stop();
+    },
     stop() {
       if (stopped) return;
       stopped = true;
       document.removeEventListener("visibilitychange", visibility);
       renderer.setAnimationLoop(null);
+      recordingEngine?.dispose();
       stopMindAr(mindar);
       video.pause();
       removePlaybackListeners();
@@ -321,6 +346,7 @@ export async function startPublicMindAr(options: {
       texture.dispose();
       geometry.dispose();
       material.dispose();
+      scene.remove(stabilizedGroup);
       URL.revokeObjectURL(trackingAssetUrl);
       container.replaceChildren();
     },
@@ -332,6 +358,82 @@ export async function startPublicMindAr(options: {
     video.removeEventListener("ended", playbackEnded);
     video.removeEventListener("error", playbackError);
   }
+}
+
+export function createPublicArPlaybackVideo(manifest: PublicArManifest, muted: boolean) {
+  const video = document.createElement("video");
+  configurePlaybackVideo(video, manifest, muted);
+  // This function is called directly from the camera permission gesture. A
+  // play/pause on the final media element preserves Safari's audio grant while
+  // QR pairing and asset caching continue asynchronously.
+  if (!muted) {
+    void video
+      .play()
+      .then(() => {
+        video.pause();
+        video.currentTime = 0;
+      })
+      .catch(() => undefined);
+  }
+  return video;
+}
+
+function configurePlaybackVideo(video: HTMLVideoElement, manifest: PublicArManifest, muted: boolean) {
+  video.loop = manifest.behavior.loop;
+  video.muted = muted;
+  video.defaultMuted = muted;
+  video.toggleAttribute("muted", muted);
+  video.autoplay = false;
+  video.playsInline = true;
+  video.preload = "auto";
+  video.crossOrigin = "anonymous";
+  video.disablePictureInPicture = true;
+  video.setAttribute("webkit-playsinline", "");
+  if (video.src !== manifest.assets.videoUrl) {
+    video.src = manifest.assets.videoUrl;
+    video.load();
+  }
+}
+
+function createAdaptivePoseStabilizer(Three: typeof ThreeModule, output: ThreeModule.Matrix4) {
+  const position = new Three.Vector3();
+  const rotation = new Three.Quaternion();
+  const scale = new Three.Vector3();
+  const targetPosition = new Three.Vector3();
+  const targetRotation = new Three.Quaternion();
+  const targetScale = new Three.Vector3();
+  let initialized = false;
+
+  const reset = (target: ThreeModule.Matrix4) => {
+    target.decompose(position, rotation, scale);
+    output.compose(position, rotation, scale);
+    initialized = true;
+  };
+
+  return {
+    reset,
+    update(target: ThreeModule.Matrix4) {
+      if (!initialized) {
+        reset(target);
+        return;
+      }
+      target.decompose(targetPosition, targetRotation, targetScale);
+      const referenceScale = Math.max(1, (Math.abs(scale.x) + Math.abs(scale.y) + Math.abs(scale.z)) / 3);
+      const translationMotion = position.distanceTo(targetPosition) / referenceScale;
+      const rotationMotion = rotation.angleTo(targetRotation) / (Math.PI / 3);
+      const scaleMotion =
+        Math.max(
+          Math.abs(targetScale.x - scale.x),
+          Math.abs(targetScale.y - scale.y),
+          Math.abs(targetScale.z - scale.z),
+        ) / referenceScale;
+      const alpha = adaptivePoseAlpha(Math.max(translationMotion, rotationMotion, scaleMotion));
+      position.lerp(targetPosition, alpha);
+      rotation.slerp(targetRotation, alpha);
+      scale.lerp(targetScale, alpha);
+      output.compose(position, rotation, scale);
+    },
+  };
 }
 
 function stopMindAr(mindar: {
@@ -395,10 +497,7 @@ export async function startMindArWithVisibleCamera(
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
   return new Promise<T>((resolve, reject) => {
-    const timer = window.setTimeout(
-      () => reject(new DOMException("AR startup timed out", "TimeoutError")),
-      timeoutMs,
-    );
+    const timer = window.setTimeout(() => reject(new DOMException("AR startup timed out", "TimeoutError")), timeoutMs);
     promise.then(
       (value) => {
         window.clearTimeout(timer);
@@ -447,9 +546,7 @@ function installBoundedCameraRequest() {
 
 function bypassIosWarmup(mindar: { controller?: object }) {
   const timer = window.setInterval(() => {
-    const controller = mindar.controller as
-      | { dummyRun?: (input: HTMLVideoElement) => Promise<void> }
-      | undefined;
+    const controller = mindar.controller as { dummyRun?: (input: HTMLVideoElement) => Promise<void> } | undefined;
     if (!controller) return;
     controller.dummyRun = async () => undefined;
     window.clearInterval(timer);

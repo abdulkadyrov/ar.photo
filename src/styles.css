@@ -927,6 +927,21 @@ textarea:focus-visible {
   padding: 1rem;
 }
 
+.quick-progress-simple {
+  display: flex;
+  min-height: 5.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  padding: 1rem;
+}
+
+.quick-progress-simple > strong {
+  color: #9c680c;
+  font-size: 1.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .quick-progress-copy {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;

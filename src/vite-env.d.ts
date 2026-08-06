@@ -27,7 +27,7 @@ declare module "mind-ar/dist/mindar-image-three.prod.js" {
     });
     video?: HTMLVideoElement;
     renderer: {
-      domElement?: HTMLCanvasElement;
+      domElement: HTMLCanvasElement;
       outputColorSpace: string;
       setAnimationLoop: (callback: (() => void) | null) => void;
       render: (scene: unknown, camera: unknown) => void;
@@ -38,12 +38,17 @@ declare module "mind-ar/dist/mindar-image-three.prod.js" {
     };
     controller?: { dispose?: () => void; markerDimensions?: Array<[number, number]> };
     cssRenderer?: { domElement?: HTMLElement };
-    scene: unknown;
+    scene: {
+      add(object: unknown): void;
+      remove(object: unknown): void;
+    };
     camera: unknown;
     addAnchor(index: number): {
-      group: { add: (mesh: unknown) => void; visible: boolean };
+      group: { add(object: unknown): void; matrix: import("three").Matrix4; visible: boolean };
+      visible: boolean;
       onTargetFound?: () => void;
       onTargetLost?: () => void;
+      onTargetUpdate?: () => void;
     };
     start(): Promise<void>;
     stop(): void;
@@ -102,5 +107,32 @@ declare module "three" {
     scale: { set: (x: number, y: number, z: number) => void };
     frustumCulled: boolean;
     renderOrder: number;
+  }
+
+  export class Matrix4 {
+    compose(position: Vector3, quaternion: Quaternion, scale: Vector3): this;
+    decompose(position: Vector3, quaternion: Quaternion, scale: Vector3): this;
+  }
+
+  export class Vector3 {
+    x: number;
+    y: number;
+    z: number;
+    copy(value: Vector3): this;
+    distanceTo(value: Vector3): number;
+    lerp(value: Vector3, alpha: number): this;
+  }
+
+  export class Quaternion {
+    copy(value: Quaternion): this;
+    angleTo(value: Quaternion): number;
+    slerp(value: Quaternion, alpha: number): this;
+  }
+
+  export class Group {
+    matrix: Matrix4;
+    matrixAutoUpdate: boolean;
+    visible: boolean;
+    add(object: unknown): void;
   }
 }
