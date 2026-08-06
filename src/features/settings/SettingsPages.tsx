@@ -101,6 +101,12 @@ export function SettingsRoute() {
           text={`${entitlements.usage.teamMembers} сотрудников · ${entitlements.usage.pendingInvitations} приглашений`}
           to="/settings/team"
         />
+        <SettingsLinkCard
+          icon={<ShieldCheck size={22} />}
+          title="Безопасность"
+          text="Второй фактор для защищённых операций"
+          to="/settings/security"
+        />
       </section>
 
       <Panel className="mt-6">
@@ -540,6 +546,7 @@ function SettingsNavigation() {
     { to: "/settings", label: "Аккаунт", end: true },
     { to: "/settings/subscription", label: "Тариф и лимиты" },
     { to: "/settings/team", label: "Команда" },
+    { to: "/settings/security", label: "Безопасность" },
   ];
   return (
     <nav aria-label="Разделы настроек" className="mt-6 flex gap-2 overflow-x-auto pb-1">

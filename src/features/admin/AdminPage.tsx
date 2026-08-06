@@ -21,6 +21,7 @@ import {
   WandSparkles,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { AppShell } from "../../app/layout/AppShell";
 import { Button, ErrorState, Input, MetricCard, Modal, Panel, Select, Skeleton, Toast } from "../../shared/ui";
 import {
@@ -1080,6 +1081,13 @@ function MfaRequired({ onVerified }: { onVerified: () => void }) {
         <SectionTitle icon={<ShieldCheck size={20} />} title="Подтвердите второй фактор" />
         <p className="mt-3 text-sm leading-6 text-muted">
           Введите код подтверждённого TOTP-фактора. До успешного challenge клиентские данные и mutations не загружаются.
+        </p>
+        <p className="mt-3 text-sm leading-6 text-muted">
+          Если это первый вход, сначала{" "}
+          <Link className="font-semibold text-primary" to="/settings/security">
+            подключите MFA в настройках безопасности
+          </Link>
+          .
         </p>
         <form
           className="mt-5 flex max-w-sm gap-2"

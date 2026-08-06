@@ -80,6 +80,9 @@ const SubscriptionRoute = lazy(() =>
 const TeamRoute = lazy(() =>
   import("../../features/settings/SettingsPages").then((module) => ({ default: module.TeamRoute })),
 );
+const SecurityRoute = lazy(() =>
+  import("../../features/settings/MfaSettingsPage").then((module) => ({ default: module.SecurityRoute })),
+);
 const AnalyticsRoute = lazy(() =>
   import("../../features/analytics/AnalyticsPage").then((module) => ({ default: module.AnalyticsRoute })),
 );
@@ -129,6 +132,7 @@ function RoutedContent() {
           <Route path="/settings" element={<Protected element={<SettingsRoute />} />} />
           <Route path="/settings/subscription" element={<Protected element={<SubscriptionRoute />} />} />
           <Route path="/settings/team" element={<Protected element={<TeamRoute />} />} />
+          <Route path="/settings/security" element={<Protected element={<SecurityRoute />} />} />
           <Route path="/project/:projectId" element={<Protected element={<PrototypeProjectRoute />} />} />
           <Route path="/viewer/test" element={<Protected element={<PrototypeTestViewerRoute />} />} />
           <Route path="/viewer/:livePhotoId" element={<PrototypeViewerRoute />} />
