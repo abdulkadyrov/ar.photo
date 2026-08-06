@@ -2,7 +2,7 @@
 
 ## Статус среды
 
-GitHub Pages публикует production frontend на `https://abdulkadyrov.github.io/ar.photo/`: workflow использует обычный fail-closed `build`, получает только browser-safe Supabase variables из GitHub Actions secrets и добавляет `404.html` для прямого открытия SPA/QR маршрутов. GitHub Pages не применяет Netlify-style `public/_headers`, поэтому перед обработкой реальных клиентских данных frontend нужно перенести на host/CDN с управляемыми security headers.
+GitHub Pages публикует production frontend на `https://abdulkadyrov.github.io/ar.photo/`: workflow использует обычный fail-closed `build`, получает только browser-safe Supabase variables из GitHub Actions secrets, добавляет `404.html` для прямого открытия SPA/QR маршрутов и обновляет сгенерированную ветку `gh-pages`. В GitHub Settings → Pages один раз выбрать `Deploy from a branch`, ветку `gh-pages` и каталог `/ (root)`. Попытка workflow настроить source автоматически неблокирующая, потому что GitHub может запретить эту repository-setting операцию встроенному токену. GitHub Pages не применяет Netlify-style `public/_headers`, поэтому перед обработкой реальных клиентских данных frontend нужно перенести на host/CDN с управляемыми security headers.
 
 Production требует отдельно управляемые frontend host/CDN, Supabase project, processing worker, DNS/TLS, scheduler, secrets, monitoring и backup policy.
 
@@ -78,7 +78,7 @@ PROCESSING_RUN_ONCE
 
 1. Ветка защищена, PR одобрен, HEAD checks полностью зелёные.
 2. `npm ci && npm run check` воспроизводится на Node 22.22.2.
-3. Clean database reset/lint/323 pgTAP зелёные.
+3. Clean database reset/lint/384 pgTAP зелёные.
 4. Browser matrix и worker container зелёные.
 5. Release manifest/SBOM сохранены для точного commit.
 6. Migration/Edge/worker/frontend changes и rollback owner перечислены в change record.
@@ -184,7 +184,7 @@ Rollback считается подтверждённым только после
 - ежеквартально восстанавливать backup в изолированный project, выполнять migrations/read-only consistency queries и основной smoke;
 - фиксировать дату, backup id, restore duration, recovered point, reviewer и отклонения.
 
-Repository CI выполняет отдельный local rehearsal после pgTAP: создаёт полный custom-format dump синтетического Supabase, восстанавливает его в новую временную БД, проверяет 14 migrations, fixtures, forced RLS и отсутствие `anon`/`private` privileges, затем уничтожает restore database и dump. В artifacts попадает только sanitized evidence с SHA-256/размером/результатами. Это подтверждает процедуру на локальном PostgreSQL, но не заменяет provider backup/PITR и Storage restore rehearsal в staging.
+Repository CI выполняет отдельный local rehearsal после pgTAP: создаёт полный custom-format dump синтетического Supabase, восстанавливает его в новую временную БД, проверяет 24 migrations, fixtures, forced RLS и отсутствие `anon`/`private` privileges, затем уничтожает restore database и dump. В artifacts попадает только sanitized evidence с SHA-256/размером/результатами. Это подтверждает процедуру на локальном PostgreSQL, но не заменяет provider backup/PITR и Storage restore rehearsal в staging.
 
 Restore никогда не репетируется поверх production. После восстановления ротировать временные credentials и уничтожить изолированную среду по approved procedure.
 

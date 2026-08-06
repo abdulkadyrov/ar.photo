@@ -58,6 +58,9 @@ jobs:
             git -C pages push origin gh-pages
           fi
       - name: Configure Pages branch source
+        # GitHub may deny this repository-setting mutation to GITHUB_TOKEN.
+        # The branch remains ready for the one-time Settings > Pages selection.
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
