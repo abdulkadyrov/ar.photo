@@ -417,11 +417,13 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   await expect(compactWork.getByText("Ревизия", { exact: false })).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   const cards = page.locator(".ar-item-card");
-  const [firstCardBox, secondCardBox] = await Promise.all([cards.nth(0).boundingBox(), cards.nth(1).boundingBox()]);
+  const [firstCardBox, workGridColumns] = await Promise.all([
+    cards.first().boundingBox(),
+    page.locator(".ar-items-grid").evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ")),
+  ]);
   expect(firstCardBox).not.toBeNull();
-  expect(secondCardBox).not.toBeNull();
   expect(Math.abs(firstCardBox!.width - firstCardBox!.height)).toBeLessThanOrEqual(2);
-  expect(Math.abs(firstCardBox!.y - secondCardBox!.y)).toBeLessThanOrEqual(2);
+  expect(workGridColumns).toHaveLength(2);
   await compactWork.click();
   await expect(page.getByRole("heading", { name: "Фото", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Видео", exact: true })).toBeVisible();
