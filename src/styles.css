@@ -625,7 +625,6 @@ textarea:focus-visible {
     white-space: nowrap;
   }
 
-  .app-eyebrow,
   .app-description {
     display: none;
   }
