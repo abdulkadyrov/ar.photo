@@ -1,7 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { QrCode } from "../../entities/ar-item/model";
-import { MediaPicker, ProgressStatus, QuickResult, QuickStepper } from "./QuickStartPage";
+import { MediaPicker, ProgressStatus, QuickResult, QuickStepper, QuickStopwatch } from "./QuickStartPage";
+import { formatElapsedTime } from "./quickStartTimer";
 
 const qr: QrCode = {
   account_id: "20000000-0000-4000-8000-000000000001",
@@ -50,5 +51,13 @@ describe("quick-start design", () => {
     expect(screen.getByText("3/4")).toBeVisible();
     expect(screen.getByRole("status")).toHaveAccessibleName("Этап 3 из 4");
     expect(screen.queryByText(/target\.mind/i)).not.toBeInTheDocument();
+  });
+
+  it("shows a stopwatch while the quick creation is running", () => {
+    render(<QuickStopwatch elapsedSeconds={83} running />);
+
+    expect(screen.getByRole("timer")).toHaveAccessibleName("Прошло 01:23");
+    expect(screen.getByText("01:23")).toBeVisible();
+    expect(formatElapsedTime(3_661)).toBe("01:01:01");
   });
 });

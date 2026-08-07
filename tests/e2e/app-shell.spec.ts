@@ -26,6 +26,22 @@ test("navigates through the protected router and opens quick creation", async ({
   ).toBeVisible();
 });
 
+test("times and automatically publishes quick creation", async ({ page }) => {
+  await page.goto("./");
+  await signInToDemo(page);
+  await page.getByRole("link", { name: "Создать AR-фото" }).first().click();
+
+  await page.getByLabel("Название").fill("Быстрая публикация");
+  await page.getByLabel("Выбрать фотографию-маркер").setInputFiles("public/test-assets/test.jpg");
+  await page.getByLabel("Выбрать видео").setInputFiles("test-assets/fixtures/h264-aac.mp4");
+  await page.getByRole("button", { name: "Оживить фото" }).click();
+
+  await expect(page.getByRole("timer")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Всё готово" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Подготовлено и опубликовано за")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Открыть AR" })).toBeEnabled();
+});
+
 test("renders the responsive SaaS navigation", async ({ page }) => {
   await page.goto("./dashboard");
   await expect(page).toHaveURL(/\/ar\.photo\/login$/);

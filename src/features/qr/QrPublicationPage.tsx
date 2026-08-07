@@ -12,7 +12,7 @@ import {
   ShieldCheck,
   Unlink,
 } from "lucide-react";
-import { useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
 import { Link, useParams } from "react-router-dom";
 import { AppShell } from "../../app/layout/AppShell";
@@ -21,6 +21,7 @@ import { Button, ErrorState, Modal, Panel, Select, Skeleton, Toast } from "../..
 import { useAuth } from "../auth/authContext";
 import { getCatalogRepository } from "../catalog/catalogRepository";
 import { getArItemRepository } from "../ar-items/arItemRepository";
+import { clearPendingQuickStart, getPendingQuickStart } from "../quick-start/quickStartRepository";
 import {
   brandLogoDataUrl,
   parseQrStyle,
@@ -115,6 +116,8 @@ export function QrPublicationRoute() {
   );
   const svgRef = useRef<SVGSVGElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const autoPublishAttempted = useRef(false);
+  const pendingQuickStart = useMemo(() => getPendingQuickStart(auth.session!.user.id), [auth.session]);
 
   const workspaceQuery = useQuery({
     queryKey: ["catalog", "workspace", auth.session!.user.id],
@@ -125,6 +128,8 @@ export function QrPublicationRoute() {
     queryKey: ["ar-item", accountId, itemId],
     queryFn: () => arItemRepository.getItem(accountId!, itemId),
     enabled: Boolean(accountId && itemId),
+    refetchInterval: (query) =>
+      query.state.data && ["ready", "published", "failed"].includes(query.state.data.status) ? false : 2_500,
   });
   const qrQuery = useQuery({
     queryKey: ["ar-item", "qr", accountId, itemId],
@@ -156,6 +161,9 @@ export function QrPublicationRoute() {
       ]);
       setConfirmation(null);
       setConfirmationText("");
+      if (action === "publish" && pendingQuickStart?.itemId === itemId) {
+        clearPendingQuickStart(auth.session!.user.id);
+      }
       setNotice({
         title:
           action === "publish"
@@ -168,8 +176,26 @@ export function QrPublicationRoute() {
         tone: "success",
       });
     },
-    onError: (error) => setNotice({ title: "Действие не выполнено", message: readableError(error), tone: "error" }),
+    onError: (error) =>
+      setNotice({ title: "Действие не выполнено", message: readableError(error), tone: "error" }),
   });
+
+  useEffect(() => {
+    const item = itemQuery.data;
+    if (
+      autoPublishAttempted.current ||
+      pendingQuickStart?.itemId !== itemId ||
+      item?.status !== "ready" ||
+      !accountId ||
+      !workspaceQuery.data?.canWrite ||
+      publicBase.error ||
+      mutation.isPending
+    ) {
+      return;
+    }
+    autoPublishAttempted.current = true;
+    mutation.mutate("publish");
+  }, [accountId, itemId, itemQuery.data, mutation, pendingQuickStart, publicBase.error, workspaceQuery.data]);
 
   if (workspaceQuery.isPending || itemQuery.isPending || qrQuery.isPending) return <QrLoading title="Публикация и QR" />;
   if (workspaceQuery.error || itemQuery.error || qrQuery.error) {

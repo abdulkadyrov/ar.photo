@@ -17,6 +17,7 @@ const pendingQuickStartSchema = z.object({
   groupId: z.string().uuid(),
   itemId: z.string().uuid(),
   title: z.string().min(2).max(160),
+  startedAt: z.number().int().positive().optional(),
 });
 
 export type PendingQuickStart = z.infer<typeof pendingQuickStartSchema>;

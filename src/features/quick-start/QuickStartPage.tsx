@@ -15,6 +15,7 @@ import {
   ScanLine,
   ShieldCheck,
   Sparkles,
+  Timer,
   Upload,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -33,6 +34,7 @@ import {
   savePendingQuickStart,
   type QuickStartWorkspace,
 } from "./quickStartRepository";
+import { currentTimestamp, formatElapsedTime } from "./quickStartTimer";
 
 const mediaRepository = getMediaRepository();
 const arItemRepository = getArItemRepository();
@@ -71,6 +73,8 @@ function QuickCreatePage({ userId }: { userId: string }) {
   const [itemId, setItemId] = useState(restoredAttempt?.itemId ?? "");
   const [result, setResult] = useState<QrCodeRecord>();
   const [error, setError] = useState("");
+  const [startedAt, setStartedAt] = useState<number | undefined>(restoredAttempt?.startedAt);
+  const [finishedAt, setFinishedAt] = useState<number | undefined>();
   const [pickerVersion, setPickerVersion] = useState(0);
   const requestId = useRef(crypto.randomUUID());
   const activeItemId = useRef(restoredAttempt?.itemId ?? "");
@@ -96,6 +100,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
   const visibleStage: QuickStage = itemFailed || itemLookupError ? "error" : stage;
   const processing = !["form", "done", "error"].includes(visibleStage);
   const canSubmit = Boolean(title.trim().length >= 2 && markerFile && videoFile && workspaceQuery.data && !processing);
+  const elapsedSeconds = useElapsedSeconds(startedAt, finishedAt);
   function showError(cause: unknown) {
     setStage("error");
     setError(readableError(cause));
@@ -123,6 +128,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
             ? await arItemRepository.getQrCode(workspace.accountId, item.id)
             : await arItemRepository.publish(workspace.accountId, item.id, resolvePublicBaseUrl());
         if (!qr) throw new Error("QR-код не создан");
+        setFinishedAt(currentTimestamp());
         setResult(qr);
         setStage("done");
         clearPendingQuickStart(userId);
@@ -137,6 +143,9 @@ function QuickCreatePage({ userId }: { userId: string }) {
 
   const submit = async () => {
     if (!workspaceQuery.data || !markerFile || !videoFile || !canSubmit) return;
+    const attemptStartedAt = currentTimestamp();
+    setStartedAt(attemptStartedAt);
+    setFinishedAt(undefined);
     setError("");
     setStage("preparing");
     setStageProgress(0);
@@ -194,6 +203,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
         ...workspace,
         itemId: item.id,
         title: title.trim(),
+        startedAt: attemptStartedAt,
       });
       setItemId(item.id);
       setStage("processing");
@@ -255,6 +265,8 @@ function QuickCreatePage({ userId }: { userId: string }) {
     setItemId("");
     setResult(undefined);
     setError("");
+    setStartedAt(undefined);
+    setFinishedAt(undefined);
     clearPendingQuickStart(userId);
     setPickerVersion((current) => current + 1);
     requestId.current = crypto.randomUUID();
@@ -285,6 +297,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
         markerPreview={markerPreview}
         videoPreview={videoPreview}
         qr={result}
+        elapsedSeconds={elapsedSeconds}
         onReset={reset}
       />
     );
@@ -336,6 +349,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
           />
         </div>
 
+        {startedAt ? <QuickStopwatch elapsedSeconds={elapsedSeconds} running={!finishedAt} /> : null}
         {visibleStage !== "form" && visibleStage !== "error" ? <ProgressStatus step={progressStep} /> : null}
         {visibleStage === "error" ? (
           <div className="quick-error" role="alert">
@@ -474,17 +488,31 @@ export function ProgressStatus({ step }: { step: 1 | 2 | 3 | 4 }) {
   );
 }
 
+export function QuickStopwatch({ elapsedSeconds, running }: { elapsedSeconds: number; running: boolean }) {
+  return (
+    <div className="quick-stopwatch" role="timer" aria-label={`Прошло ${formatElapsedTime(elapsedSeconds)}`}>
+      <span>
+        <Timer size={18} /> Время создания
+      </span>
+      <strong>{formatElapsedTime(elapsedSeconds)}</strong>
+      <small>{running ? "идёт" : "готово"}</small>
+    </div>
+  );
+}
+
 export function QuickResult({
   title,
   markerPreview,
   videoPreview,
   qr,
+  elapsedSeconds,
   onReset,
 }: {
   title: string;
   markerPreview?: string;
   videoPreview?: string;
   qr: QrCodeRecord;
+  elapsedSeconds?: number;
   onReset(): void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -553,6 +581,13 @@ export function QuickResult({
               <span>Откройте AR на телефоне, разрешите камеру и наведите её на фотографию целиком.</span>
             </div>
           </div>
+          {elapsedSeconds !== undefined ? (
+            <div className="quick-result-duration">
+              <Timer size={18} />
+              <span>Подготовлено и опубликовано за</span>
+              <strong>{formatElapsedTime(elapsedSeconds)}</strong>
+            </div>
+          ) : null}
         </section>
 
         <aside className="quick-result-card quick-qr-card" aria-label="QR-код AR-фото">
@@ -727,6 +762,17 @@ function useObjectUrl(file?: File) {
 
 function percent(uploaded: number, total: number) {
   return total > 0 ? Math.round((uploaded / total) * 100) : 0;
+}
+
+function useElapsedSeconds(startedAt?: number, finishedAt?: number) {
+  const [now, setNow] = useState(() => finishedAt ?? startedAt ?? 0);
+  useEffect(() => {
+    if (!startedAt || finishedAt) return;
+    const timer = window.setInterval(() => setNow(currentTimestamp()), 1_000);
+    return () => window.clearInterval(timer);
+  }, [finishedAt, startedAt]);
+  if (!startedAt) return 0;
+  return Math.max(0, Math.floor(((finishedAt ?? now) - startedAt) / 1_000));
 }
 
 function formatBytes(bytes: number) {
