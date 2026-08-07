@@ -154,12 +154,12 @@ function RecentProjectCard({ project }: { project: Project & { groupCount: numbe
   });
   return (
     <article className="dashboard-project-card">
-      <Link className="dashboard-project-cover" to={`/projects/${project.id}`}>
+      <Link className="dashboard-project-cover" to={`/items?projectId=${encodeURIComponent(project.id)}`}>
         {coverQuery.data ? <img alt="" src={coverQuery.data} /> : <FolderKanban size={28} />}
         <span className={`project-state project-state-${project.status}`}>{projectStatus(project.status)}</span>
       </Link>
       <div>
-        <Link className="dashboard-project-title" to={`/projects/${project.id}`}>
+        <Link className="dashboard-project-title" to={`/items?projectId=${encodeURIComponent(project.id)}`}>
           {project.name}
         </Link>
         <p>

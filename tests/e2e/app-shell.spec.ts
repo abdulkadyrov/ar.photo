@@ -217,6 +217,10 @@ test("creates a production project and group without duplicate submissions", asy
   await expect(page.getByRole("link", { name: "Выпускной 2027 — Школа №25" })).toHaveCount(1);
   await expect(page.locator("article").filter({ hasText: "Выпускной 2027 — Школа №25" }).locator("img")).toHaveCount(1);
   await page.getByRole("link", { name: "Выпускной 2027 — Школа №25" }).click();
+  await expect(page).toHaveURL(/\/items\?projectId=/);
+  const createdProjectId = new URL(page.url()).searchParams.get("projectId");
+  expect(createdProjectId).toBeTruthy();
+  await page.goto(`./projects/${createdProjectId}`);
   await expect(page.getByRole("heading", { name: "Выпускной 2027 — Школа №25" })).toBeVisible();
 
   const projectUrl = page.url();
@@ -247,7 +251,7 @@ test("creates a production project and group without duplicate submissions", asy
   const destinationDialog = page.getByRole("dialog", { name: "Новый проект" });
   await destinationDialog.getByPlaceholder("Например, Выпускной 2027").fill("Архив школы №25");
   await destinationDialog.getByRole("button", { name: "Создать проект" }).click();
-  await page.getByRole("link", { name: "Выпускной 2027 — Школа №25" }).click();
+  await page.goto(projectUrl);
 
   const teachersCard = page.locator('section[aria-label="Группы проекта"] > div').filter({ hasText: "Учителя" });
   await teachersCard.getByRole("button", { name: "Перенести" }).click();
@@ -271,6 +275,9 @@ test("validates and uploads a marker through the resumable media queue", async (
   await projectDialog.getByPlaceholder("Например, Выпускной 2027").fill("Media upload project");
   await projectDialog.getByRole("button", { name: "Создать проект" }).click();
   await page.getByRole("link", { name: "Media upload project" }).click();
+  const mediaProjectId = new URL(page.url()).searchParams.get("projectId");
+  expect(mediaProjectId).toBeTruthy();
+  await page.goto(`./projects/${mediaProjectId}`);
   await page.getByRole("button", { name: "Добавить группу" }).first().click();
   const groupDialog = page.getByRole("dialog", { name: "Новая группа" });
   await groupDialog.getByPlaceholder("Например, 11А класс").fill("Media upload group");
@@ -336,6 +343,10 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   await projectDialog.getByPlaceholder("Например, Выпускной 2027").fill("AR workflow project");
   await projectDialog.getByRole("button", { name: "Создать проект" }).click();
   await page.getByRole("link", { name: "AR workflow project" }).click();
+  await expect(page).toHaveURL(/\/items\?projectId=/);
+  const projectId = new URL(page.url()).searchParams.get("projectId");
+  expect(projectId).toBeTruthy();
+  await page.goto(`./projects/${projectId}`);
   await page.getByRole("button", { name: "Добавить группу" }).first().click();
   const groupDialog = page.getByRole("dialog", { name: "Новая группа" });
   await groupDialog.getByPlaceholder("Например, 11А класс").fill("AR workflow group");
@@ -387,6 +398,20 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   expect(initialPublicUrl).not.toContain("88000000-0000-4000-8000-000000000001");
   await expect(page.getByText("Публичный base URL", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Открыть AR" })).toBeVisible();
+
+  const qrPageUrl = page.url();
+  await page.getByRole("link", { name: "AR-работы" }).click();
+  const compactWork = page.getByRole("link", { name: "Открыть AR-работу «Портрет Алексея»" });
+  await expect(compactWork).toBeVisible();
+  await expect(compactWork.getByText("Портрет Алексея", { exact: true })).toBeVisible();
+  await expect(compactWork.getByText("Ревизия", { exact: false })).toHaveCount(0);
+  await compactWork.click();
+  await expect(page.getByRole("heading", { name: "Фото", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Видео", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "QR-код", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Видео AR-работы")).toBeVisible();
+  await expect(page.getByLabel("Открыть публичную ссылку")).toBeVisible();
+  await page.goto(qrPageUrl);
 
   await page.setViewportSize({ width: 319, height: 628 });
   await page.evaluate(() => window.scrollTo(0, 0));

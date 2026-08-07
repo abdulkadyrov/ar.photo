@@ -4,6 +4,9 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
+  ChevronRight,
+  Clipboard,
+  ExternalLink,
   FileVideo2,
   ImageIcon,
   LoaderCircle,
@@ -15,6 +18,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "../../app/layout/AppShell";
 import type { ArItem, ArItemSettings, MediaAsset, ProcessingJob } from "../../entities/ar-item/model";
@@ -26,6 +30,7 @@ import { markerAccept, prepareMediaFile, videoAccept } from "../media/mediaValid
 import { resolvePublicBaseUrl } from "../qr/qrDesign";
 import { getArItemRepository } from "./arItemRepository";
 import { analyzeMarkerFile, type MarkerQualityResult } from "./markerQuality";
+import "./ArItemPages.css";
 
 const catalogRepository = getCatalogRepository();
 const mediaRepository = getMediaRepository();
@@ -72,68 +77,49 @@ export function ArItemsRoute() {
     queryFn: () => arItemRepository.listItems(workspaceQuery.data!.accountId, projectId),
     enabled: Boolean(workspaceQuery.data?.accountId),
   });
+  const assetsQuery = useQuery({
+    queryKey: ["media-assets", workspaceQuery.data?.accountId, projectId ?? "all"],
+    queryFn: () => mediaRepository.listAssets(workspaceQuery.data!.accountId, projectId),
+    enabled: Boolean(workspaceQuery.data?.accountId),
+  });
 
-  if (workspaceQuery.isPending || itemsQuery.isPending) return <ItemsLoading />;
-  if (workspaceQuery.error || itemsQuery.error) {
+  if (workspaceQuery.error || itemsQuery.error || assetsQuery.error) {
     return (
       <AppShell title="AR-работы" description="Связанные фотографии и видео">
         <div className="mt-6">
-          <ErrorState text={readableError(workspaceQuery.error ?? itemsQuery.error)} />
+          <ErrorState text={readableError(workspaceQuery.error ?? itemsQuery.error ?? assetsQuery.error)} />
         </div>
       </AppShell>
     );
   }
+  if (workspaceQuery.isPending || itemsQuery.isPending || assetsQuery.isPending) return <ItemsLoading />;
 
   return (
     <AppShell
-      eyebrow={workspaceQuery.data.accountName}
       title="AR-работы"
-      description={
-        projectId
-          ? "Все черновики, обрабатываемые и готовые AR-работы выбранного проекта."
-          : "Создавайте связь маркера и видео, следите за обработкой и проверяйте результат до публикации."
-      }
+      compactMobile
       actions={
         <>
           {projectId ? (
-            <Link className="btn btn-quiet" to={`/projects/${encodeURIComponent(projectId)}`}>
-              <ArrowLeft size={17} /> Проект
+            <Link className="btn btn-quiet ar-items-back" to="/projects">
+              <ArrowLeft size={17} /> <span>Проекты</span>
             </Link>
           ) : null}
-          <Link className="btn btn-primary" to={projectId ? `/items/new?projectId=${encodeURIComponent(projectId)}` : "/items/new"}>
+          <Link
+            className="btn btn-primary"
+            to={projectId ? `/items/new?projectId=${encodeURIComponent(projectId)}` : "/items/new"}
+          >
             <Plus size={17} /> Новая AR-работа
           </Link>
         </>
       }
     >
       {itemsQuery.data.length ? (
-        <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Список AR-работ">
-          {itemsQuery.data.map((item) => (
-            <article key={item.id} className="surface-card rounded-card border border-line p-5 shadow-soft">
-              <div className="flex items-start justify-between gap-3">
-                <span className="metric-icon">
-                  <Sparkles size={20} />
-                </span>
-                <ItemStatus status={item.status} />
-              </div>
-              <h2 className="mt-5 text-xl font-semibold">{item.title}</h2>
-              <p className="mt-2 line-clamp-2 min-h-10 text-sm leading-5 text-muted">
-                {item.description ?? "Описание не добавлено"}
-              </p>
-              <div className="mt-5 flex items-center justify-between border-t border-line pt-4 text-xs text-muted">
-                <span>Ревизия {item.version}</span>
-                <span>{new Date(item.updated_at).toLocaleDateString("ru-RU")}</span>
-              </div>
-              <Link className="btn btn-ghost mt-4 w-full" to={`/items/${item.id}/edit`}>
-                Открыть мастер <ArrowRight size={16} />
-              </Link>
-              {item.status === "ready" || item.status === "published" ? (
-                <Link className="btn btn-primary mt-2 w-full" to={`/items/${item.id}/qr`}>
-                  {item.status === "published" ? "QR и публикация" : "Опубликовать"} <ScanLine size={16} />
-                </Link>
-              ) : null}
-            </article>
-          ))}
+        <section className="ar-items-grid" aria-label="Список AR-работ">
+          {itemsQuery.data.map((item) => {
+            const marker = assetsQuery.data.find((asset) => asset.id === item.marker_asset_id);
+            return <ArItemCard item={item} marker={marker} key={item.id} />;
+          })}
         </section>
       ) : (
         <Panel className="mt-6 py-12 text-center">
@@ -151,6 +137,179 @@ export function ArItemsRoute() {
       )}
     </AppShell>
   );
+}
+
+export function ArItemDetailRoute() {
+  const auth = useAuth();
+  const { itemId = "" } = useParams();
+  const [notice, setNotice] = useState<string | null>(null);
+  const workspaceQuery = useQuery({
+    queryKey: ["catalog", "workspace", auth.session!.user.id],
+    queryFn: () => catalogRepository.getWorkspace(auth.session!.user.id),
+  });
+  const accountId = workspaceQuery.data?.accountId;
+  const itemQuery = useQuery({
+    queryKey: ["ar-item", accountId, itemId],
+    queryFn: () => arItemRepository.getItem(accountId!, itemId),
+    enabled: Boolean(accountId && itemId),
+  });
+  const assetsQuery = useQuery({
+    queryKey: ["media-assets", accountId, itemQuery.data?.project_id],
+    queryFn: () => mediaRepository.listAssets(accountId!, itemQuery.data!.project_id),
+    enabled: Boolean(accountId && itemQuery.data?.project_id),
+  });
+  const qrQuery = useQuery({
+    queryKey: ["ar-item", "qr", accountId, itemId],
+    queryFn: () => arItemRepository.getQrCode(accountId!, itemId),
+    enabled: Boolean(accountId && itemId),
+  });
+
+  if (workspaceQuery.error || itemQuery.error || assetsQuery.error || qrQuery.error) {
+    return (
+      <AppShell title="AR-работа">
+        <div className="mt-6">
+          <ErrorState
+            text={readableError(workspaceQuery.error ?? itemQuery.error ?? assetsQuery.error ?? qrQuery.error)}
+          />
+        </div>
+      </AppShell>
+    );
+  }
+  if (workspaceQuery.isPending || itemQuery.isPending || assetsQuery.isPending || qrQuery.isPending) {
+    return <ItemDetailLoading />;
+  }
+
+  const item = itemQuery.data;
+  const marker = assetsQuery.data.find((asset) => asset.id === item.marker_asset_id);
+  const video = assetsQuery.data.find((asset) => asset.id === item.video_asset_id);
+  const qrCode = qrQuery.data;
+  const copyPublicUrl = async () => {
+    if (!qrCode) return;
+    try {
+      await navigator.clipboard.writeText(qrCode.public_url);
+      setNotice("Ссылка скопирована");
+    } catch {
+      setNotice("Не удалось скопировать ссылку");
+    }
+  };
+
+  return (
+    <AppShell
+      title={item.title}
+      compactMobile
+      actions={
+        <Link className="btn btn-quiet ar-items-back" to={`/items?projectId=${encodeURIComponent(item.project_id)}`}>
+          <ArrowLeft size={17} /> <span>AR-работы</span>
+        </Link>
+      }
+    >
+      <main className="ar-item-detail">
+        <section className="ar-item-media-section" aria-labelledby="ar-item-photo-title">
+          <h2 id="ar-item-photo-title">Фото</h2>
+          <SignedMedia asset={marker} kind="image" label="Фотография-маркер" />
+        </section>
+        <section className="ar-item-media-section" aria-labelledby="ar-item-video-title">
+          <h2 id="ar-item-video-title">Видео</h2>
+          <SignedMedia asset={video} kind="video" label="Видео AR-работы" />
+        </section>
+        <section className="ar-item-publication" aria-labelledby="ar-item-qr-title">
+          <h2 id="ar-item-qr-title">QR-код</h2>
+          {qrCode ? (
+            <QRCodeSVG value={qrCode.public_url} size={220} level="H" marginSize={2} title={`QR: ${item.title}`} />
+          ) : (
+            <div className="ar-item-empty-preview">QR-код появится после публикации</div>
+          )}
+          <label htmlFor="ar-item-public-url">Публичная ссылка</label>
+          <div className="ar-item-public-link">
+            <p id="ar-item-public-url" title={qrCode?.public_url}>
+              {qrCode?.public_url ?? "Ссылка ещё не создана"}
+            </p>
+            <button disabled={!qrCode} aria-label="Копировать публичную ссылку" onClick={() => void copyPublicUrl()}>
+              <Clipboard size={18} />
+            </button>
+            {qrCode ? (
+              <a href={qrCode.public_url} target="_blank" rel="noreferrer" aria-label="Открыть публичную ссылку">
+                <ExternalLink size={18} />
+              </a>
+            ) : null}
+          </div>
+        </section>
+      </main>
+      {notice ? (
+        <div className="fixed bottom-24 right-5 z-50 lg:bottom-6">
+          <Toast
+            title={notice}
+            tone={notice.startsWith("Не удалось") ? "error" : "success"}
+            onDismiss={() => setNotice(null)}
+          />
+        </div>
+      ) : null}
+    </AppShell>
+  );
+}
+
+function ArItemCard({ item, marker }: { item: ArItem; marker?: MediaAsset }) {
+  const previewQuery = useAssetUrl(marker);
+  return (
+    <article className="ar-item-card">
+      <Link to={`/items/${item.id}`} aria-label={`Открыть AR-работу «${item.title}»`}>
+        <div className="ar-item-card-preview">
+          {previewQuery.data ? <img src={previewQuery.data} alt="" /> : <ImageIcon size={26} aria-hidden="true" />}
+        </div>
+        <div className="ar-item-card-copy">
+          <h2>{item.title}</h2>
+          <time dateTime={item.updated_at}>{formatArItemDate(item.updated_at)}</time>
+        </div>
+        <ChevronRight size={22} aria-hidden="true" />
+      </Link>
+    </article>
+  );
+}
+
+function SignedMedia({ asset, kind, label }: { asset?: MediaAsset; kind: "image" | "video"; label: string }) {
+  const urlQuery = useAssetUrl(asset);
+  if (!asset) return <div className="ar-item-empty-preview">Файл не добавлен</div>;
+  if (urlQuery.isPending) return <Skeleton className="ar-item-media-preview" />;
+  if (!urlQuery.data) return <div className="ar-item-empty-preview">Файл недоступен</div>;
+  if (kind === "video") {
+    return (
+      <video
+        className="ar-item-media-preview"
+        src={urlQuery.data}
+        controls
+        playsInline
+        preload="metadata"
+        aria-label={label}
+      />
+    );
+  }
+  return <img className="ar-item-media-preview" src={urlQuery.data} alt={label} />;
+}
+
+function useAssetUrl(asset?: MediaAsset) {
+  return useQuery({
+    queryKey: ["media-asset-url", asset?.id, asset?.storage_path],
+    queryFn: () => mediaRepository.getAssetUrl(asset!),
+    enabled: Boolean(asset),
+    staleTime: 8 * 60_000,
+  });
+}
+
+function ItemDetailLoading() {
+  return (
+    <AppShell title="AR-работа">
+      <div className="ar-item-detail">
+        <Skeleton className="h-72" />
+        <Skeleton className="h-72" />
+      </div>
+    </AppShell>
+  );
+}
+
+function formatArItemDate(value: string) {
+  return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "short", year: "numeric" })
+    .format(new Date(value))
+    .replace(" г.", "");
 }
 
 export function NewArItemRoute() {

@@ -30,6 +30,9 @@ const MediaUploadRoute = lazy(() =>
 const ArItemsRoute = lazy(() =>
   import("../../features/ar-items/ArItemPages").then((module) => ({ default: module.ArItemsRoute })),
 );
+const ArItemDetailRoute = lazy(() =>
+  import("../../features/ar-items/ArItemPages").then((module) => ({ default: module.ArItemDetailRoute })),
+);
 const NewArItemRoute = lazy(() =>
   import("../../features/ar-items/ArItemPages").then((module) => ({ default: module.NewArItemRoute })),
 );
@@ -123,6 +126,7 @@ function RoutedContent() {
           <Route path="/media" element={<Protected element={<MediaUploadRoute />} />} />
           <Route path="/items" element={<Protected element={<ArItemsRoute />} />} />
           <Route path="/items/new" element={<Protected element={<NewArItemRoute />} />} />
+          <Route path="/items/:itemId" element={<Protected element={<ArItemDetailRoute />} />} />
           <Route path="/items/:itemId/edit" element={<Protected element={<EditArItemRoute />} />} />
           <Route path="/items/:itemId/qr" element={<Protected element={<QrPublicationRoute />} />} />
           <Route path="/qr-codes" element={<Protected element={<QrCodesRoute />} />} />

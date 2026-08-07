@@ -229,7 +229,10 @@ export function ProjectsRoute() {
         </div>
       ) : projectsQuery.data.items.length ? (
         <>
-          <section className="projects-grid mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-3" aria-label="Список проектов">
+          <section
+            className="projects-grid mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-3"
+            aria-label="Список проектов"
+          >
             {projectsQuery.data.items.map((project) => (
               <ProjectCard
                 key={project.id}
@@ -910,7 +913,7 @@ function ProjectCard({
     <article className="project-card surface-card overflow-hidden rounded-card border border-line shadow-soft">
       <Link
         className="project-card-cover group relative block aspect-[16/7] overflow-hidden bg-[radial-gradient(circle_at_25%_20%,rgba(139,92,246,.34),transparent_35%),linear-gradient(145deg,#151e2d,#0b1018)] p-5"
-        to={`/projects/${project.id}`}
+        to={`/items?projectId=${encodeURIComponent(project.id)}`}
       >
         <CoverImage className="absolute inset-0 h-full w-full object-cover" path={project.cover_path} alt="" />
         <span className="relative grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-black/40 text-primary shadow-soft backdrop-blur-sm transition group-hover:scale-105">
@@ -928,7 +931,7 @@ function ProjectCard({
             </div>
             <Link
               className="project-card-title mt-3 block truncate text-xl font-semibold hover:text-primary"
-              to={`/projects/${project.id}`}
+              to={`/items?projectId=${encodeURIComponent(project.id)}`}
             >
               {project.name}
             </Link>
@@ -1416,7 +1419,13 @@ function ProjectMetric({
         <p className="text-xs text-muted">{label}</p>
         <strong className="mt-1 block text-lg">{value}</strong>
       </div>
-      {to ? <ArrowRight aria-hidden="true" className="text-muted transition group-hover:translate-x-0.5 group-hover:text-primary" size={19} /> : null}
+      {to ? (
+        <ArrowRight
+          aria-hidden="true"
+          className="text-muted transition group-hover:translate-x-0.5 group-hover:text-primary"
+          size={19}
+        />
+      ) : null}
     </div>
   );
 
@@ -1432,11 +1441,7 @@ function ProjectMetric({
     );
   }
 
-  return (
-    <Panel>
-      {content}
-    </Panel>
-  );
+  return <Panel>{content}</Panel>;
 }
 
 function FormField({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
