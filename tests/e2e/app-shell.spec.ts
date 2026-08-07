@@ -240,7 +240,7 @@ test("creates a production project and group without duplicate submissions", asy
   const projectUrl = page.url();
   await page.getByRole("link", { name: "Открыть ar-работы проекта: 0" }).click();
   await expect(page).toHaveURL(/\/items\?projectId=/);
-  await expect(page.getByRole("heading", { name: "AR-работы", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Выпускной 2027 — Школа №25", exact: true })).toBeVisible();
   await page.goto(projectUrl);
 
   await page.getByRole("button", { name: "Добавить группу" }).first().click();
