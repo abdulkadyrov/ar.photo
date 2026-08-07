@@ -170,17 +170,6 @@ test("keeps the public AR viewer camera-explicit with a no-camera fallback", asy
   expect(
     await page.evaluate(() => (window as typeof window & { __arPhotoCameraRequests: number }).__arPhotoCameraRequests),
   ).toBe(1);
-
-  await page.setViewportSize({ width: 319, height: 628 });
-  await page.evaluate(() => window.scrollTo(0, 0));
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  const [openArBox, mobileNavBox] = await Promise.all([
-    page.getByRole("button", { name: "Открыть AR" }).boundingBox(),
-    page.getByRole("navigation", { name: "Мобильная навигация" }).boundingBox(),
-  ]);
-  expect(openArBox).not.toBeNull();
-  expect(mobileNavBox).not.toBeNull();
-  expect(openArBox!.y + openArBox!.height).toBeLessThanOrEqual(mobileNavBox!.y);
 });
 
 test("creates a production project and group without duplicate submissions", async ({ page }) => {
@@ -375,6 +364,19 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   expect(initialPublicUrl).not.toContain("88000000-0000-4000-8000-000000000001");
   await expect(page.getByText("Публичный base URL", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Открыть AR" })).toBeVisible();
+
+  await page.setViewportSize({ width: 319, height: 628 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const [openArBox, mobileNavBox] = await Promise.all([
+    page.getByRole("button", { name: "Открыть AR" }).boundingBox(),
+    page.getByRole("navigation", { name: "Мобильная навигация" }).boundingBox(),
+  ]);
+  expect(openArBox).not.toBeNull();
+  expect(mobileNavBox).not.toBeNull();
+  expect(openArBox!.y + openArBox!.height).toBeLessThanOrEqual(mobileNavBox!.y);
+
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.getByText("Дополнительно", { exact: true }).click();
 
   await page.getByRole("button", { name: "AR Photo", exact: true }).click();
