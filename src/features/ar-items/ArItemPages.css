@@ -191,22 +191,63 @@
   }
 
   .ar-items-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
     margin-top: 0.75rem;
   }
 
+  .ar-item-card {
+    aspect-ratio: 1;
+    border-radius: 16px;
+  }
+
   .ar-item-card > a {
-    min-height: 92px;
-    grid-template-columns: 92px minmax(0, 1fr) auto;
-    gap: 0.75rem;
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .ar-item-card > a::after {
+    position: absolute;
+    z-index: 1;
+    inset: 35% 0 0;
+    background: linear-gradient(180deg, transparent, rgba(10, 14, 23, 0.88));
+    content: "";
   }
 
   .ar-item-card-preview {
-    min-height: 92px;
+    position: absolute;
+    inset: 0;
+    min-height: 0;
+  }
+
+  .ar-item-card-copy {
+    position: absolute;
+    z-index: 2;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    padding: 0.7rem;
+    color: #ffffff;
+  }
+
+  .ar-item-card-copy h2 {
+    color: #ffffff;
+    font-size: 0.88rem;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
+  }
+
+  .ar-item-card-copy time {
+    margin-top: 0.2rem;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.64rem;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
   }
 
   .ar-item-card > a > svg {
-    width: 19px;
-    margin-right: 0.75rem;
+    display: none;
   }
 
   .ar-item-detail {
