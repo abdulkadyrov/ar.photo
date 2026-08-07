@@ -46,6 +46,12 @@ jobs:
         with:
           ref: gh-pages
           path: pages
+          fetch-depth: 6
+      - name: Preserve previous immutable assets
+        run: |
+          for revision in $(git -C pages rev-list --max-count=6 HEAD); do
+            git -C pages archive "$revision" assets | tar --extract --skip-old-files --directory=dist
+          done
       - name: Publish Pages branch
         run: |
           rsync -a --delete --exclude=.git dist/ pages/

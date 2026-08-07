@@ -35,16 +35,28 @@ const requiredWorkerRules = [
   "url.pathname.startsWith(`${BASE_URL}assets/`)",
   "!isSafeStaticRequest(event.request)",
   "/private|no-store/i.test(cacheControl)",
+  'cache: "reload"',
+  'cache: "no-store"',
 ];
 const requiredDemoBoundaryRules = [
   [runtimeConfig, "VITE_ENABLE_DEMO_MODE", "runtime demo opt-in"],
   [runtimeConfig, '"unconfigured"', "fail-closed runtime mode"],
   [packageManifest, '"build:demo"', "explicit demo build"],
   [pagesWorkflow, "VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}", "Pages Supabase URL secret"],
-  [pagesWorkflow, "VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}", "Pages publishable key secret"],
+  [
+    pagesWorkflow,
+    "VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}",
+    "Pages publishable key secret",
+  ],
   [pagesWorkflow, "VITE_PUBLIC_APP_URL: https://abdulkadyrov.github.io/ar.photo/", "canonical Pages origin"],
   [pagesWorkflow, "run: npm run build", "production Pages build"],
   [pagesWorkflow, "cp dist/index.html dist/404.html", "Pages SPA fallback"],
+  [
+    pagesWorkflow,
+    'git -C pages archive "$revision" assets | tar --extract --skip-old-files --directory=dist',
+    "restored immutable assets from recent Pages releases",
+  ],
+  [pagesWorkflow, "fetch-depth: 6", "Pages release history checkout"],
 ];
 const requiredAuthConfigRules = [
   [authConfig, /enable_signup\s*=\s*true/, "self-service Auth signup"],

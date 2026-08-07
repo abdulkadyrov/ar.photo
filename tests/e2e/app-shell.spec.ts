@@ -404,7 +404,7 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   await expect(page.getByRole("heading", { name: "Все артефакты готовы" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "AR-работа готова к публикации" })).toBeVisible();
   await page.getByRole("button", { name: "Опубликовать и создать QR" }).click();
-  await expect(page.getByRole("heading", { name: "Портрет Алексея" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Портрет Алексея", level: 1 })).toBeVisible();
   await expect(page.getByTestId("qr-preview")).toBeVisible();
 
   const initialPublicUrl = await page.getByTestId("public-qr-url").textContent();
@@ -697,7 +697,7 @@ test("keeps PWA caching static-only and restores the last visited shell offline"
     };
   });
 
-  expect(cacheState.keys).toEqual(["ar-photo-static-v3"]);
+  expect(cacheState.keys).toEqual(["ar-photo-static-v4"]);
   expect(cacheState.privateCandidateCached).toBe(false);
   expect(cacheState.staticAssetCached).toBe(true);
 
