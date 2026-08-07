@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "ar-photo-static-";
-const CACHE_NAME = `${CACHE_PREFIX}v3`;
+const CACHE_NAME = `${CACHE_PREFIX}v4`;
 const BASE_URL = "/ar.photo/";
 const APP_SHELL = [BASE_URL, `${BASE_URL}manifest.webmanifest`, `${BASE_URL}icon.svg`];
 const STATIC_DESTINATIONS = new Set(["script", "style", "font", "image"]);
@@ -17,7 +17,11 @@ function canStore(response) {
 }
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+  event.waitUntil(
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => cache.addAll(APP_SHELL.map((url) => new Request(url, { cache: "reload" })))),
+  );
 });
 
 self.addEventListener("activate", (event) => {
@@ -49,7 +53,7 @@ self.addEventListener("message", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   if (event.request.mode === "navigate") {
-    event.respondWith(fetch(event.request).catch(() => caches.match(BASE_URL)));
+    event.respondWith(fetch(new Request(event.request, { cache: "no-store" })).catch(() => caches.match(BASE_URL)));
     return;
   }
   if (!isSafeStaticRequest(event.request)) return;
