@@ -58,6 +58,8 @@ export class DemoCatalogRepository implements CatalogRepository {
         ...project,
         groupCount: state.groups.filter((group) => group.project_id === project.id && !group.deleted_at).length,
         arItemCount: state.arItemProjectIds.filter((projectId) => projectId === project.id).length,
+        previewBucket: project.cover_path ? "project-covers-private" : null,
+        previewPath: project.cover_path,
       })),
       page: params.page,
       pageSize: params.pageSize,

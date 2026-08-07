@@ -16,6 +16,82 @@
   display: none;
 }
 
+.project-card {
+  position: relative;
+}
+
+.project-card:has(.project-card-menu[open]) {
+  overflow: visible;
+}
+
+.project-card-menu {
+  position: absolute;
+  z-index: 4;
+  top: 0.75rem;
+  right: 0.75rem;
+}
+
+.project-card-menu[open] {
+  z-index: 20;
+}
+
+.project-card-menu > summary {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 12px;
+  background: rgba(10, 14, 23, 0.62);
+  color: #ffffff;
+  box-shadow: 0 8px 22px rgba(10, 14, 23, 0.2);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  list-style: none;
+}
+
+.project-card-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.project-card-menu-popover {
+  position: absolute;
+  top: 46px;
+  right: 0;
+  display: grid;
+  width: 170px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 0.3rem;
+  box-shadow: 0 18px 38px rgba(10, 14, 23, 0.2);
+}
+
+.project-card-menu-popover button {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 0.55rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  padding: 0.55rem 0.65rem;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 650;
+  text-align: left;
+}
+
+.project-card-menu-popover button:hover,
+.project-card-menu-popover button:focus-visible {
+  background: var(--surface);
+}
+
+.project-card-menu-popover .project-card-menu-danger {
+  color: #c0183b;
+}
+
 @media (max-width: 639px) {
   .app-content-compact-mobile .app-eyebrow {
     display: none;
@@ -125,51 +201,61 @@
   }
 
   .projects-grid {
-    gap: 0.6rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
     margin-top: 0.75rem;
   }
 
   .project-card {
-    display: grid;
-    min-height: 132px;
-    grid-template-columns: 88px minmax(0, 1fr);
+    display: block;
+    min-height: 0;
+    aspect-ratio: 1;
     border-radius: 16px;
+    background: #111827;
   }
 
   .project-card-cover {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    width: 100%;
     height: 100%;
-    min-height: 132px;
+    min-height: 0;
     aspect-ratio: auto;
-    padding: 0.5rem;
+    padding: 0;
+    border-radius: inherit;
   }
 
-  .project-card-cover > span {
-    width: 34px;
-    height: 34px;
-    border-radius: 11px;
-  }
-
-  .project-card-cover > span svg {
-    width: 17px;
-    height: 17px;
+  .project-card-cover::after {
+    position: absolute;
+    inset: 32% 0 0;
+    background: linear-gradient(180deg, transparent, rgba(8, 12, 20, 0.9));
+    content: "";
   }
 
   .project-card-body {
+    position: absolute;
+    z-index: 1;
+    inset: 0;
+    display: flex;
     min-width: 0;
-    padding: 0.65rem;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 0.7rem;
+    color: #ffffff;
+    pointer-events: none;
   }
 
   .project-card-badges {
-    gap: 0.35rem;
-  }
-
-  .project-card-badges > span {
-    font-size: 0.58rem;
+    display: none;
   }
 
   .project-card-title {
-    margin-top: 0.4rem;
-    font-size: 0.9rem;
+    margin-top: 0;
+    color: #ffffff;
+    font-size: 0.88rem;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+    pointer-events: auto;
   }
 
   .project-card-description {
@@ -177,23 +263,33 @@
   }
 
   .project-card-meta {
-    gap: 0.45rem;
-    margin-top: 0.45rem;
+    gap: 0;
+    margin-top: 0.22rem;
     border: 0;
     padding-top: 0;
-    font-size: 0.58rem;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.64rem;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
   }
 
-  .project-card-actions {
-    gap: 0.35rem;
-    margin-top: 0.5rem;
+  .project-card-meta span:first-child,
+  .project-card-meta span:last-child {
+    display: none;
   }
 
-  .project-card-actions .btn {
+  .project-card-menu {
+    top: 0.45rem;
+    right: 0.45rem;
+  }
+
+  .project-card-menu > summary {
     width: 34px;
-    min-height: 34px;
-    padding: 0;
-    overflow: hidden;
-    font-size: 0;
+    height: 34px;
+    border-radius: 11px;
+  }
+
+  .project-card-menu-popover {
+    top: 39px;
+    width: 158px;
   }
 }

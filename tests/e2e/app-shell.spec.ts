@@ -120,9 +120,19 @@ test("keeps the dashboard and project catalog compact on a narrow phone", async 
   await projectDialog.getByPlaceholder("Например, Выпускной 2027").fill("Компактный черновик");
   await projectDialog.getByRole("button", { name: "Создать проект" }).click();
   await expect(page.getByRole("link", { name: "Компактный черновик" })).toBeVisible();
-  const projectCardBox = await page.locator(".project-card").first().boundingBox();
-  expect(projectCardBox).not.toBeNull();
-  expect(projectCardBox!.height).toBeLessThanOrEqual(160);
+  const [firstProjectCardBox, projectGridColumns] = await Promise.all([
+    page.locator(".project-card").first().boundingBox(),
+    page.locator(".projects-grid").evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ")),
+  ]);
+  expect(firstProjectCardBox).not.toBeNull();
+  expect(Math.abs(firstProjectCardBox!.width - firstProjectCardBox!.height)).toBeLessThanOrEqual(2);
+  expect(projectGridColumns).toHaveLength(2);
+
+  const projectCard = page.locator(".project-card").filter({ hasText: "Компактный черновик" });
+  await projectCard.locator('summary[aria-label="Действия проекта «Компактный черновик»"]').click();
+  await expect(projectCard.getByRole("menuitem", { name: "Редактировать проект «Компактный черновик»" })).toBeVisible();
+  await expect(projectCard.getByRole("menuitem", { name: "Архивировать проект «Компактный черновик»" })).toBeVisible();
+  await expect(projectCard.getByRole("menuitem", { name: "Удалить проект «Компактный черновик»" })).toBeVisible();
 
   await page.getByRole("button", { name: "Черновики", exact: true }).click();
   await expect(page).toHaveURL(/status=draft/);

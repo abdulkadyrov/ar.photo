@@ -59,7 +59,7 @@ export interface CatalogRepository {
   reorderGroups(accountId: string, projectId: string, orderedGroupIds: string[]): Promise<Group[]>;
   moveGroup(accountId: string, groupId: string, destinationProjectId: string): Promise<Group>;
   uploadGroupCover(accountId: string, groupId: string, file: File): Promise<Group>;
-  getCoverUrl(path: string | null): Promise<string | null>;
+  getCoverUrl(path: string | null, bucket?: string | null): Promise<string | null>;
 }
 
 export class SupabaseCatalogRepository implements CatalogRepository {
@@ -125,7 +125,12 @@ export class SupabaseCatalogRepository implements CatalogRepository {
     const [groups, items] = ids.length
       ? await Promise.all([
           this.client.from("groups").select("project_id").in("project_id", ids).is("deleted_at", null),
-          this.client.from("ar_items").select("project_id").in("project_id", ids).is("deleted_at", null),
+          this.client
+            .from("ar_items")
+            .select("project_id,marker_asset_id,updated_at")
+            .in("project_id", ids)
+            .is("deleted_at", null)
+            .order("updated_at", { ascending: false }),
         ])
       : [
           { data: [], error: null },
@@ -135,12 +140,35 @@ export class SupabaseCatalogRepository implements CatalogRepository {
     if (groups.error) throw mapCatalogError(groups.error);
     if (items.error) throw mapCatalogError(items.error);
 
+    const previewItemsByProject = new Map<string, NonNullable<typeof items.data>[number]>();
+    for (const item of items.data ?? []) {
+      if (item.marker_asset_id && !previewItemsByProject.has(item.project_id)) {
+        previewItemsByProject.set(item.project_id, item);
+      }
+    }
+    const markerIds = [...new Set([...previewItemsByProject.values()].map((item) => item.marker_asset_id!))];
+    const markerAssets = markerIds.length
+      ? await this.client
+          .from("media_assets")
+          .select("id,storage_bucket,storage_path")
+          .eq("account_id", accountId)
+          .in("id", markerIds)
+          .is("deleted_at", null)
+      : { data: [], error: null };
+    if (markerAssets.error) throw mapCatalogError(markerAssets.error);
+
     return {
-      items: projects.map((project) => ({
-        ...project,
-        groupCount: groups.data?.filter((group) => group.project_id === project.id).length ?? 0,
-        arItemCount: items.data?.filter((item) => item.project_id === project.id).length ?? 0,
-      })),
+      items: projects.map((project) => {
+        const previewItem = previewItemsByProject.get(project.id);
+        const previewAsset = markerAssets.data?.find((asset) => asset.id === previewItem?.marker_asset_id);
+        return {
+          ...project,
+          groupCount: groups.data?.filter((group) => group.project_id === project.id).length ?? 0,
+          arItemCount: items.data?.filter((item) => item.project_id === project.id).length ?? 0,
+          previewBucket: project.cover_path ? "project-covers-private" : (previewAsset?.storage_bucket ?? null),
+          previewPath: project.cover_path ?? previewAsset?.storage_path ?? null,
+        };
+      }),
       page: params.page,
       pageSize: params.pageSize,
       total: count ?? 0,
@@ -304,9 +332,11 @@ export class SupabaseCatalogRepository implements CatalogRepository {
     );
   }
 
-  async getCoverUrl(path: string | null) {
+  async getCoverUrl(path: string | null, bucket = "project-covers-private") {
     if (!path) return null;
-    const { data, error } = await this.client.storage.from("project-covers-private").createSignedUrl(path, 600);
+    const { data, error } = await this.client.storage
+      .from(bucket || "project-covers-private")
+      .createSignedUrl(path, 600);
     if (error) throw mapCatalogError(error);
     return data.signedUrl;
   }

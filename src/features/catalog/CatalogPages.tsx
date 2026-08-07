@@ -15,6 +15,7 @@ import {
   GripVertical,
   Image,
   Layers3,
+  EllipsisVertical,
   MoveRight,
   Pencil,
   Plus,
@@ -34,6 +35,7 @@ import type {
   Project,
   ProjectCategory,
   ProjectInput,
+  ProjectListItem,
   ProjectListFilter,
   ProjectListSort,
   ProjectOption,
@@ -903,7 +905,7 @@ function ProjectCard({
   onEdit,
   onAction,
 }: {
-  project: Project & { groupCount: number; arItemCount: number };
+  project: ProjectListItem;
   canWrite: boolean;
   onEdit: () => void;
   onAction: (type: ProjectAction["type"]) => void;
@@ -915,11 +917,73 @@ function ProjectCard({
         className="project-card-cover group relative block aspect-[16/7] overflow-hidden bg-[radial-gradient(circle_at_25%_20%,rgba(139,92,246,.34),transparent_35%),linear-gradient(145deg,#151e2d,#0b1018)] p-5"
         to={`/items?projectId=${encodeURIComponent(project.id)}`}
       >
-        <CoverImage className="absolute inset-0 h-full w-full object-cover" path={project.cover_path} alt="" />
-        <span className="relative grid h-11 w-11 place-items-center rounded-2xl border border-white/10 bg-black/40 text-primary shadow-soft backdrop-blur-sm transition group-hover:scale-105">
-          <FolderKanban size={22} />
-        </span>
+        <CoverImage
+          alt=""
+          bucket={project.previewBucket}
+          className="absolute inset-0 h-full w-full object-cover"
+          path={project.previewPath ?? project.cover_path}
+        />
       </Link>
+      {canWrite ? (
+        <details className="project-card-menu">
+          <summary aria-label={`Действия проекта «${project.name}»`}>
+            <EllipsisVertical size={20} />
+          </summary>
+          <div className="project-card-menu-popover" role="menu">
+            {deleted ? (
+              <button
+                aria-label={`Восстановить проект «${project.name}»`}
+                onClick={(event) => {
+                  event.currentTarget.closest("details")?.removeAttribute("open");
+                  onAction("restoreDeleted");
+                }}
+                role="menuitem"
+                type="button"
+              >
+                <RotateCcw size={16} /> Восстановить
+              </button>
+            ) : (
+              <>
+                <button
+                  aria-label={`Редактировать проект «${project.name}»`}
+                  onClick={(event) => {
+                    event.currentTarget.closest("details")?.removeAttribute("open");
+                    onEdit();
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  <Pencil size={16} /> Редактировать
+                </button>
+                <button
+                  aria-label={`${project.status === "archived" ? "Вернуть" : "Архивировать"} проект «${project.name}»`}
+                  onClick={(event) => {
+                    event.currentTarget.closest("details")?.removeAttribute("open");
+                    onAction(project.status === "archived" ? "restore" : "archive");
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  {project.status === "archived" ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+                  {project.status === "archived" ? "Вернуть" : "Архивировать"}
+                </button>
+                <button
+                  aria-label={`Удалить проект «${project.name}»`}
+                  className="project-card-menu-danger"
+                  onClick={(event) => {
+                    event.currentTarget.closest("details")?.removeAttribute("open");
+                    onAction("delete");
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  <Trash2 size={16} /> Удалить
+                </button>
+              </>
+            )}
+          </div>
+        </details>
+      ) : null}
       <div className="project-card-body p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -945,47 +1009,6 @@ function ProjectCard({
           <span>{project.arItemCount} AR-работ</span>
           <span className="ml-auto">{formatShortDate(project.updated_at)}</span>
         </div>
-        {canWrite ? (
-          <div className="project-card-actions mt-4 flex flex-wrap gap-2">
-            {deleted ? (
-              <Button
-                aria-label={`Восстановить проект «${project.name}»`}
-                variant="quiet"
-                onClick={() => onAction("restoreDeleted")}
-                icon={<RotateCcw size={15} />}
-              >
-                Восстановить
-              </Button>
-            ) : (
-              <>
-                <Button
-                  aria-label={`Изменить проект «${project.name}»`}
-                  variant="quiet"
-                  onClick={onEdit}
-                  icon={<Pencil size={15} />}
-                >
-                  Изменить
-                </Button>
-                <Button
-                  aria-label={`${project.status === "archived" ? "Вернуть" : "Архивировать"} проект «${project.name}»`}
-                  variant="quiet"
-                  onClick={() => onAction(project.status === "archived" ? "restore" : "archive")}
-                  icon={project.status === "archived" ? <ArchiveRestore size={15} /> : <Archive size={15} />}
-                >
-                  {project.status === "archived" ? "Вернуть" : "В архив"}
-                </Button>
-                <Button
-                  aria-label={`Удалить проект «${project.name}»`}
-                  variant="danger"
-                  onClick={() => onAction("delete")}
-                  icon={<Trash2 size={15} />}
-                >
-                  Удалить
-                </Button>
-              </>
-            )}
-          </div>
-        ) : null}
       </div>
     </article>
   );
@@ -1238,10 +1261,20 @@ function CoverFileField({ file, onPick }: { file: File | null; onPick: (file?: F
   );
 }
 
-function CoverImage({ path, alt, className }: { path: string | null; alt: string; className: string }) {
+function CoverImage({
+  path,
+  alt,
+  className,
+  bucket,
+}: {
+  path: string | null;
+  alt: string;
+  className: string;
+  bucket?: string | null;
+}) {
   const coverQuery = useQuery({
-    queryKey: ["catalog", "cover", path],
-    queryFn: () => catalogRepository.getCoverUrl(path),
+    queryKey: ["catalog", "cover", bucket ?? "project-covers-private", path],
+    queryFn: () => catalogRepository.getCoverUrl(path, bucket),
     enabled: Boolean(path),
     staleTime: 8 * 60_000,
   });

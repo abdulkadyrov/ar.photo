@@ -22,6 +22,8 @@ export type Workspace = {
 export type ProjectListItem = Project & {
   groupCount: number;
   arItemCount: number;
+  previewBucket?: string | null;
+  previewPath?: string | null;
 };
 
 export type ProjectListFilter = ProjectStatus | "all" | "deleted";
