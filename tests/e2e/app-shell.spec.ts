@@ -93,8 +93,7 @@ test("keeps mobile actions above navigation and separates the project search ico
 
   const create = page.getByRole("link", { name: "Создать AR-фото" }).last();
   const mobileNav = page.getByRole("navigation", { name: "Мобильная навигация" });
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  await page.waitForFunction(() => window.scrollY > 0);
+  await create.scrollIntoViewIfNeeded();
   const [createBox, navBox] = await Promise.all([create.boundingBox(), mobileNav.boundingBox()]);
   expect(createBox).not.toBeNull();
   expect(navBox).not.toBeNull();
