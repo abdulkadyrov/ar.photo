@@ -1,1 +1,0 @@
-import{r as e}from"./index-CBITGu45.js";var t=e(`ChevronRight`,[[`path`,{d:`m9 18 6-6-6-6`,key:`mthhwq`}]]);export{t};
