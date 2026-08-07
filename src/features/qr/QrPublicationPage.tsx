@@ -9,7 +9,6 @@ import {
   QrCode,
   RefreshCw,
   Share2,
-  ShieldCheck,
   Unlink,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -28,9 +27,8 @@ import {
   qrDownloadName,
   qrStylePresets,
   resolvePublicBaseUrl,
-  validatePublicQrUrl,
-  validateQrDesign,
 } from "./qrDesign";
+import "./QrPublicationPage.css";
 
 const catalogRepository = getCatalogRepository();
 const arItemRepository = getArItemRepository();
@@ -205,8 +203,6 @@ export function QrPublicationRoute() {
   const item = itemQuery.data;
   const qrCode = qrQuery.data;
   const style = parseQrStyle(qrCode?.style ?? qrStylePresets.white);
-  const designValidation = validateQrDesign(style);
-  const urlValidation = qrCode ? validatePublicQrUrl(qrCode.public_url, item.id) : { valid: false, issues: [] };
   const canPublish = item.status === "ready" && !publicBase.error && workspaceQuery.data.canWrite;
   const imageSize = Math.round(320 * style.logoScale);
   const imageSettings = style.logo
@@ -252,234 +248,163 @@ export function QrPublicationRoute() {
 
   return (
     <AppShell
-      eyebrow="Publication boundary"
       title={item.title}
-      description="Стабильная публичная ссылка, печатный QR и отзыв публикации без раскрытия внутренних идентификаторов."
       actions={
-        <Link className="btn btn-quiet" to="/items">
-          <ArrowLeft size={17} /> AR-работы
+        <Link className="btn btn-quiet qr-back-link" to="/items">
+          <ArrowLeft size={17} /> <span>AR-работы</span>
         </Link>
       }
     >
-      <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="grid gap-5">
-          <Panel>
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Статус</p>
-                <h2 className="mt-2 text-2xl font-semibold">
-                  {item.status === "published" ? "Публичный viewer активен" : "Готово к публикации"}
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-                  {item.status === "published"
-                    ? "Unpublish мгновенно закрывает manifest, а rotate отзывает старую ссылку и требует перепечатать QR."
-                    : "Публикация доступна только для завершённой processing revision с проверенными marker/video assets."}
-                </p>
+      <div className="qr-publication-page">
+        {item.status === "ready" ? (
+          <Panel className="qr-publish-card">
+            <span className="qr-status-pill">Готово</span>
+            <h2>Всё подготовлено</h2>
+            <p>Опубликуйте AR-фото, чтобы получить ссылку и QR-код.</p>
+            {publicBase.error ? <p className="qr-publication-error">{publicBase.error}</p> : null}
+            <Button full disabled={!canPublish || mutation.isPending} onClick={() => mutation.mutate("publish")}>
+              {mutation.isPending ? <LoaderCircle className="animate-spin" size={17} /> : <QrCode size={17} />}
+              Опубликовать и создать QR
+            </Button>
+          </Panel>
+        ) : null}
+
+        {item.status === "published" && qrCode ? (
+          <>
+            <Panel className="qr-primary-card">
+              <div className="qr-card-status-row">
+                <span className="qr-status-pill qr-status-published">Опубликовано</span>
+                <span className="qr-version">QR v{qrCode.version}</span>
               </div>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                  item.status === "published" ? "bg-emerald-400/15 text-emerald-300" : "bg-white/5 text-muted"
-                }`}
+
+              <div className="qr-print-content" data-print-root>
+                <div
+                  className="qr-code-frame"
+                  data-print-qr
+                  data-testid="qr-preview"
+                  style={
+                    {
+                      background: style.background === "transparent" ? "#FFFFFF" : style.background,
+                      "--qr-print-size": `${printSize}mm`,
+                    } as CSSProperties
+                  }
+                >
+                  <QRCodeSVG
+                    ref={svgRef}
+                    value={qrCode.public_url}
+                    size={320}
+                    level="H"
+                    marginSize={style.quietZone}
+                    fgColor={style.foreground}
+                    bgColor={style.background}
+                    imageSettings={imageSettings}
+                    title={`QR: ${item.title}`}
+                    className="h-auto w-full"
+                  />
+                  <QRCodeCanvas
+                    ref={canvasRef}
+                    value={qrCode.public_url}
+                    size={1024}
+                    level="H"
+                    marginSize={style.quietZone}
+                    fgColor={style.foreground}
+                    bgColor={style.background}
+                    imageSettings={
+                      style.logo
+                        ? {
+                            src: brandLogoDataUrl,
+                            width: Math.round(1024 * style.logoScale),
+                            height: Math.round(1024 * style.logoScale),
+                            excavate: true,
+                          }
+                        : undefined
+                    }
+                    className="hidden"
+                    aria-hidden="true"
+                  />
+                </div>
+                <h2>{item.title}</h2>
+                <p>Наведите камеру на QR, затем — на фотографию.</p>
+              </div>
+
+              <div className="qr-link-block" data-print-hide>
+                <label htmlFor="public-qr-url">Публичная ссылка</label>
+                <div className="qr-link-field">
+                  <p id="public-qr-url" title={qrCode.public_url} data-testid="public-qr-url">
+                    {qrCode.public_url}
+                  </p>
+                  <button aria-label="Копировать публичную ссылку" onClick={() => void copyPublicUrl()}>
+                    <Clipboard size={18} />
+                  </button>
+                  <button aria-label="Поделиться публичной ссылкой" onClick={() => void sharePublicUrl()}>
+                    <Share2 size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <Button
+                className="qr-open-button"
+                full
+                onClick={() => window.open(qrCode.public_url, "_blank", "noopener,noreferrer")}
+                data-print-hide
               >
-                {item.status === "published" ? "Опубликовано" : item.status === "ready" ? "Готово" : item.status}
-              </span>
-            </div>
+                <ExternalLink size={18} /> Открыть AR
+              </Button>
+            </Panel>
 
-            <div className="mt-5 rounded-xl border border-line bg-black/15 p-4">
-              <p className="text-xs uppercase tracking-[0.14em] text-muted">Публичный base URL</p>
-              <p className="mt-2 break-all font-mono text-sm">{publicBase.value || "Не настроен"}</p>
-              <p className="mt-2 text-xs leading-5 text-muted">
-                Настраивается через <code>VITE_PUBLIC_APP_URL</code>; production требует HTTPS. Custom domain меняет
-                только origin, публичный capability slug остаётся случайным.
-              </p>
-              {publicBase.error ? <p className="mt-2 text-sm text-red-300">{publicBase.error}</p> : null}
-            </div>
+            <details className="qr-extra-card" data-print-hide>
+              <summary>Дополнительно</summary>
+              <div className="qr-extra-content">
+                <section>
+                  <h2>Скачать QR</h2>
+                  <div className="qr-download-actions">
+                    <Button variant="ghost" onClick={downloadSvg}>
+                      <Download size={16} /> SVG
+                    </Button>
+                    <Button variant="ghost" onClick={downloadPng}>
+                      <Download size={16} /> PNG
+                    </Button>
+                    <Button variant="ghost" onClick={() => window.print()}>
+                      <Printer size={16} /> Печать
+                    </Button>
+                  </div>
+                </section>
 
-            <div className="mt-5 flex flex-wrap gap-2">
-              {item.status === "ready" ? (
-                <Button disabled={!canPublish || mutation.isPending} onClick={() => mutation.mutate("publish")}>
-                  {mutation.isPending ? <LoaderCircle className="animate-spin" size={16} /> : <QrCode size={16} />}
-                  Опубликовать и создать QR
-                </Button>
-              ) : null}
-              {item.status === "published" ? (
-                <>
-                  <Button variant="danger" disabled={mutation.isPending} onClick={() => setConfirmation("unpublish")}>
-                    <Unlink size={16} /> Отключить публикацию
-                  </Button>
+                <section>
+                  <h2>Оформление</h2>
+                  <div className="qr-style-options">
+                    {(["white", "transparent", "brand"] as const).map((preset) => (
+                      <button
+                        key={preset}
+                        aria-pressed={style.preset === preset}
+                        disabled={mutation.isPending}
+                        onClick={() => mutation.mutate({ style: preset })}
+                      >
+                        {preset === "white" ? "Белый" : preset === "transparent" ? "Прозрачный" : "AR Photo"}
+                      </button>
+                    ))}
+                  </div>
+                  <Select
+                    label="Размер печати"
+                    value={printSize}
+                    onChange={(event) => setPrintSize(event.target.value)}
+                    options={printSizes.map((size) => ({ label: `${size} × ${size} мм`, value: String(size) }))}
+                  />
+                </section>
+
+                <section className="qr-publication-actions">
+                  <h2>Управление публикацией</h2>
                   <Button variant="quiet" disabled={mutation.isPending} onClick={() => setConfirmation("rotate")}>
                     <RefreshCw size={16} /> Обновить публичную ссылку
                   </Button>
-                </>
-              ) : null}
-            </div>
-          </Panel>
-
-          {item.status === "published" && qrCode ? (
-            <Panel>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Публичная ссылка</p>
-                  <p className="mt-2 break-all font-mono text-sm" data-testid="public-qr-url">
-                    {qrCode.public_url}
-                  </p>
-                </div>
-                <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-muted">QR v{qrCode.version}</span>
+                  <Button variant="danger" disabled={mutation.isPending} onClick={() => setConfirmation("unpublish")}>
+                    <Unlink size={16} /> Отключить публикацию
+                  </Button>
+                </section>
               </div>
-              <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                <Button variant="ghost" onClick={() => void copyPublicUrl()}>
-                  <Clipboard size={16} /> Копировать
-                </Button>
-                <Button variant="ghost" onClick={() => void sharePublicUrl()}>
-                  <Share2 size={16} /> Поделиться
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => window.open(qrCode.public_url, "_blank", "noopener,noreferrer")}
-                >
-                  <ExternalLink size={16} /> Открыть
-                </Button>
-                <Button variant="ghost" onClick={() => window.print()}>
-                  <Printer size={16} /> Тест печати
-                </Button>
-              </div>
-            </Panel>
-          ) : null}
-
-          {item.status === "published" && qrCode ? (
-            <Panel>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Оформление QR</p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                {(["white", "transparent", "brand"] as const).map((preset) => (
-                  <button
-                    key={preset}
-                    aria-pressed={style.preset === preset}
-                    className={`rounded-xl border p-4 text-left transition ${
-                      style.preset === preset ? "border-primary bg-primary/10" : "border-line bg-white/[0.025]"
-                    }`}
-                    disabled={mutation.isPending}
-                    onClick={() => mutation.mutate({ style: preset })}
-                  >
-                    <span className="font-semibold">
-                      {preset === "white" ? "Белый" : preset === "transparent" ? "Прозрачный" : "AR Photo"}
-                    </span>
-                    <span className="mt-2 block text-xs leading-5 text-muted">
-                      {preset === "brand"
-                        ? "Фирменный цвет и безопасный логотип"
-                        : preset === "transparent"
-                          ? "Для гарантированно светлого фона"
-                          : "Максимальная совместимость"}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <Select
-                  label="Размер печати"
-                  value={printSize}
-                  onChange={(event) => setPrintSize(event.target.value)}
-                  options={printSizes.map((size) => ({ label: `${size} × ${size} мм`, value: String(size) }))}
-                />
-                <div className="rounded-xl border border-line p-4 text-sm">
-                  <p className="font-semibold">Readability gate</p>
-                  <p className="mt-1 text-muted">
-                    Quiet zone {style.quietZone} · ECC H · contrast {designValidation.contrastRatio.toFixed(1)}:1
-                  </p>
-                </div>
-              </div>
-            </Panel>
-          ) : null}
-        </div>
-
-        <Panel className="h-fit xl:sticky xl:top-6">
-          {item.status === "published" && qrCode ? (
-            <div className="text-center" data-print-root>
-              <div
-                className="mx-auto grid max-w-[340px] place-items-center rounded-2xl p-3"
-                data-print-qr
-                data-testid="qr-preview"
-                style={
-                  {
-                    background: style.background === "transparent" ? "#FFFFFF" : style.background,
-                    "--qr-print-size": `${printSize}mm`,
-                  } as CSSProperties
-                }
-              >
-                <QRCodeSVG
-                  ref={svgRef}
-                  value={qrCode.public_url}
-                  size={320}
-                  level="H"
-                  marginSize={style.quietZone}
-                  fgColor={style.foreground}
-                  bgColor={style.background}
-                  imageSettings={imageSettings}
-                  title={`QR: ${item.title}`}
-                  className="h-auto w-full"
-                />
-                <QRCodeCanvas
-                  ref={canvasRef}
-                  value={qrCode.public_url}
-                  size={1024}
-                  level="H"
-                  marginSize={style.quietZone}
-                  fgColor={style.foreground}
-                  bgColor={style.background}
-                  imageSettings={
-                    style.logo
-                      ? {
-                          src: brandLogoDataUrl,
-                          width: Math.round(1024 * style.logoScale),
-                          height: Math.round(1024 * style.logoScale),
-                          excavate: true,
-                        }
-                      : undefined
-                  }
-                  className="hidden"
-                  aria-hidden="true"
-                />
-              </div>
-              <h2 className="mt-5 text-xl font-semibold">{item.title}</h2>
-              <p className="mt-2 text-sm text-muted">Наведите камеру на QR, затем — на фотографию.</p>
-              <div className="mt-5 grid grid-cols-2 gap-2" data-print-hide>
-                <Button variant="ghost" onClick={downloadSvg}>
-                  <Download size={16} /> SVG
-                </Button>
-                <Button variant="ghost" onClick={downloadPng}>
-                  <Download size={16} /> PNG
-                </Button>
-              </div>
-              <div
-                className={`mt-5 rounded-xl border p-4 text-left text-sm ${
-                  designValidation.valid && urlValidation.valid
-                    ? "border-emerald-400/20 bg-emerald-400/5"
-                    : "border-red-400/20 bg-red-400/5"
-                }`}
-              >
-                <p className="flex items-center gap-2 font-semibold">
-                  {designValidation.valid && urlValidation.valid ? (
-                    <ShieldCheck className="text-emerald-300" size={18} />
-                  ) : (
-                    <QrCode className="text-red-300" size={18} />
-                  )}
-                  {designValidation.valid && urlValidation.valid ? "QR прошёл software gate" : "QR требует исправления"}
-                </p>
-                <p className="mt-2 text-xs leading-5 text-muted">
-                  URL не содержит UUID/PII/signed media; quiet zone, ECC H, контраст и logo scale проверены. Физический scan
-                  test на втором устройстве остаётся launch gate.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="py-10 text-center">
-              <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-primary/15 text-primary">
-                <QrCode size={32} />
-              </span>
-              <h2 className="mt-5 text-xl font-semibold">QR появится после публикации</h2>
-              <p className="mt-2 text-sm leading-6 text-muted">До этого public manifest остаётся закрыт.</p>
-            </div>
-          )}
-        </Panel>
+            </details>
+          </>
+        ) : null}
       </div>
 
       <Modal

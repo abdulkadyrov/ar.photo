@@ -31,13 +31,13 @@
 }
 
 html {
-  min-width: 320px;
+  min-width: 0;
   background: var(--background);
 }
 
 body {
   margin: 0;
-  min-width: 320px;
+  min-width: 0;
   min-height: 100vh;
   background: radial-gradient(circle at 78% -12%, rgba(115, 87, 255, 0.08), transparent 34rem), var(--background);
 }
@@ -597,6 +597,79 @@ textarea:focus-visible {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+}
+
+/* Compact protected pages */
+@media (max-width: 639px) {
+  .app-content {
+    padding: 0.8rem 0.75rem;
+    padding-bottom: calc(5.7rem + env(safe-area-inset-bottom));
+  }
+
+  .app-topbar {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.65rem;
+    padding-bottom: 0.7rem;
+  }
+
+  .app-topbar > div:first-child {
+    min-width: 0;
+  }
+
+  .app-topbar h1 {
+    overflow: hidden;
+    font-size: 1.45rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app-eyebrow,
+  .app-description {
+    display: none;
+  }
+
+  .app-topbar-actions {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+  }
+
+  .app-topbar-actions .btn {
+    min-height: 40px;
+    padding: 0.55rem 0.65rem;
+  }
+
+  .app-content main > .mt-6,
+  .app-content main > .mt-8 {
+    margin-top: 0.9rem;
+  }
+
+  .app-content .surface-card {
+    border-radius: 18px;
+  }
+
+  .mobile-nav {
+    padding: 0.4rem max(0.25rem, env(safe-area-inset-right)) calc(0.4rem + env(safe-area-inset-bottom))
+      max(0.25rem, env(safe-area-inset-left));
+  }
+
+  .mobile-nav-link {
+    min-width: 0;
+    min-height: 44px;
+    gap: 0.15rem;
+    font-size: clamp(0.54rem, 2.35vw, 0.62rem);
+  }
+
+  .mobile-nav-link > span:last-child {
+    max-width: 100%;
+    white-space: nowrap;
+  }
+
+  .mobile-create-icon {
+    width: 38px;
+    height: 38px;
+    margin-top: -1.15rem;
   }
 }
 
@@ -1902,7 +1975,7 @@ textarea:focus-visible {
 
 @media (max-width: 680px) {
   .quick-flow {
-    padding: 0.65rem;
+    padding: 0.5rem;
   }
 
   .quick-header {
@@ -1927,7 +2000,15 @@ textarea:focus-visible {
   }
 
   .quick-flow-content {
-    margin-top: 1.6rem;
+    margin-top: 0.8rem;
+  }
+
+  .quick-stepper li {
+    gap: 0;
+  }
+
+  .quick-stepper li > span:last-of-type {
+    display: none;
   }
 
   .quick-stepper strong {
@@ -1944,15 +2025,17 @@ textarea:focus-visible {
   }
 
   .quick-page-heading {
-    margin-top: 1.8rem;
+    margin: 0.8rem auto 0.75rem;
   }
 
   .quick-page-heading h1 {
-    font-size: 2.15rem;
+    margin-top: 0;
+    font-size: 1.65rem;
   }
 
+  .quick-page-heading > span,
   .quick-page-heading p {
-    font-size: 0.84rem;
+    display: none;
   }
 
   .quick-create-card,
@@ -1962,8 +2045,9 @@ textarea:focus-visible {
   }
 
   .quick-media-pair {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.85rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+    margin-top: 0.8rem;
   }
 
   .quick-media-link {
@@ -1971,11 +2055,75 @@ textarea:focus-visible {
   }
 
   .quick-media-preview {
-    min-height: 235px;
+    min-height: 132px;
+  }
+
+  .quick-media-picker {
+    border-radius: 16px;
+  }
+
+  .quick-media-picker-heading {
+    min-height: 54px;
+    padding: 0.55rem 0.65rem;
+  }
+
+  .quick-media-picker-heading small,
+  .quick-added-badge {
+    display: none;
+  }
+
+  .quick-media-picker-heading strong {
+    font-size: 0.78rem;
+  }
+
+  .quick-media-empty {
+    gap: 0.3rem;
+    padding: 0.65rem;
+  }
+
+  .quick-media-empty > span:last-child {
+    display: none;
+  }
+
+  .quick-media-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+
+  .quick-pick-file {
+    inset: auto auto 0.65rem;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.64rem;
+  }
+
+  .quick-media-file {
+    padding: 1.8rem 0.55rem 0.55rem;
+  }
+
+  .quick-media-file strong {
+    font-size: 0.64rem;
+  }
+
+  .quick-replace-file {
+    padding: 0.38rem;
+  }
+
+  .quick-replace-file span {
+    display: none;
+  }
+
+  .quick-media-hint {
+    display: none;
   }
 
   .quick-form-actions {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
+    margin-top: 0.8rem;
+  }
+
+  .quick-flow .btn {
+    min-height: 46px;
   }
 
   .quick-result-card-heading {
