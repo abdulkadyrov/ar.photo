@@ -86,18 +86,23 @@ test("opens the production QR camera from the protected workspace", async ({ pag
   ).toBe(1);
 });
 
-test("keeps mobile actions above navigation and separates the project search icon", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+test("keeps the dashboard and project catalog compact on a narrow phone", async ({ page }) => {
+  await page.setViewportSize({ width: 364, height: 628 });
   await page.goto("./dashboard");
   await signInToDemo(page);
 
-  const create = page.getByRole("link", { name: "Создать AR-фото" }).last();
   const mobileNav = page.getByRole("navigation", { name: "Мобильная навигация" });
-  await create.scrollIntoViewIfNeeded();
-  const [createBox, navBox] = await Promise.all([create.boundingBox(), mobileNav.boundingBox()]);
-  expect(createBox).not.toBeNull();
+  const [heroBox, recentHeadingBox, navBox] = await Promise.all([
+    page.locator(".dashboard-hero").boundingBox(),
+    page.getByRole("heading", { name: "Недавние проекты" }).boundingBox(),
+    mobileNav.boundingBox(),
+  ]);
+  expect(heroBox).not.toBeNull();
+  expect(heroBox!.height).toBeLessThanOrEqual(160);
+  expect(recentHeadingBox).not.toBeNull();
   expect(navBox).not.toBeNull();
-  expect(createBox!.y + createBox!.height).toBeLessThanOrEqual(navBox!.y - 8);
+  expect(recentHeadingBox!.y + recentHeadingBox!.height).toBeLessThanOrEqual(navBox!.y);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.goto("./projects");
   const search = page.getByRole("textbox", { name: "Поиск проектов" });
@@ -105,6 +110,24 @@ test("keeps mobile actions above navigation and separates the project search ico
   expect(
     await search.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft)),
   ).toBeGreaterThanOrEqual(48);
+  const toolbarBox = await page.locator(".projects-toolbar").boundingBox();
+  expect(toolbarBox).not.toBeNull();
+  expect(toolbarBox!.height).toBeLessThanOrEqual(130);
+  await expect(page.getByRole("button", { name: "Черновики", exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Создать", exact: true }).click();
+  const projectDialog = page.getByRole("dialog", { name: "Новый проект" });
+  await projectDialog.getByPlaceholder("Например, Выпускной 2027").fill("Компактный черновик");
+  await projectDialog.getByRole("button", { name: "Создать проект" }).click();
+  await expect(page.getByRole("link", { name: "Компактный черновик" })).toBeVisible();
+  const projectCardBox = await page.locator(".project-card").first().boundingBox();
+  expect(projectCardBox).not.toBeNull();
+  expect(projectCardBox!.height).toBeLessThanOrEqual(160);
+
+  await page.getByRole("button", { name: "Черновики", exact: true }).click();
+  await expect(page).toHaveURL(/status=draft/);
+  await expect(page.getByRole("link", { name: "Компактный черновик" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 test("protects the workspace and clears the demo session on logout", async ({ page }) => {

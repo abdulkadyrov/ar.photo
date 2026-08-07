@@ -20,6 +20,7 @@ import {
   Plus,
   RotateCcw,
   Search,
+  SlidersHorizontal,
   Sparkles,
   Trash2,
   Upload,
@@ -45,6 +46,7 @@ import { Button, ErrorState, FileButton, Input, Modal, Panel, Select, Skeleton, 
 import { CatalogError, getCatalogRepository } from "./catalogRepository";
 import { CoverFileError, coverFileAccept } from "./coverFile";
 import { getArItemRepository } from "../ar-items/arItemRepository";
+import "./CatalogPages.css";
 
 const catalogRepository = getCatalogRepository();
 const arItemRepository = getArItemRepository();
@@ -135,40 +137,84 @@ export function ProjectsRoute() {
       eyebrow={workspace.accountName}
       title="Мои проекты"
       description="Создавайте коллекции, управляйте группами и отслеживайте готовность AR-материалов."
+      compactMobile
       actions={
-        <Button disabled={!workspace.canWrite} onClick={() => setCreating(true)} icon={<Plus size={18} />}>
-          Создать проект
+        <Button
+          className="projects-top-create"
+          disabled={!workspace.canWrite}
+          onClick={() => setCreating(true)}
+          icon={<Plus size={18} />}
+        >
+          <span className="projects-top-create-long">Создать проект</span>
+          <span className="projects-top-create-short">Создать</span>
         </Button>
       }
     >
       {!workspace.canWrite ? <WorkspaceReadOnlyNotice workspace={workspace} /> : null}
 
-      <Panel className="mt-6">
-        <div className="grid gap-3 lg:grid-cols-[minmax(240px,1fr)_190px_210px_auto]">
+      <Panel className="projects-toolbar mt-6">
+        <div className="projects-toolbar-grid grid gap-3 lg:grid-cols-[minmax(240px,1fr)_190px_210px_auto]">
           <ProjectSearchForm key={search} initialSearch={search} onSearch={(value) => changeParam("search", value)} />
-          <Select
-            aria-label="Статус проектов"
-            label=""
-            options={projectFilterOptions}
-            value={filter}
-            onChange={(event) => changeParam("status", event.target.value)}
-          />
-          <Select
-            aria-label="Сортировка проектов"
-            label=""
-            options={projectSortOptions}
-            value={sort}
-            onChange={(event) => changeParam("sort", event.target.value)}
-          />
+          <div className="projects-status-control-wrapper">
+            <Select
+              aria-label="Статус проектов"
+              className="projects-status-control"
+              label=""
+              options={projectFilterOptions}
+              value={filter}
+              onChange={(event) => changeParam("status", event.target.value)}
+            />
+          </div>
+          <label className="projects-sort-control">
+            <span className="sr-only">Сортировка проектов</span>
+            <SlidersHorizontal aria-hidden="true" className="projects-sort-icon" size={18} />
+            <select
+              aria-label="Сортировка проектов"
+              className="field-control projects-sort-select"
+              value={sort}
+              onChange={(event) => changeParam("sort", event.target.value)}
+            >
+              {projectSortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <Button
+            aria-label="Сбросить фильтры"
+            className="projects-reset"
             type="button"
             variant="quiet"
             onClick={() => {
               setSearchParams({});
             }}
           >
-            Сбросить
+            <RotateCcw size={17} />
+            <span>Сбросить</span>
           </Button>
+        </div>
+        <div aria-label="Фильтр проектов" className="projects-filter-tabs" role="group">
+          {projectMobileFilterOptions.map((option) => (
+            <button
+              aria-pressed={filter === option.value}
+              className={`projects-filter-tab ${filter === option.value ? "projects-filter-tab-active" : ""}`}
+              key={option.value}
+              onClick={() => changeParam("status", option.value)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+          <button
+            aria-label="Корзина"
+            aria-pressed={filter === "deleted"}
+            className={`projects-filter-tab projects-filter-icon ${filter === "deleted" ? "projects-filter-tab-active" : ""}`}
+            onClick={() => changeParam("status", "deleted")}
+            type="button"
+          >
+            <Trash2 size={17} />
+          </button>
         </div>
       </Panel>
 
@@ -183,7 +229,7 @@ export function ProjectsRoute() {
         </div>
       ) : projectsQuery.data.items.length ? (
         <>
-          <section className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-3" aria-label="Список проектов">
+          <section className="projects-grid mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-3" aria-label="Список проектов">
             {projectsQuery.data.items.map((project) => (
               <ProjectCard
                 key={project.id}
@@ -861,9 +907,9 @@ function ProjectCard({
 }) {
   const deleted = Boolean(project.deleted_at);
   return (
-    <article className="surface-card overflow-hidden rounded-card border border-line shadow-soft">
+    <article className="project-card surface-card overflow-hidden rounded-card border border-line shadow-soft">
       <Link
-        className="group relative block aspect-[16/7] overflow-hidden bg-[radial-gradient(circle_at_25%_20%,rgba(139,92,246,.34),transparent_35%),linear-gradient(145deg,#151e2d,#0b1018)] p-5"
+        className="project-card-cover group relative block aspect-[16/7] overflow-hidden bg-[radial-gradient(circle_at_25%_20%,rgba(139,92,246,.34),transparent_35%),linear-gradient(145deg,#151e2d,#0b1018)] p-5"
         to={`/projects/${project.id}`}
       >
         <CoverImage className="absolute inset-0 h-full w-full object-cover" path={project.cover_path} alt="" />
@@ -871,50 +917,66 @@ function ProjectCard({
           <FolderKanban size={22} />
         </span>
       </Link>
-      <div className="p-4">
+      <div className="project-card-body p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="project-card-badges flex flex-wrap items-center gap-2">
               <StatusPill tone={deleted ? "danger" : project.status === "active" ? "success" : "muted"}>
                 {deleted ? "Удалён" : projectStatusLabels[project.status]}
               </StatusPill>
               <span className="text-xs text-muted">{projectCategoryLabels[project.category]}</span>
             </div>
             <Link
-              className="mt-3 block truncate text-xl font-semibold hover:text-primary"
+              className="project-card-title mt-3 block truncate text-xl font-semibold hover:text-primary"
               to={`/projects/${project.id}`}
             >
               {project.name}
             </Link>
-            <p className="mt-2 line-clamp-2 min-h-10 text-sm leading-5 text-muted">
+            <p className="project-card-description mt-2 line-clamp-2 min-h-10 text-sm leading-5 text-muted">
               {project.description || "Описание пока не добавлено"}
             </p>
           </div>
         </div>
-        <div className="mt-4 flex items-center gap-4 border-t border-line pt-4 text-xs text-muted">
+        <div className="project-card-meta mt-4 flex items-center gap-4 border-t border-line pt-4 text-xs text-muted">
           <span>{project.groupCount} групп</span>
           <span>{project.arItemCount} AR-работ</span>
           <span className="ml-auto">{formatShortDate(project.updated_at)}</span>
         </div>
         {canWrite ? (
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="project-card-actions mt-4 flex flex-wrap gap-2">
             {deleted ? (
-              <Button variant="quiet" onClick={() => onAction("restoreDeleted")} icon={<RotateCcw size={15} />}>
+              <Button
+                aria-label={`Восстановить проект «${project.name}»`}
+                variant="quiet"
+                onClick={() => onAction("restoreDeleted")}
+                icon={<RotateCcw size={15} />}
+              >
                 Восстановить
               </Button>
             ) : (
               <>
-                <Button variant="quiet" onClick={onEdit} icon={<Pencil size={15} />}>
+                <Button
+                  aria-label={`Изменить проект «${project.name}»`}
+                  variant="quiet"
+                  onClick={onEdit}
+                  icon={<Pencil size={15} />}
+                >
                   Изменить
                 </Button>
                 <Button
+                  aria-label={`${project.status === "archived" ? "Вернуть" : "Архивировать"} проект «${project.name}»`}
                   variant="quiet"
                   onClick={() => onAction(project.status === "archived" ? "restore" : "archive")}
                   icon={project.status === "archived" ? <ArchiveRestore size={15} /> : <Archive size={15} />}
                 >
                   {project.status === "archived" ? "Вернуть" : "В архив"}
                 </Button>
-                <Button variant="danger" onClick={() => onAction("delete")} icon={<Trash2 size={15} />}>
+                <Button
+                  aria-label={`Удалить проект «${project.name}»`}
+                  variant="danger"
+                  onClick={() => onAction("delete")}
+                  icon={<Trash2 size={15} />}
+                >
                   Удалить
                 </Button>
               </>
@@ -1419,6 +1481,13 @@ const projectFilterOptions = [
   { value: "active", label: "Активные" },
   { value: "archived", label: "Архив" },
   { value: "deleted", label: "Корзина" },
+];
+
+const projectMobileFilterOptions: Array<{ value: ProjectListFilter; label: string }> = [
+  { value: "all", label: "Все" },
+  { value: "draft", label: "Черновики" },
+  { value: "active", label: "Активные" },
+  { value: "archived", label: "Архив" },
 ];
 
 const projectSortOptions = [

@@ -1,0 +1,161 @@
+.dashboard-top-create-short {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .app-content-compact-mobile .app-eyebrow {
+    display: none;
+  }
+
+  .app-content-compact-mobile .app-topbar h1 {
+    font-size: 1.35rem;
+  }
+
+  .dashboard-top-create-long {
+    display: none;
+  }
+
+  .dashboard-top-create-short {
+    display: inline;
+  }
+
+  .dashboard-top-create {
+    min-width: 0;
+    padding-inline: 0.7rem;
+  }
+
+  .dashboard-hero {
+    min-height: 0;
+    margin-top: 0.75rem;
+    border-radius: 18px;
+    padding: 0.9rem;
+  }
+
+  .dashboard-hero::after {
+    width: 12rem;
+    height: 12rem;
+    filter: blur(48px);
+  }
+
+  .dashboard-hero-kicker {
+    gap: 0.3rem;
+    padding: 0.28rem 0.5rem;
+    font-size: 0.62rem;
+  }
+
+  .dashboard-hero h2 {
+    margin-top: 0.6rem;
+    font-size: 1.45rem;
+    line-height: 1.05;
+  }
+
+  .dashboard-hero p {
+    display: none;
+  }
+
+  .dashboard-hero-actions {
+    margin-top: 0.75rem;
+  }
+
+  .dashboard-hero-actions .btn {
+    min-height: 42px;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .dashboard-hero-actions .btn-ghost {
+    display: none;
+  }
+
+  .dashboard-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+    margin-top: 0.75rem;
+  }
+
+  .dashboard-metrics > .surface-card {
+    min-height: 76px;
+    border-radius: 15px;
+    padding: 0.65rem;
+  }
+
+  .dashboard-metrics > .surface-card > div {
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .dashboard-metrics .metric-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+  }
+
+  .dashboard-metrics .metric-icon svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .dashboard-metrics p:first-child {
+    font-size: 0.67rem;
+  }
+
+  .dashboard-metrics strong {
+    margin-top: 0.2rem;
+    font-size: 1.05rem;
+    line-height: 1.1;
+  }
+
+  .dashboard-metrics strong + p {
+    display: none;
+  }
+
+  .section-heading-row {
+    align-items: center;
+  }
+
+  .section-heading-row .section-kicker {
+    display: none;
+  }
+
+  .section-heading-row h2 {
+    font-size: 1.05rem;
+  }
+
+  .dashboard-recent-grid {
+    gap: 0.55rem;
+    margin-top: 0.65rem;
+  }
+
+  .dashboard-project-card {
+    display: grid;
+    min-height: 86px;
+    grid-template-columns: 88px minmax(0, 1fr);
+    border-radius: 15px;
+  }
+
+  .dashboard-project-cover {
+    height: 100%;
+    min-height: 86px;
+    aspect-ratio: auto;
+  }
+
+  .dashboard-project-card > div {
+    align-self: center;
+    padding: 0.7rem;
+  }
+
+  .dashboard-project-title {
+    font-size: 0.82rem;
+  }
+
+  .dashboard-project-card p {
+    margin-top: 0.3rem;
+    font-size: 0.66rem;
+  }
+
+  .project-state {
+    inset: 0.4rem auto auto 0.4rem;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.56rem;
+  }
+}

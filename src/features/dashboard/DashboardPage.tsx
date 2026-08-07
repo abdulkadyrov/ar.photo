@@ -6,6 +6,7 @@ import type { Project } from "../../entities/catalog/model";
 import { ErrorState, MetricCard, Panel, Skeleton } from "../../shared/ui";
 import { useAuth } from "../auth/authContext";
 import { getCatalogRepository } from "../catalog/catalogRepository";
+import "./DashboardPage.css";
 
 const catalogRepository = getCatalogRepository();
 
@@ -54,9 +55,12 @@ export function DashboardRoute() {
       eyebrow={workspace.accountName}
       title="Главная"
       description="Создайте оживающую фотографию — загрузку, обработку и QR-код AR Photo подготовит автоматически."
+      compactMobile
       actions={
-        <Link className="btn btn-primary" to="/create">
-          <Plus size={18} /> Создать AR-фото
+        <Link className="btn btn-primary dashboard-top-create" to="/create">
+          <Plus size={18} />
+          <span className="dashboard-top-create-long">Создать AR-фото</span>
+          <span className="dashboard-top-create-short">Создать</span>
         </Link>
       }
     >
@@ -85,7 +89,7 @@ export function DashboardRoute() {
         </div>
       </section>
 
-      <section className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Сводка кабинета">
+      <section className="dashboard-metrics mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Сводка кабинета">
         <MetricCard
           icon={<FolderKanban size={20} />}
           label="Проекты"
@@ -113,13 +117,13 @@ export function DashboardRoute() {
           </Link>
         </div>
         {projectsQuery.isPending ? (
-          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="dashboard-recent-grid mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {[0, 1, 2].map((item) => (
               <Skeleton className="h-64" key={item} />
             ))}
           </div>
         ) : projects.length ? (
-          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="dashboard-recent-grid mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {projects.map((project) => (
               <RecentProjectCard key={project.id} project={project} />
             ))}

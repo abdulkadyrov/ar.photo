@@ -31,12 +31,14 @@ export function AppShell({
   title,
   description,
   actions,
+  compactMobile = false,
   children,
 }: {
   eyebrow?: string;
   title: string;
   description?: string;
   actions?: ReactNode;
+  compactMobile?: boolean;
   children: ReactNode;
 }) {
   const auth = useAuth();
@@ -116,7 +118,7 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="app-content pb-24 lg:pb-10">
+      <div className={`app-content pb-24 lg:pb-10 ${compactMobile ? "app-content-compact-mobile" : ""}`}>
         <header className="app-topbar">
           <div>
             {eyebrow ? <p className="app-eyebrow">{eyebrow}</p> : null}
