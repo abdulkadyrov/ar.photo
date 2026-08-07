@@ -53,10 +53,11 @@ const requiredDemoBoundaryRules = [
   [pagesWorkflow, "cp dist/index.html dist/404.html", "Pages SPA fallback"],
   [
     pagesWorkflow,
-    'git -C pages archive "$revision" assets | tar --extract --skip-old-files --directory=dist',
+    'git -C pages archive "$revision" assets | tar --extract --directory=dist',
     "restored immutable assets from recent Pages releases",
   ],
-  [pagesWorkflow, "fetch-depth: 6", "Pages release history checkout"],
+  [pagesWorkflow, "rsync -a --ignore-existing pages/assets/ dist/assets/", "retained immutable Pages assets"],
+  [pagesWorkflow, "fetch-depth: 24", "Pages release history checkout"],
 ];
 const requiredAuthConfigRules = [
   [authConfig, /enable_signup\s*=\s*true/, "self-service Auth signup"],
