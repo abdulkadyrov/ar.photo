@@ -14,6 +14,7 @@ import {
   Plus,
   RefreshCw,
   ScanLine,
+  Share2,
   Sparkles,
   Upload,
 } from "lucide-react";
@@ -72,32 +73,62 @@ export function ArItemsRoute() {
     queryKey: ["catalog", "workspace", auth.session!.user.id],
     queryFn: () => catalogRepository.getWorkspace(auth.session!.user.id),
   });
+  const accountId = workspaceQuery.data?.accountId;
+  const projectQuery = useQuery({
+    queryKey: ["catalog", "project", accountId, projectId],
+    queryFn: () => catalogRepository.getProject(accountId!, projectId!),
+    enabled: Boolean(accountId && projectId),
+  });
+  const groupsQuery = useQuery({
+    queryKey: ["catalog", "groups", accountId, projectId],
+    queryFn: () => catalogRepository.listGroups(accountId!, projectId!),
+    enabled: Boolean(accountId && projectId),
+  });
   const itemsQuery = useQuery({
-    queryKey: ["ar-items", workspaceQuery.data?.accountId, projectId ?? "all"],
-    queryFn: () => arItemRepository.listItems(workspaceQuery.data!.accountId, projectId),
-    enabled: Boolean(workspaceQuery.data?.accountId),
+    queryKey: ["ar-items", accountId, projectId ?? "all"],
+    queryFn: () => arItemRepository.listItems(accountId!, projectId),
+    enabled: Boolean(accountId),
   });
   const assetsQuery = useQuery({
-    queryKey: ["media-assets", workspaceQuery.data?.accountId, projectId ?? "all"],
-    queryFn: () => mediaRepository.listAssets(workspaceQuery.data!.accountId, projectId),
-    enabled: Boolean(workspaceQuery.data?.accountId),
+    queryKey: ["media-assets", accountId, projectId ?? "all"],
+    queryFn: () => mediaRepository.listAssets(accountId!, projectId),
+    enabled: Boolean(accountId),
   });
 
-  if (workspaceQuery.error || itemsQuery.error || assetsQuery.error) {
+  if (workspaceQuery.error || projectQuery.error || groupsQuery.error || itemsQuery.error || assetsQuery.error) {
     return (
       <AppShell title="AR-работы" description="Связанные фотографии и видео">
         <div className="mt-6">
-          <ErrorState text={readableError(workspaceQuery.error ?? itemsQuery.error ?? assetsQuery.error)} />
+          <ErrorState
+            text={readableError(
+              workspaceQuery.error ?? projectQuery.error ?? groupsQuery.error ?? itemsQuery.error ?? assetsQuery.error,
+            )}
+          />
         </div>
       </AppShell>
     );
   }
-  if (workspaceQuery.isPending || itemsQuery.isPending || assetsQuery.isPending) return <ItemsLoading />;
+  if (
+    workspaceQuery.isPending ||
+    itemsQuery.isPending ||
+    assetsQuery.isPending ||
+    (projectId && (projectQuery.isPending || groupsQuery.isPending))
+  ) {
+    return <ItemsLoading />;
+  }
+
+  const groups = groupsQuery.data ?? [];
+  const groupById = new Map(groups.map((group) => [group.id, group.name]));
+  const contextLabel = projectId
+    ? `${groups.length === 1 ? groups[0].name : `${groups.length} групп`} · ${itemsQuery.data.length} AR-работ`
+    : `${itemsQuery.data.length} AR-работ`;
 
   return (
     <AppShell
-      title="AR-работы"
+      title={projectQuery.data?.name ?? "AR-работы"}
+      description={contextLabel}
       compactMobile
+      showDescriptionOnMobile
       actions={
         <>
           {projectId ? (
@@ -106,10 +137,10 @@ export function ArItemsRoute() {
             </Link>
           ) : null}
           <Link
-            className="btn btn-primary"
+            className="btn btn-primary ar-items-create"
             to={projectId ? `/items/new?projectId=${encodeURIComponent(projectId)}` : "/items/new"}
           >
-            <Plus size={17} /> Новая AR-работа
+            <Plus size={17} /> <span>Новая AR-работа</span>
           </Link>
         </>
       }
@@ -118,7 +149,7 @@ export function ArItemsRoute() {
         <section className="ar-items-grid" aria-label="Список AR-работ">
           {itemsQuery.data.map((item) => {
             const marker = assetsQuery.data.find((asset) => asset.id === item.marker_asset_id);
-            return <ArItemCard item={item} marker={marker} key={item.id} />;
+            return <ArItemCard groupName={groupById.get(item.group_id)} item={item} marker={marker} key={item.id} />;
           })}
         </section>
       ) : (
@@ -192,6 +223,19 @@ export function ArItemDetailRoute() {
       setNotice("Не удалось скопировать ссылку");
     }
   };
+  const sharePublicUrl = async () => {
+    if (!qrCode) return;
+    if (!navigator.share) {
+      await copyPublicUrl();
+      return;
+    }
+    try {
+      await navigator.share({ title: item.title, url: qrCode.public_url });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setNotice("Не удалось поделиться ссылкой");
+    }
+  };
 
   return (
     <AppShell
@@ -213,12 +257,19 @@ export function ArItemDetailRoute() {
           <SignedMedia asset={video} kind="video" label="Видео AR-работы" />
         </section>
         <section className="ar-item-publication" aria-labelledby="ar-item-qr-title">
-          <h2 id="ar-item-qr-title">QR-код</h2>
-          {qrCode ? (
-            <QRCodeSVG value={qrCode.public_url} size={220} level="H" marginSize={2} title={`QR: ${item.title}`} />
-          ) : (
-            <div className="ar-item-empty-preview">QR-код появится после публикации</div>
-          )}
+          <div className="ar-item-qr-summary">
+            <div className="ar-item-qr-code">
+              {qrCode ? (
+                <QRCodeSVG value={qrCode.public_url} size={220} level="H" marginSize={2} title={`QR: ${item.title}`} />
+              ) : (
+                <ScanLine aria-hidden="true" size={36} />
+              )}
+            </div>
+            <div>
+              <h2 id="ar-item-qr-title">QR-код</h2>
+              <p>{qrCode ? "Для открытия работы в AR" : "Появится после публикации"}</p>
+            </div>
+          </div>
           <label htmlFor="ar-item-public-url">Публичная ссылка</label>
           <div className="ar-item-public-link">
             <p id="ar-item-public-url" title={qrCode?.public_url}>
@@ -227,11 +278,23 @@ export function ArItemDetailRoute() {
             <button disabled={!qrCode} aria-label="Копировать публичную ссылку" onClick={() => void copyPublicUrl()}>
               <Clipboard size={18} />
             </button>
+          </div>
+          <div className="ar-item-public-actions">
+            <button disabled={!qrCode} onClick={() => void copyPublicUrl()} type="button">
+              <Clipboard size={16} /> Копировать
+            </button>
+            <button disabled={!qrCode} onClick={() => void sharePublicUrl()} type="button">
+              <Share2 size={16} /> Поделиться
+            </button>
             {qrCode ? (
               <a href={qrCode.public_url} target="_blank" rel="noreferrer" aria-label="Открыть публичную ссылку">
-                <ExternalLink size={18} />
+                <ExternalLink size={16} /> Открыть
               </a>
-            ) : null}
+            ) : (
+              <span aria-disabled="true">
+                <ExternalLink size={16} /> Открыть
+              </span>
+            )}
           </div>
         </section>
       </main>
@@ -248,7 +311,7 @@ export function ArItemDetailRoute() {
   );
 }
 
-function ArItemCard({ item, marker }: { item: ArItem; marker?: MediaAsset }) {
+function ArItemCard({ item, marker, groupName }: { item: ArItem; marker?: MediaAsset; groupName?: string }) {
   const previewQuery = useAssetUrl(marker);
   return (
     <article className="ar-item-card">
@@ -256,6 +319,7 @@ function ArItemCard({ item, marker }: { item: ArItem; marker?: MediaAsset }) {
         <div className="ar-item-card-preview">
           {previewQuery.data ? <img src={previewQuery.data} alt="" /> : <ImageIcon size={26} aria-hidden="true" />}
         </div>
+        {groupName ? <span className="ar-item-card-group">{groupName}</span> : null}
         <div className="ar-item-card-copy">
           <h2>{item.title}</h2>
           <time dateTime={item.updated_at}>{formatArItemDate(item.updated_at)}</time>

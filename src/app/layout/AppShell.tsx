@@ -26,12 +26,21 @@ const navigation = [
   { to: "/support", label: "Поддержка", icon: Headphones },
 ] as const;
 
+const mobileNavigation = [
+  { to: "/dashboard", label: "Главная", icon: House, end: true },
+  { to: "/projects", label: "Проекты", icon: FolderKanban },
+  { to: "/create", label: "Создать", icon: Plus },
+  { to: "/camera", label: "AR-камера", icon: Camera },
+  { to: "/profile", label: "Профиль", icon: UserRound },
+] as const;
+
 export function AppShell({
   eyebrow,
   title,
   description,
   actions,
   compactMobile = false,
+  showDescriptionOnMobile = false,
   children,
 }: {
   eyebrow?: string;
@@ -39,6 +48,7 @@ export function AppShell({
   description?: string;
   actions?: ReactNode;
   compactMobile?: boolean;
+  showDescriptionOnMobile?: boolean;
   children: ReactNode;
 }) {
   const auth = useAuth();
@@ -118,30 +128,22 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className={`app-content pb-24 lg:pb-10 ${compactMobile ? "app-content-compact-mobile" : ""}`}>
+      <div
+        className={`app-content pb-24 lg:pb-10 ${compactMobile ? "app-content-compact-mobile" : ""} ${showDescriptionOnMobile ? "app-content-mobile-description" : ""}`}
+      >
         <header className="app-topbar">
           <div>
             {eyebrow ? <p className="app-eyebrow">{eyebrow}</p> : null}
             <h1>{title}</h1>
             {description ? <p className="app-description">{description}</p> : null}
           </div>
-          <div className="app-topbar-actions">
-            {actions}
-            <button
-              aria-label="Выйти"
-              className="btn btn-quiet lg:hidden"
-              onClick={() => void auth.signOut()}
-              title="Выйти"
-            >
-              <LogOut size={17} />
-            </button>
-          </div>
+          <div className="app-topbar-actions">{actions}</div>
         </header>
         <main>{children}</main>
       </div>
 
       <nav aria-label="Мобильная навигация" className="mobile-nav lg:hidden">
-        {navigation.map((item) => {
+        {mobileNavigation.map((item) => {
           const Icon = item.icon;
           const create = item.to === "/create";
           return (
@@ -156,7 +158,7 @@ export function AppShell({
               <span className={create ? "mobile-create-icon" : ""}>
                 <Icon size={create ? 22 : 19} />
               </span>
-              <span>{create ? "Создать" : item.label === "Мои проекты" ? "Проекты" : item.label}</span>
+              <span>{item.label}</span>
             </NavLink>
           );
         })}

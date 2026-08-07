@@ -95,6 +95,9 @@ const AdminRoute = lazy(() =>
 const SupportRoute = lazy(() =>
   import("../../features/support/SupportPage").then((module) => ({ default: module.SupportRoute })),
 );
+const ProfileRoute = lazy(() =>
+  import("../../features/profile/ProfilePage").then((module) => ({ default: module.ProfileRoute })),
+);
 
 export function AppRouter() {
   return (
@@ -133,6 +136,7 @@ function RoutedContent() {
           <Route path="/analytics" element={<Protected element={<AnalyticsRoute />} />} />
           <Route path="/admin" element={<Protected element={<AdminRoute />} />} />
           <Route path="/support" element={<Protected element={<SupportRoute />} />} />
+          <Route path="/profile" element={<Protected element={<ProfileRoute />} />} />
           <Route path="/camera" element={<Protected element={<ArCameraEntryRoute />} />} />
           <Route path="/settings" element={<Protected element={<SettingsRoute />} />} />
           <Route path="/settings/subscription" element={<Protected element={<SubscriptionRoute />} />} />

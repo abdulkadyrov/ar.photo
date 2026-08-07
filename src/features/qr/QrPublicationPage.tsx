@@ -21,13 +21,7 @@ import { useAuth } from "../auth/authContext";
 import { getCatalogRepository } from "../catalog/catalogRepository";
 import { getArItemRepository } from "../ar-items/arItemRepository";
 import { clearPendingQuickStart, getPendingQuickStart } from "../quick-start/quickStartRepository";
-import {
-  brandLogoDataUrl,
-  parseQrStyle,
-  qrDownloadName,
-  qrStylePresets,
-  resolvePublicBaseUrl,
-} from "./qrDesign";
+import { brandLogoDataUrl, parseQrStyle, qrDownloadName, qrStylePresets, resolvePublicBaseUrl } from "./qrDesign";
 import "./QrPublicationPage.css";
 
 const catalogRepository = getCatalogRepository();
@@ -109,9 +103,7 @@ export function QrPublicationRoute() {
   const [confirmation, setConfirmation] = useState<"unpublish" | "rotate" | null>(null);
   const [confirmationText, setConfirmationText] = useState("");
   const [printSize, setPrintSize] = useState("40");
-  const [notice, setNotice] = useState<{ title: string; message?: string; tone: "success" | "error" } | null>(
-    null,
-  );
+  const [notice, setNotice] = useState<{ title: string; message?: string; tone: "success" | "error" } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const autoPublishAttempted = useRef(false);
@@ -174,8 +166,7 @@ export function QrPublicationRoute() {
         tone: "success",
       });
     },
-    onError: (error) =>
-      setNotice({ title: "Действие не выполнено", message: readableError(error), tone: "error" }),
+    onError: (error) => setNotice({ title: "Действие не выполнено", message: readableError(error), tone: "error" }),
   });
 
   useEffect(() => {
@@ -195,7 +186,8 @@ export function QrPublicationRoute() {
     mutation.mutate("publish");
   }, [accountId, itemId, itemQuery.data, mutation, pendingQuickStart, publicBase.error, workspaceQuery.data]);
 
-  if (workspaceQuery.isPending || itemQuery.isPending || qrQuery.isPending) return <QrLoading title="Публикация и QR" />;
+  if (workspaceQuery.isPending || itemQuery.isPending || qrQuery.isPending)
+    return <QrLoading title="Публикация и QR" />;
   if (workspaceQuery.error || itemQuery.error || qrQuery.error) {
     return <QrError title="Публикация и QR" error={workspaceQuery.error ?? itemQuery.error ?? qrQuery.error} />;
   }
@@ -235,7 +227,10 @@ export function QrPublicationRoute() {
   const downloadSvg = () => {
     if (!qrCode || !svgRef.current) return;
     const serialized = new XMLSerializer().serializeToString(svgRef.current);
-    downloadBlob(new Blob([serialized], { type: "image/svg+xml;charset=utf-8" }), qrDownloadName(item.title, qrCode.version, "svg"));
+    downloadBlob(
+      new Blob([serialized], { type: "image/svg+xml;charset=utf-8" }),
+      qrDownloadName(item.title, qrCode.version, "svg"),
+    );
   };
 
   const downloadPng = () => {
@@ -250,7 +245,7 @@ export function QrPublicationRoute() {
     <AppShell
       title={item.title}
       actions={
-        <Link className="btn btn-quiet qr-back-link" to="/items">
+        <Link className="btn btn-quiet qr-back-link" to={`/items?projectId=${encodeURIComponent(item.project_id)}`}>
           <ArrowLeft size={17} /> <span>AR-работы</span>
         </Link>
       }

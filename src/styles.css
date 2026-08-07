@@ -629,6 +629,16 @@ textarea:focus-visible {
     display: none;
   }
 
+  .app-content-mobile-description .app-description {
+    display: block;
+    overflow: hidden;
+    margin-top: 0.18rem;
+    font-size: 0.67rem;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .app-topbar-actions {
     flex: 0 0 auto;
     flex-wrap: nowrap;

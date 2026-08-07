@@ -54,6 +54,7 @@ test("renders the responsive SaaS navigation", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("navigation", { name: "Мобильная навигация" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Мобильная навигация" }).getByText("AR-камера")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Мобильная навигация" }).getByText("Профиль")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
@@ -143,7 +144,10 @@ test("keeps the dashboard and project catalog compact on a narrow phone", async 
 test("protects the workspace and clears the demo session on logout", async ({ page }) => {
   await page.goto("./dashboard");
   await signInToDemo(page);
+  await page.setViewportSize({ width: 390, height: 844 });
 
+  await page.getByRole("navigation", { name: "Мобильная навигация" }).getByRole("link", { name: "Профиль" }).click();
+  await expect(page.getByRole("heading", { name: "Профиль", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Выйти" }).click();
 
   await expect(page).toHaveURL(/\/ar\.photo\/login$/);
@@ -411,11 +415,14 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
 
   const qrPageUrl = page.url();
   await page.getByRole("link", { name: "AR-работы" }).click();
+  await expect(page.getByRole("heading", { name: "AR workflow project", exact: true })).toBeVisible();
+  await expect(page.getByText("AR workflow group · 1 AR-работ", { exact: true })).toBeVisible();
   const compactWork = page.getByRole("link", { name: "Открыть AR-работу «Портрет Алексея»" });
   await expect(compactWork).toBeVisible();
   await expect(compactWork.getByText("Портрет Алексея", { exact: true })).toBeVisible();
   await expect(compactWork.getByText("Ревизия", { exact: false })).toHaveCount(0);
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 319, height: 628 });
+  await expect(compactWork.getByText("AR workflow group", { exact: true })).toBeVisible();
   const cards = page.locator(".ar-item-card");
   const [firstCardBox, workGridColumns] = await Promise.all([
     cards.first().boundingBox(),
@@ -430,6 +437,24 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   await expect(page.getByRole("heading", { name: "QR-код", exact: true })).toBeVisible();
   await expect(page.getByLabel("Видео AR-работы")).toBeVisible();
   await expect(page.getByLabel("Открыть публичную ссылку")).toBeVisible();
+  const mediaSections = page.locator(".ar-item-media-section");
+  const [photoSectionBox, videoSectionBox, photoPreviewBox, videoPreviewBox, qrSummaryBox] = await Promise.all([
+    mediaSections.nth(0).boundingBox(),
+    mediaSections.nth(1).boundingBox(),
+    mediaSections.nth(0).locator(".ar-item-media-preview").boundingBox(),
+    mediaSections.nth(1).locator(".ar-item-media-preview").boundingBox(),
+    page.locator(".ar-item-qr-summary").boundingBox(),
+  ]);
+  expect(photoSectionBox).not.toBeNull();
+  expect(videoSectionBox).not.toBeNull();
+  expect(photoPreviewBox).not.toBeNull();
+  expect(videoPreviewBox).not.toBeNull();
+  expect(qrSummaryBox).not.toBeNull();
+  expect(Math.abs(photoSectionBox!.y - videoSectionBox!.y)).toBeLessThanOrEqual(2);
+  expect(Math.abs(photoPreviewBox!.width - photoPreviewBox!.height)).toBeLessThanOrEqual(2);
+  expect(Math.abs(videoPreviewBox!.width - videoPreviewBox!.height)).toBeLessThanOrEqual(2);
+  expect(qrSummaryBox!.y).toBeGreaterThan(photoSectionBox!.y + photoSectionBox!.height);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.goto(qrPageUrl);
 
   await page.setViewportSize({ width: 319, height: 628 });
@@ -511,8 +536,27 @@ test("shows subscription usage and manages team permissions within the tariff", 
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(
-    page.getByRole("navigation", { name: "Мобильная навигация" }).getByRole("link", { name: "Поддержка" }),
+    page.getByRole("navigation", { name: "Мобильная навигация" }).getByRole("link", { name: "Профиль" }),
   ).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("shows account, subscription and support inside the mobile profile", async ({ page }) => {
+  await page.setViewportSize({ width: 319, height: 628 });
+  await page.goto("./profile");
+  await signInToDemo(page);
+
+  await expect(page.getByRole("heading", { name: "Профиль", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Студия", exact: true })).toBeVisible();
+  await expect(page.getByText(/Действует до|Без даты окончания/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Поддержка" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Выйти" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Мобильная навигация" }).getByText("Профиль")).toBeVisible();
+
+  await page.getByRole("button", { name: "Изменить имя" }).click();
+  await page.getByLabel("Отображаемое имя").fill("Алина Магомедова");
+  await page.getByRole("button", { name: "Сохранить имя" }).click();
+  await expect(page.getByRole("heading", { name: "Алина Магомедова" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
