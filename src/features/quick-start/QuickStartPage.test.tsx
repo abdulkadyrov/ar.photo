@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { QrCode } from "../../entities/ar-item/model";
 import { MediaPicker, ProgressStatus, QuickResult, QuickStepper, QuickStopwatch } from "./QuickStartPage";
@@ -31,6 +31,54 @@ describe("quick-start design", () => {
 
     expect(screen.getByLabelText("Выбрать фотографию-маркер")).toBeEnabled();
     expect(screen.getByText("Чёткое фото без бликов даст лучший трекинг")).toBeVisible();
+  });
+
+  it("restricts the video chooser to video files and accepts a dropped video", () => {
+    const onPick = vi.fn();
+    render(<MediaPicker kind="video" disabled={false} onPick={onPick} />);
+
+    const input = screen.getByLabelText("Выбрать видео");
+    expect(input.getAttribute("accept")).toContain("video/*");
+
+    const video = new File(["video"], "family.avi", { type: "video/x-msvideo" });
+    fireEvent.drop(screen.getByTestId("video-media-picker"), {
+      dataTransfer: { files: [video], types: ["Files"] },
+    });
+
+    expect(onPick).toHaveBeenCalledWith(video);
+  });
+
+  it("rejects a photo dropped into the video picker", () => {
+    const onPick = vi.fn();
+    render(<MediaPicker kind="video" disabled={false} onPick={onPick} />);
+
+    const photo = new File(["photo"], "family.jpg", { type: "image/jpeg" });
+    fireEvent.drop(screen.getByTestId("video-media-picker"), {
+      dataTransfer: { files: [photo], types: ["Files"] },
+    });
+
+    expect(onPick).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent("Перетащите сюда видеофайл");
+  });
+
+  it("opens the selected video in a full preview", () => {
+    const video = new File(["video"], "family.mp4", { type: "video/mp4" });
+    render(
+      <MediaPicker
+        kind="video"
+        file={video}
+        previewUrl="blob:https://example.test/video"
+        disabled={false}
+        onPick={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Просмотреть видео family.mp4" }));
+
+    expect(screen.getByRole("dialog", { name: "family.mp4" })).toBeVisible();
+    expect(screen.getByLabelText("Видео family.mp4")).toHaveAttribute("controls");
+    fireEvent.click(screen.getByRole("button", { name: "Закрыть предпросмотр" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("renders the complete QR result actions", () => {

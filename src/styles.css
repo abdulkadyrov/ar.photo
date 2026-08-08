@@ -1365,6 +1365,7 @@ textarea:focus-visible {
   cursor: pointer;
   transition:
     border-color 160ms ease,
+    background 160ms ease,
     box-shadow 160ms ease,
     transform 160ms ease;
 }
@@ -1436,15 +1437,6 @@ textarea:focus-visible {
   background: #eee9de;
 }
 
-.quick-media-preview > img,
-.quick-media-preview > video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 .quick-media-empty {
   display: grid;
   justify-items: center;
@@ -1501,6 +1493,7 @@ textarea:focus-visible {
   background: linear-gradient(transparent, rgba(13, 18, 24, 0.9) 36%);
   padding: 2.4rem 0.9rem 0.85rem;
   color: white;
+  pointer-events: none;
 }
 
 .quick-media-file > span:first-child {
@@ -1526,6 +1519,8 @@ textarea:focus-visible {
   background: rgba(255, 255, 255, 0.13);
   padding: 0.45rem 0.6rem;
   backdrop-filter: blur(8px);
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .quick-media-hint {

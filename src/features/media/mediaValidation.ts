@@ -7,11 +7,11 @@ import {
   VideoOptimizationUnavailableError,
 } from "./videoOptimization";
 
-// The picker intentionally has no extension/MIME filter. The selected bytes
-// are decoded and normalized before upload, so a missing or unusual suffix
-// must not prevent the user from choosing an otherwise valid file.
+// Keep the marker picker permissive because camera exports sometimes arrive
+// without a reliable MIME type. The video picker is intentionally restricted:
+// desktop and mobile file choosers should only offer videos for that slot.
 export const markerAccept = "";
-export const videoAccept = "";
+export const videoAccept = "video/*,.mp4,.mov,.m4v,.avi,.webm,.mkv,.mpeg,.mpg,.mts,.m2ts,.3gp,.3g2,.wmv,.flv";
 export const mediaAccept = "";
 export const markerMaxBytes = 25 * 1024 * 1024;
 export const videoMaxBytes = 500 * 1024 * 1024;
@@ -58,6 +58,15 @@ export function classifyMediaFile(file: File): MediaKind {
   if (file.type.toLowerCase().startsWith("video/")) return "video";
   const extension = file.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
   return extension && videoExtensions.has(extension) ? "video" : "marker";
+}
+
+export function matchesMediaPickerKind(file: File, kind: "marker" | "video") {
+  const mime = file.type.toLowerCase();
+  const extension = file.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  if (kind === "video") {
+    return mime.startsWith("video/") || Boolean(extension && videoExtensions.has(extension));
+  }
+  return mime.startsWith("image/") || Boolean(extension && markerExtensions.has(extension));
 }
 
 export async function prepareMediaFile(
@@ -318,7 +327,23 @@ async function optimizeMarkerImage(decoded: DecodedImage, format: ImageFormat | 
   };
 }
 
-const videoExtensions = new Set(["mp4", "mov", "m4v", "mkv", "webm", "avi", "mts", "m2ts", "3gp", "3g2", "wmv", "flv"]);
+const markerExtensions = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "avif", "gif", "bmp", "tif", "tiff"]);
+const videoExtensions = new Set([
+  "mp4",
+  "mov",
+  "m4v",
+  "mkv",
+  "webm",
+  "avi",
+  "mpeg",
+  "mpg",
+  "mts",
+  "m2ts",
+  "3gp",
+  "3g2",
+  "wmv",
+  "flv",
+]);
 
 async function validateOptimizedVideo(file: File, expectedAudioCodec: "aac" | "none") {
   const head = new Uint8Array(await file.slice(0, Math.min(file.size, 2 * 1024 * 1024)).arrayBuffer());

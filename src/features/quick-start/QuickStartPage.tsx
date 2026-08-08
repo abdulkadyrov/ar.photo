@@ -10,6 +10,7 @@ import {
   ImagePlus,
   LockKeyhole,
   LoaderCircle,
+  Maximize2,
   QrCode,
   RefreshCw,
   ScanLine,
@@ -17,15 +18,17 @@ import {
   Sparkles,
   Timer,
   Upload,
+  X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type DragEvent } from "react";
+import { createPortal } from "react-dom";
 import { QRCodeSVG } from "qrcode.react";
 import type { ArItem, QrCode as QrCodeRecord } from "../../entities/ar-item/model";
 import { Button, Input } from "../../shared/ui";
 import { getArItemRepository } from "../ar-items/arItemRepository";
 import { useAuth } from "../auth/authContext";
 import { getMediaRepository } from "../media/mediaRepository";
-import { markerAccept, prepareMediaFile, videoAccept } from "../media/mediaValidation";
+import { markerAccept, matchesMediaPickerKind, prepareMediaFile, videoAccept } from "../media/mediaValidation";
 import { resolvePublicBaseUrl } from "../qr/qrDesign";
 import {
   clearPendingQuickStart,
@@ -35,6 +38,7 @@ import {
   type QuickStartWorkspace,
 } from "./quickStartRepository";
 import { currentTimestamp, formatElapsedTime } from "./quickStartTimer";
+import "./QuickStartPage.css";
 
 const mediaRepository = getMediaRepository();
 const arItemRepository = getArItemRepository();
@@ -401,73 +405,209 @@ export function MediaPicker({
   onPick(file?: File): void;
 }) {
   const marker = kind === "marker";
+  const inputId = useId();
+  const [dragging, setDragging] = useState(false);
+  const [pickerError, setPickerError] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const chooseFile = (candidate?: File) => {
+    setPickerError("");
+    if (!candidate) {
+      onPick(undefined);
+      return;
+    }
+    if (!matchesMediaPickerKind(candidate, kind)) {
+      setPickerError(marker ? "Выберите файл изображения" : "Выберите видеофайл");
+      return;
+    }
+    onPick(candidate);
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDragging(false);
+    if (disabled) return;
+    const candidate = Array.from(event.dataTransfer.files).find((droppedFile) =>
+      matchesMediaPickerKind(droppedFile, kind),
+    );
+    if (!candidate) {
+      setPickerError(marker ? "Перетащите сюда фотографию" : "Перетащите сюда видеофайл");
+      return;
+    }
+    chooseFile(candidate);
+  };
+
   return (
-    <label
-      className={`quick-media-picker ${file ? "quick-media-picker-ready" : ""} ${disabled ? "quick-media-picker-disabled" : ""}`}
-    >
-      <span className="quick-media-picker-heading">
-        <span>
-          <small>{marker ? "Маркер" : "Контент"}</small>
-          <strong>{marker ? "Фотография" : "Видео"}</strong>
+    <>
+      <div
+        className={`quick-media-picker ${file ? "quick-media-picker-ready" : ""} ${disabled ? "quick-media-picker-disabled" : ""} ${dragging ? "quick-media-picker-dragging" : ""}`}
+        data-testid={`${kind}-media-picker`}
+        onDragEnter={(event) => {
+          event.preventDefault();
+          if (!disabled && event.dataTransfer.types.includes("Files")) setDragging(true);
+        }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          if (!disabled) event.dataTransfer.dropEffect = "copy";
+        }}
+        onDrop={handleDrop}
+      >
+        <span className="quick-media-picker-heading">
+          <span>
+            <small>{marker ? "Маркер" : "Контент"}</small>
+            <strong>{marker ? "Фотография" : "Видео"}</strong>
+          </span>
+          {file ? (
+            <span className="quick-added-badge">
+              <Check size={13} /> Добавлено
+            </span>
+          ) : null}
         </span>
-        {file ? (
-          <span className="quick-added-badge">
-            <Check size={13} /> Добавлено
+
+        <span className="quick-media-preview">
+          {previewUrl ? (
+            <button
+              aria-label={`Просмотреть ${marker ? "фотографию" : "видео"} ${file?.name ?? ""}`}
+              className="quick-media-open"
+              type="button"
+              onClick={() => setPreviewOpen(true)}
+            >
+              {marker ? (
+                <img src={previewUrl} alt={`Предпросмотр фотографии ${file?.name ?? ""}`} />
+              ) : (
+                <video
+                  src={previewUrl}
+                  muted
+                  playsInline
+                  preload="metadata"
+                  aria-label={`Предпросмотр видео ${file?.name ?? ""}`}
+                />
+              )}
+              <span className="quick-media-view-badge">
+                <Maximize2 size={14} /> Просмотреть
+              </span>
+            </button>
+          ) : (
+            <label className="quick-media-select-surface" htmlFor={disabled ? undefined : inputId}>
+              <span className="quick-media-empty">
+                <span className="quick-media-icon">{marker ? <ImagePlus size={29} /> : <FileVideo2 size={29} />}</span>
+                <strong>{marker ? "Выберите фотографию" : "Выберите видео"}</strong>
+                <span>{marker ? "JPG, PNG или WebP" : "MP4, MOV, AVI и другие видеоформаты"}</span>
+              </span>
+              <span className="quick-pick-file">
+                <Upload size={16} /> Добавить файл
+              </span>
+            </label>
+          )}
+
+          {file ? (
+            <span className="quick-media-file">
+              <span>
+                <strong>{file.name}</strong>
+                <small>{formatBytes(file.size)}</small>
+              </span>
+              <label className="quick-replace-file" htmlFor={disabled ? undefined : inputId}>
+                <Upload size={15} /> <span>Заменить</span>
+              </label>
+            </span>
+          ) : null}
+          {dragging ? (
+            <span className="quick-media-drop-overlay">
+              <Upload size={24} /> Отпустите файл здесь
+            </span>
+          ) : null}
+        </span>
+
+        <span className="quick-media-hint">
+          <LockKeyhole size={14} />
+          <span>
+            {marker ? "Чёткое фото без бликов даст лучший трекинг" : "Звук и цвет сохранятся после обработки"}
+          </span>
+        </span>
+        {pickerError ? (
+          <span className="quick-media-picker-error" role="alert">
+            {pickerError}
           </span>
         ) : null}
-      </span>
+        <input
+          id={inputId}
+          aria-label={marker ? "Выбрать фотографию-маркер" : "Выбрать видео"}
+          className="sr-only"
+          type="file"
+          accept={marker ? markerAccept : videoAccept}
+          disabled={disabled}
+          onChange={(event) => {
+            chooseFile(event.currentTarget.files?.[0]);
+            event.currentTarget.value = "";
+          }}
+        />
+      </div>
+      {previewOpen && previewUrl && file ? (
+        <MediaPreviewDialog kind={kind} file={file} previewUrl={previewUrl} onClose={() => setPreviewOpen(false)} />
+      ) : null}
+    </>
+  );
+}
 
-      <span className="quick-media-preview">
-        {previewUrl ? (
-          marker ? (
-            <img src={previewUrl} alt={`Предпросмотр фотографии ${file?.name ?? ""}`} />
+function MediaPreviewDialog({
+  kind,
+  file,
+  previewUrl,
+  onClose,
+}: {
+  kind: "marker" | "video";
+  file: File;
+  previewUrl: string;
+  onClose(): void;
+}) {
+  const titleId = useId();
+  const closeButton = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeButton.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <div className="quick-media-dialog-backdrop" onMouseDown={onClose}>
+      <section
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="quick-media-dialog"
+        role="dialog"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header>
+          <div>
+            <small>{kind === "marker" ? "Фотография" : "Видео"}</small>
+            <h2 id={titleId}>{file.name}</h2>
+          </div>
+          <button ref={closeButton} type="button" aria-label="Закрыть предпросмотр" onClick={onClose}>
+            <X size={22} />
+          </button>
+        </header>
+        <div className="quick-media-dialog-content">
+          {kind === "marker" ? (
+            <img src={previewUrl} alt={`Фотография ${file.name}`} />
           ) : (
-            <video
-              src={previewUrl}
-              muted
-              playsInline
-              preload="metadata"
-              aria-label={`Предпросмотр видео ${file?.name ?? ""}`}
-            />
-          )
-        ) : (
-          <span className="quick-media-empty">
-            <span className="quick-media-icon">{marker ? <ImagePlus size={29} /> : <FileVideo2 size={29} />}</span>
-            <strong>{marker ? "Выберите фотографию" : "Выберите видео"}</strong>
-            <span>{marker ? "JPG, PNG или WebP" : "MP4, MOV или WebM"}</span>
-          </span>
-        )}
-
-        {file ? (
-          <span className="quick-media-file">
-            <span>
-              <strong>{file.name}</strong>
-              <small>{formatBytes(file.size)}</small>
-            </span>
-            <span className="quick-replace-file">
-              <Upload size={15} /> Заменить
-            </span>
-          </span>
-        ) : (
-          <span className="quick-pick-file">
-            <Upload size={16} /> Добавить файл
-          </span>
-        )}
-      </span>
-
-      <span className="quick-media-hint">
-        <LockKeyhole size={14} />
-        <span>{marker ? "Чёткое фото без бликов даст лучший трекинг" : "Звук и цвет сохранятся после обработки"}</span>
-      </span>
-      <input
-        aria-label={marker ? "Выбрать фотографию-маркер" : "Выбрать видео"}
-        className="sr-only"
-        type="file"
-        accept={marker ? markerAccept : videoAccept}
-        disabled={disabled}
-        onChange={(event) => onPick(event.currentTarget.files?.[0])}
-      />
-    </label>
+            <video src={previewUrl} controls playsInline preload="metadata" aria-label={`Видео ${file.name}`} />
+          )}
+        </div>
+      </section>
+    </div>,
+    document.body,
   );
 }
 
