@@ -173,6 +173,8 @@ export function ArItemsRoute() {
 export function ArItemDetailRoute() {
   const auth = useAuth();
   const { itemId = "" } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [notice, setNotice] = useState<string | null>(null);
   const workspaceQuery = useQuery({
     queryKey: ["catalog", "workspace", auth.session!.user.id],
@@ -214,6 +216,7 @@ export function ArItemDetailRoute() {
   const marker = assetsQuery.data.find((asset) => asset.id === item.marker_asset_id);
   const video = assetsQuery.data.find((asset) => asset.id === item.video_asset_id);
   const qrCode = qrQuery.data;
+  const canReturnToItems = Boolean((location.state as { fromArItems?: unknown } | null)?.fromArItems);
   const copyPublicUrl = async () => {
     if (!qrCode) return;
     try {
@@ -242,9 +245,20 @@ export function ArItemDetailRoute() {
       title={item.title}
       compactMobile
       actions={
-        <Link className="btn btn-quiet ar-items-back" to={`/items?projectId=${encodeURIComponent(item.project_id)}`}>
-          <ArrowLeft size={17} /> <span>AR-работы</span>
-        </Link>
+        canReturnToItems ? (
+          <button
+            className="btn btn-quiet ar-items-back"
+            aria-label="Вернуться к AR-работам"
+            onClick={() => navigate(-1)}
+            type="button"
+          >
+            <ArrowLeft size={17} /> <span>AR-работы</span>
+          </button>
+        ) : (
+          <Link className="btn btn-quiet ar-items-back" to={`/items?projectId=${encodeURIComponent(item.project_id)}`}>
+            <ArrowLeft size={17} /> <span>AR-работы</span>
+          </Link>
+        )
       }
     >
       <main className="ar-item-detail">
@@ -315,7 +329,7 @@ function ArItemCard({ item, marker, groupName }: { item: ArItem; marker?: MediaA
   const previewQuery = useAssetUrl(marker);
   return (
     <article className="ar-item-card">
-      <Link to={`/items/${item.id}`} aria-label={`Открыть AR-работу «${item.title}»`}>
+      <Link to={`/items/${item.id}`} state={{ fromArItems: true }} aria-label={`Открыть AR-работу «${item.title}»`}>
         <div className="ar-item-card-preview">
           {previewQuery.data ? <img src={previewQuery.data} alt="" /> : <ImageIcon size={26} aria-hidden="true" />}
         </div>

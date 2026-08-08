@@ -5,6 +5,7 @@ import { useAuth } from "../../features/auth/authContext";
 import { RouteErrorBoundary } from "../../shared/errors/RouteErrorBoundary";
 import { getPublicRuntimeConfig } from "../../shared/config/env";
 import { getRouterBasename } from "./routerBase";
+import { ScrollPositionManager } from "./ScrollPositionManager";
 
 const QuickStartRoute = lazy(() =>
   import("../../features/quick-start/QuickStartPage").then((module) => ({ default: module.QuickStartRoute })),
@@ -102,6 +103,7 @@ const ProfileRoute = lazy(() =>
 export function AppRouter() {
   return (
     <BrowserRouter basename={getRouterBasename(import.meta.env.BASE_URL)}>
+      <ScrollPositionManager />
       <RoutedContent />
     </BrowserRouter>
   );

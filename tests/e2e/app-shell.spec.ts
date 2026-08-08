@@ -55,6 +55,7 @@ test("renders the responsive SaaS navigation", async ({ page }) => {
   await expect(page.getByRole("navigation", { name: "Мобильная навигация" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Мобильная навигация" }).getByText("AR-камера")).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Мобильная навигация" }).getByText("Профиль")).toBeVisible();
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).touchAction)).toBe("pan-y");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
@@ -431,6 +432,14 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   expect(firstCardBox).not.toBeNull();
   expect(Math.abs(firstCardBox!.width - firstCardBox!.height)).toBeLessThanOrEqual(2);
   expect(workGridColumns).toHaveLength(2);
+  await page.evaluate(() => {
+    const style = document.createElement("style");
+    style.textContent = ".ar-items-grid { padding-top: 720px; }";
+    document.head.append(style);
+    window.scrollTo(0, 500);
+  });
+  const savedListScrollY = await page.evaluate(() => window.scrollY);
+  expect(savedListScrollY).toBeGreaterThan(0);
   await compactWork.click();
   await expect(page.getByRole("heading", { name: "Фото", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Видео", exact: true })).toBeVisible();
@@ -455,14 +464,19 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   expect(Math.abs(videoPreviewBox!.width - videoPreviewBox!.height)).toBeLessThanOrEqual(2);
   expect(qrSummaryBox!.y).toBeGreaterThan(photoSectionBox!.y + photoSectionBox!.height);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.getByRole("button", { name: "Вернуться к AR-работам" }).click();
+  await expect(page.getByRole("heading", { name: "AR workflow project", exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThanOrEqual(savedListScrollY - 1);
   await page.goto(qrPageUrl);
 
   await page.setViewportSize({ width: 319, height: 628 });
   await page.evaluate(() => window.scrollTo(0, 0));
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const qrMobileNav = page.getByRole("navigation", { name: "Мобильная навигация" });
+  await expect(qrMobileNav).toBeVisible();
   const [openArBox, mobileNavBox] = await Promise.all([
     page.getByRole("button", { name: "Открыть AR" }).boundingBox(),
-    page.getByRole("navigation", { name: "Мобильная навигация" }).boundingBox(),
+    qrMobileNav.boundingBox(),
   ]);
   expect(openArBox).not.toBeNull();
   expect(mobileNavBox).not.toBeNull();
