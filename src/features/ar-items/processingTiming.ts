@@ -1,7 +1,5 @@
 import type { ArItem, ProcessingJob } from "../../entities/ar-item/model";
 
-const rootJobTypes = new Set<ProcessingJob["type"]>(["marker_analysis", "video_inspection", "video_transcode"]);
-
 const timestamp = (value: string | null | undefined) => {
   const parsed = value ? Date.parse(value) : Number.NaN;
   return Number.isFinite(parsed) ? parsed : null;
@@ -23,32 +21,27 @@ export function getProcessingTiming(item: ArItem, jobs: ProcessingJob[], now = D
   const relevantJobs = jobs.filter((job) => revision(job) === item.version);
   if (!relevantJobs.length) return null;
 
-  const roots = relevantJobs.filter((job) => rootJobTypes.has(job.type));
-  const startCandidates = (roots.length ? roots : relevantJobs)
-    .map((job) => timestamp(job.started_at))
-    .filter((value): value is number => value !== null)
-    .sort((left, right) => left - right);
-
-  let startedAt: number;
-  if (startCandidates.length) {
-    const newestRootStart = startCandidates[startCandidates.length - 1];
-    const currentAttemptStarts = startCandidates.filter((value) => newestRootStart - value <= 60_000);
-    startedAt = Math.min(...currentAttemptStarts);
-  } else {
-    const queueCandidates = (roots.length ? roots : relevantJobs)
-      .flatMap((job) => [timestamp(job.updated_at), timestamp(job.created_at)])
-      .filter((value): value is number => value !== null);
-    if (!queueCandidates.length) return null;
-    startedAt = Math.max(...queueCandidates);
-  }
+  // prepare_ar_item_processing creates these jobs in the same transaction that
+  // handles the user's "Оживить" click. Keep this original timestamp across
+  // queueing, failures, and retries so the displayed duration is the complete
+  // user wait until the QR is published.
+  const startCandidates = relevantJobs
+    .map((job) => timestamp(job.created_at))
+    .filter((value): value is number => value !== null);
+  if (!startCandidates.length) return null;
+  const startedAt = Math.min(...startCandidates);
 
   const completedCandidates = relevantJobs
     .map((job) => timestamp(job.completed_at))
     .filter((value): value is number => value !== null);
   const publishedAt = timestamp(item.published_at);
-  if (publishedAt !== null) completedCandidates.push(publishedAt);
   const finished = item.status === "ready" || item.status === "published" || item.status === "failed";
-  const finishedAt = finished && completedCandidates.length ? Math.max(...completedCandidates) : null;
+  const finishedAt =
+    item.status === "published" && publishedAt !== null
+      ? publishedAt
+      : finished && completedCandidates.length
+        ? Math.max(...completedCandidates)
+        : null;
 
   return {
     elapsedMs: Math.max(0, (finishedAt ?? now) - startedAt),
@@ -60,11 +53,12 @@ export function getProcessingTiming(item: ArItem, jobs: ProcessingJob[], now = D
 
 export function formatProcessingDuration(milliseconds: number) {
   const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const days = Math.floor(totalSeconds / 86_400);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
+  if (days) return `${days} д ${String(hours % 24).padStart(2, "0")} ч`;
   if (hours) return `${hours} ч ${String(minutes).padStart(2, "0")} мин`;
   if (minutes) return `${minutes} мин ${String(seconds).padStart(2, "0")} сек`;
   return `${seconds} сек`;
 }
-
