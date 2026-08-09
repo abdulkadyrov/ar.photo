@@ -70,8 +70,25 @@ async function downloadSource(client: WorkerClient, input: ProcessingInput, dest
   await pipeline(Readable.fromWeb(response.body as never), createWriteStream(destination, { flags: "wx" }));
 }
 
-async function inspectMarker(sourcePath: string) {
-  const image = await loadImage(sourcePath);
+async function loadMarkerImage(sourcePath: string, decodedPath: string) {
+  try {
+    return await loadImage(sourcePath);
+  } catch {
+    try {
+      await command(
+        "ffmpeg",
+        ["-v", "error", "-i", sourcePath, "-frames:v", "1", "-y", decodedPath],
+        2 * 60 * 1000,
+      );
+      return await loadImage(decodedPath);
+    } catch {
+      throw new WorkerFault("marker_decode_failed");
+    }
+  }
+}
+
+async function inspectMarker(sourcePath: string, tempDirectory: string) {
+  const image = await loadMarkerImage(sourcePath, join(tempDirectory, "marker-analysis.png"));
   const scale = Math.min(1, 512 / Math.max(image.width, image.height));
   const width = Math.max(2, Math.round(image.width * scale));
   const height = Math.max(2, Math.round(image.height * scale));
@@ -103,8 +120,8 @@ async function inspectVideo(sourcePath: string) {
   return parseFfprobeOutput(output);
 }
 
-async function compileMarker(sourcePath: string, outputPath: string) {
-  const image = await loadImage(sourcePath);
+async function compileMarker(sourcePath: string, outputPath: string, tempDirectory: string) {
+  const image = await loadMarkerImage(sourcePath, join(tempDirectory, "marker-compilation.png"));
   const dimensions = fitTrackingImageDimensions(image.width, image.height);
   const normalized = createCanvas(dimensions.width, dimensions.height);
   const context = normalized.getContext("2d");
@@ -280,7 +297,7 @@ async function executeJob(
   await reportProgress(client, job, workerId, 20);
 
   if (job.type === "marker_analysis") {
-    const analysis = await inspectMarker(sourcePath);
+    const analysis = await inspectMarker(sourcePath, tempDirectory);
     return { ...analysis, metrics: analysis.metrics, reasons: analysis.reasons };
   }
   if (job.type === "video_inspection") {
@@ -298,7 +315,7 @@ async function executeJob(
   }
   if (job.type === "marker_compilation") {
     const outputPath = join(tempDirectory, "target.mind");
-    const target = await compileMarker(sourcePath, outputPath);
+    const target = await compileMarker(sourcePath, outputPath, tempDirectory);
     await reportProgress(client, job, workerId, 75);
     const digest = await uploadGeneratedObject(client, storagePath, outputPath, "application/octet-stream");
     return { storageBucket: "generated-private", storagePath, sha256: digest, target };
