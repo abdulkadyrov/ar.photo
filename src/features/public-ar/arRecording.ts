@@ -42,7 +42,7 @@ export function recordingCanvasSize(viewportWidth: number, viewportHeight: numbe
 export function createArRecordingEngine(options: {
   cameraVideo: HTMLVideoElement;
   rendererCanvas: HTMLCanvasElement;
-  playbackVideo: HTMLVideoElement;
+  playbackVideo: HTMLVideoElement | (() => HTMLVideoElement);
 }): ArRecordingEngine {
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d", { alpha: false });
@@ -86,7 +86,9 @@ export function createArRecordingEngine(options: {
       resize();
       chunks = [];
       outputStream = canvas.captureStream(30);
-      const playbackStream = (options.playbackVideo as CaptureStreamVideo).captureStream?.();
+      const playbackVideo =
+        typeof options.playbackVideo === "function" ? options.playbackVideo() : options.playbackVideo;
+      const playbackStream = (playbackVideo as CaptureStreamVideo).captureStream?.();
       for (const track of playbackStream?.getAudioTracks() ?? []) outputStream.addTrack(track);
       recorder = new MediaRecorder(outputStream, {
         ...(mimeType ? { mimeType } : {}),

@@ -127,6 +127,7 @@ export type Database = {
           project_id: string;
           public_slug: string;
           published_at: string | null;
+          qr_bundle_id: string;
           status: Database["public"]["Enums"]["ar_item_status"];
           title: string;
           tracking_dataset_path: string | null;
@@ -167,6 +168,7 @@ export type Database = {
           project_id: string;
           public_slug?: string;
           published_at?: string | null;
+          qr_bundle_id?: string;
           status?: Database["public"]["Enums"]["ar_item_status"];
           title: string;
           tracking_dataset_path?: string | null;
@@ -207,6 +209,7 @@ export type Database = {
           project_id?: string;
           public_slug?: string;
           published_at?: string | null;
+          qr_bundle_id?: string;
           status?: Database["public"]["Enums"]["ar_item_status"];
           title?: string;
           tracking_dataset_path?: string | null;
@@ -1369,6 +1372,7 @@ export type Database = {
           project_id: string;
           public_slug: string;
           published_at: string | null;
+          qr_bundle_id: string;
           status: Database["public"]["Enums"]["ar_item_status"];
           title: string;
           tracking_dataset_path: string | null;
@@ -1679,6 +1683,7 @@ export type Database = {
           project_id: string;
           public_slug: string;
           published_at: string | null;
+          qr_bundle_id: string;
           status: Database["public"]["Enums"]["ar_item_status"];
           title: string;
           tracking_dataset_path: string | null;
@@ -1735,6 +1740,7 @@ export type Database = {
           project_id: string;
           public_slug: string;
           published_at: string | null;
+          qr_bundle_id: string;
           status: Database["public"]["Enums"]["ar_item_status"];
           title: string;
           tracking_dataset_path: string | null;
@@ -1753,6 +1759,18 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      create_ar_item_draft_in_bundle: {
+        Args: {
+          p_bundle_root_item_id: string;
+          p_description: string;
+          p_request_id: string;
+          p_target_account_id: string;
+          p_target_group_id: string;
+          p_target_project_id: string;
+          p_title: string;
+        };
+        Returns: Database["public"]["Tables"]["ar_items"]["Row"];
       };
       create_group: {
         Args: {
@@ -1999,6 +2017,7 @@ export type Database = {
           marker_width: number;
           poster_bucket: string;
           poster_path: string;
+          target_index: number;
           title: string;
           tracking_bucket: string;
           tracking_path: string;
@@ -2069,6 +2088,7 @@ export type Database = {
           project_id: string;
           public_slug: string;
           published_at: string | null;
+          qr_bundle_id: string;
           status: Database["public"]["Enums"]["ar_item_status"];
           title: string;
           tracking_dataset_path: string | null;
@@ -2128,6 +2148,7 @@ export type Database = {
           project_id: string;
           public_slug: string;
           published_at: string | null;
+          qr_bundle_id: string;
           status: Database["public"]["Enums"]["ar_item_status"];
           title: string;
           tracking_dataset_path: string | null;
@@ -2172,6 +2193,15 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      publish_ar_bundle: {
+        Args: {
+          p_expires_at?: string;
+          p_public_base_url: string;
+          p_root_item_id: string;
+          p_target_account_id: string;
+        };
+        Returns: Database["public"]["Tables"]["qr_codes"]["Row"];
       };
       purge_analytics_before: {
         Args: { p_batch_limit?: number; p_cutoff: string };
@@ -2418,6 +2448,7 @@ export type Database = {
           project_id: string;
           public_slug: string;
           published_at: string | null;
+          qr_bundle_id: string;
           status: Database["public"]["Enums"]["ar_item_status"];
           title: string;
           tracking_dataset_path: string | null;
@@ -2436,6 +2467,10 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      unpublish_ar_bundle: {
+        Args: { p_root_item_id: string; p_target_account_id: string };
+        Returns: Database["public"]["Tables"]["ar_items"]["Row"];
       };
       update_ar_item_qr_style: {
         Args: { p_item_id: string; p_style: Json; p_target_account_id: string };

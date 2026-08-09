@@ -59,36 +59,37 @@ Deno.serve(async (request) => {
   }
 
   const resolved = await client.rpc("get_public_ar_manifest_source", { p_public_slug: publicSlug });
-  const source = (resolved.data?.[0] ?? null) as PublicManifestSource | null;
+  const sources = (resolved.data ?? []) as PublicManifestSource[];
   if (resolved.error) {
     console.error("Public manifest source unavailable", { code: resolved.error.code });
     return json({ code: "manifest_unavailable" }, 503, cors);
   }
-  if (!source) return json({ code: "not_found" }, 404, cors);
+  if (!sources.length) return json({ code: "not_found" }, 404, cors);
 
-  const [tracking, video, poster] = await Promise.all([
-    client.storage.from(source.tracking_bucket).createSignedUrl(source.tracking_path, SIGNED_URL_TTL_SECONDS),
-    client.storage.from(source.video_bucket).createSignedUrl(source.video_path, SIGNED_URL_TTL_SECONDS),
-    client.storage.from(source.poster_bucket).createSignedUrl(source.poster_path, SIGNED_URL_TTL_SECONDS),
-  ]);
-  if (tracking.error || video.error || poster.error) {
-    console.error("Public manifest signing failed", {
-      tracking: tracking.error?.name,
-      video: video.error?.name,
-      poster: poster.error?.name,
-    });
+  const signedTargets = await Promise.all(
+    sources.map(async (source) => {
+      const [tracking, video, poster] = await Promise.all([
+        client.storage.from(source.tracking_bucket).createSignedUrl(source.tracking_path, SIGNED_URL_TTL_SECONDS),
+        client.storage.from(source.video_bucket).createSignedUrl(source.video_path, SIGNED_URL_TTL_SECONDS),
+        client.storage.from(source.poster_bucket).createSignedUrl(source.poster_path, SIGNED_URL_TTL_SECONDS),
+      ]);
+      return { tracking, video, poster };
+    }),
+  );
+  if (signedTargets.some(({ tracking, video, poster }) => tracking.error || video.error || poster.error)) {
+    console.error("Public manifest bundle signing failed", { targetCount: sources.length });
     return json({ code: "manifest_unavailable" }, 503, cors);
   }
 
   const expiresAt = new Date(Date.now() + SIGNED_URL_TTL_SECONDS * 1000).toISOString();
   return json(
     createPublicManifest(
-      source,
-      {
-        trackingAssetUrl: tracking.data.signedUrl,
-        videoUrl: video.data.signedUrl,
-        posterUrl: poster.data.signedUrl,
-      },
+      sources,
+      signedTargets.map(({ tracking, video, poster }) => ({
+        trackingAssetUrl: tracking.data!.signedUrl,
+        videoUrl: video.data!.signedUrl,
+        posterUrl: poster.data!.signedUrl,
+      })),
       expiresAt,
     ),
     200,

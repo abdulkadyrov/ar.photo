@@ -1,7 +1,14 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { QrCode } from "../../entities/ar-item/model";
-import { MediaPicker, ProgressStatus, QuickResult, QuickStepper, QuickStopwatch } from "./QuickStartPage";
+import {
+  AdditionalArPhotoPair,
+  MediaPicker,
+  ProgressStatus,
+  QuickResult,
+  QuickStepper,
+  QuickStopwatch,
+} from "./QuickStartPage";
 import { formatElapsedTime } from "./quickStartTimer";
 
 const qr: QrCode = {
@@ -79,6 +86,24 @@ describe("quick-start design", () => {
     expect(screen.getByLabelText("Видео family.mp4")).toHaveAttribute("controls");
     fireEvent.click(screen.getByRole("button", { name: "Закрыть предпросмотр" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("renders an optional second photo and keeps it in the same QR", () => {
+    const onRemove = vi.fn();
+    render(
+      <AdditionalArPhotoPair
+        index={2}
+        pair={{ id: "pair-two" }}
+        disabled={false}
+        onChange={vi.fn()}
+        onRemove={onRemove}
+      />,
+    );
+
+    expect(screen.getByText("AR-фото 2")).toBeVisible();
+    expect(screen.getByText("Тот же QR-код")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Удалить AR-фото 2" }));
+    expect(onRemove).toHaveBeenCalledOnce();
   });
 
   it("renders the complete QR result actions", () => {

@@ -1,3 +1,106 @@
+.quick-ar-photo-list {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.4rem;
+}
+
+.quick-ar-photo-block {
+  border: 1px solid rgba(207, 198, 184, 0.75);
+  border-radius: 24px;
+  background: rgba(251, 248, 241, 0.55);
+  padding: 0.85rem;
+}
+
+.quick-ar-photo-block-extra {
+  border-color: rgba(115, 87, 255, 0.28);
+  background: rgba(246, 243, 255, 0.55);
+}
+
+.quick-ar-photo-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.05rem 0.15rem 0.75rem;
+}
+
+.quick-ar-photo-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.quick-ar-photo-heading span {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.quick-ar-photo-heading small {
+  border-radius: 999px;
+  background: rgba(115, 87, 255, 0.1);
+  padding: 0.3rem 0.5rem;
+  color: var(--primary);
+  font-size: 0.63rem;
+  font-weight: 750;
+}
+
+.quick-ar-photo-heading button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid #dfd7ca;
+  border-radius: 11px;
+  background: #fffdf8;
+  padding: 0.45rem 0.65rem;
+  color: #9f3a48;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.quick-ar-photo-block .quick-media-pair {
+  margin-top: 0;
+}
+
+.quick-add-ar-photo {
+  display: flex;
+  width: 100%;
+  min-height: 66px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  margin-top: 1rem;
+  border: 1px dashed rgba(115, 87, 255, 0.55);
+  border-radius: 17px;
+  background: rgba(115, 87, 255, 0.055);
+  padding: 0.75rem 1rem;
+  color: var(--primary);
+  text-align: left;
+}
+
+.quick-add-ar-photo > span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.quick-add-ar-photo strong {
+  font-size: 0.8rem;
+}
+
+.quick-add-ar-photo small {
+  color: var(--muted);
+  font-size: 0.66rem;
+}
+
+.quick-add-ar-photo:hover:not(:disabled) {
+  border-style: solid;
+  background: rgba(115, 87, 255, 0.1);
+}
+
+.quick-add-ar-photo:disabled {
+  opacity: 0.6;
+}
+
 .quick-media-picker-dragging {
   border-color: var(--primary);
   background: #f2efff;
@@ -153,4 +256,33 @@
   width: 100%;
   max-height: calc(100dvh - 8rem);
   object-fit: contain;
+}
+
+@media (max-width: 640px) {
+  .quick-ar-photo-list {
+    gap: 0.75rem;
+    margin-top: 0.8rem;
+  }
+
+  .quick-ar-photo-block {
+    border-radius: 18px;
+    padding: 0.6rem;
+  }
+
+  .quick-ar-photo-heading {
+    padding-bottom: 0.55rem;
+  }
+
+  .quick-ar-photo-heading button {
+    min-height: 36px;
+  }
+
+  .quick-add-ar-photo {
+    min-height: 58px;
+    margin-top: 0.75rem;
+  }
+
+  .quick-add-ar-photo small {
+    display: none;
+  }
 }

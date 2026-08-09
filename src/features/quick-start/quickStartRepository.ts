@@ -16,6 +16,7 @@ const pendingQuickStartSchema = z.object({
   projectId: z.string().uuid(),
   groupId: z.string().uuid(),
   itemId: z.string().uuid(),
+  itemIds: z.array(z.string().uuid()).min(1).max(20).optional(),
   title: z.string().min(2).max(160),
   startedAt: z.number().int().positive().optional(),
 });

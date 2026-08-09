@@ -34,6 +34,7 @@ export interface ArItemRepository {
   retry(accountId: string, itemId: string): Promise<ProcessingJob[]>;
   getQrCode(accountId: string, itemId: string): Promise<QrCode | null>;
   publish(accountId: string, itemId: string, publicBaseUrl: string, expiresAt?: string): Promise<QrCode>;
+  publishBundle(accountId: string, rootItemId: string, publicBaseUrl: string, expiresAt?: string): Promise<QrCode>;
   unpublish(accountId: string, itemId: string): Promise<ArItem>;
   rotatePublicSlug(accountId: string, itemId: string, publicBaseUrl: string): Promise<QrCode>;
   updateQrStyle(accountId: string, itemId: string, style: QrStyle): Promise<QrCode>;
@@ -70,14 +71,20 @@ export class SupabaseArItemRepository implements ArItemRepository {
   }
 
   async createDraft(accountId: string, input: CreateArItemInput) {
-    const { data, error } = await this.client.rpc("create_ar_item_draft", {
+    const common = {
       p_target_account_id: accountId,
       p_target_project_id: input.projectId,
       p_target_group_id: input.groupId,
       p_title: input.title.trim(),
       p_description: input.description.trim(),
       p_request_id: input.requestId,
-    });
+    };
+    const { data, error } = input.bundleRootItemId
+      ? await this.client.rpc("create_ar_item_draft_in_bundle", {
+          ...common,
+          p_bundle_root_item_id: input.bundleRootItemId,
+        })
+      : await this.client.rpc("create_ar_item_draft", common);
     if (error) throw mapArItemError(error);
     return data;
   }
@@ -164,10 +171,21 @@ export class SupabaseArItemRepository implements ArItemRepository {
     return data;
   }
 
-  async unpublish(accountId: string, itemId: string) {
-    const { data, error } = await this.client.rpc("unpublish_ar_item", {
+  async publishBundle(accountId: string, rootItemId: string, publicBaseUrl: string, expiresAt?: string) {
+    const { data, error } = await this.client.rpc("publish_ar_bundle", {
       p_target_account_id: accountId,
-      p_item_id: itemId,
+      p_root_item_id: rootItemId,
+      p_public_base_url: publicBaseUrl,
+      p_expires_at: expiresAt,
+    });
+    if (error) throw mapArItemError(error);
+    return data;
+  }
+
+  async unpublish(accountId: string, itemId: string) {
+    const { data, error } = await this.client.rpc("unpublish_ar_bundle", {
+      p_target_account_id: accountId,
+      p_root_item_id: itemId,
     });
     if (error) throw mapArItemError(error);
     return data;

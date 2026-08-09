@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(21);
+select plan(22);
 
 select ok(
   not pg_catalog.has_function_privilege('anon', 'public.get_public_ar_manifest_source(text)', 'EXECUTE'),
@@ -131,6 +131,64 @@ select is_empty(
 );
 
 reset role;
+insert into public.media_assets (
+  id, account_id, project_id, group_id, kind, storage_bucket, storage_path,
+  original_file_name, mime_type, size_bytes, sha256, version, metadata, created_by
+)
+values (
+  '85000000-0000-4000-8000-000000000002',
+  '20000000-0000-4000-8000-000000000001',
+  '50000000-0000-4000-8000-000000000001',
+  '60000000-0000-4000-8000-000000000001',
+  'video',
+  'videos-private',
+  'accounts/private/group-video.mp4',
+  'group-video.mp4',
+  'video/mp4',
+  4096,
+  repeat('f', 64),
+  1,
+  '{"width":1920,"height":1080,"durationSeconds":12,"videoCodec":"h264","audioCodec":"aac"}'::jsonb,
+  '10000000-0000-4000-8000-000000000010'
+);
+insert into public.ar_items (
+  id, account_id, project_id, group_id, qr_bundle_id, title, public_slug, status,
+  marker_width, marker_height, video_asset_id, video_path, video_thumbnail_path,
+  tracking_dataset_path, tracking_status, visibility, published_at, created_by
+)
+select
+  '86000000-0000-4000-8000-000000000002',
+  root.account_id,
+  root.project_id,
+  root.group_id,
+  root.qr_bundle_id,
+  'Public AR fixture 2',
+  repeat('d', 36),
+  'published',
+  1200,
+  1600,
+  '85000000-0000-4000-8000-000000000002',
+  'accounts/private/group-video.mp4',
+  'accounts/private/items/group/v1/thumbnail/video.webp',
+  'accounts/private/items/group/v1/tracking/target.mind',
+  'ready',
+  'public',
+  statement_timestamp(),
+  root.created_by
+from public.ar_items root
+where root.id = '86000000-0000-4000-8000-000000000001';
+
+set local role service_role;
+select is(
+  (select count(*) from public.get_public_ar_manifest_source(repeat('b', 36))),
+  2::bigint,
+  'one public slug resolves every published target in its AR bundle'
+);
+
+reset role;
+delete from public.ar_items where id = '86000000-0000-4000-8000-000000000002';
+delete from public.media_assets where id = '85000000-0000-4000-8000-000000000002';
+
 update public.ar_items set status = 'ready', visibility = 'private', published_at = null
 where id = '86000000-0000-4000-8000-000000000001';
 set local role service_role;

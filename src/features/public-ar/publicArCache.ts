@@ -1,15 +1,19 @@
-import type { PublicArManifest } from "./publicManifest";
+import { publicArTargets, type PublicArManifest } from "./publicManifest";
 
 const CACHE_DB = "ar-photo-public-viewer";
 const CACHE_STORE = "projects";
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2;
 const memoryCache = new Map<string, CachedPublicArProject>();
 
 export type CachedPublicArProject = {
-  version: 1;
+  version: 2;
   publicSlug: string;
   fingerprint: string;
   savedAt: string;
+  targets: CachedPublicArTarget[];
+};
+
+export type CachedPublicArTarget = {
   poster: Blob;
   video: Blob;
   trackingAsset: Blob;
@@ -21,12 +25,15 @@ export type MaterializedPublicArProject = {
 };
 
 export function publicArAssetFingerprint(manifest: PublicArManifest) {
-  const assetPaths = [
-    stableAssetPath(manifest.assets.posterUrl),
-    stableAssetPath(manifest.assets.videoUrl),
-    stableAssetPath(manifest.assets.trackingAssetUrl),
-  ];
-  return [manifest.version, manifest.marker.width, manifest.marker.height, ...assetPaths].join("|");
+  const targetParts = publicArTargets(manifest).flatMap((target) => [
+    target.targetId,
+    target.marker.width,
+    target.marker.height,
+    stableAssetPath(target.assets.posterUrl),
+    stableAssetPath(target.assets.videoUrl),
+    stableAssetPath(target.assets.trackingAssetUrl),
+  ]);
+  return [manifest.version, ...targetParts].join("|");
 }
 
 export async function loadCachedPublicArProject(
@@ -38,8 +45,15 @@ export async function loadCachedPublicArProject(
   if (typeof indexedDB === "undefined") return null;
   try {
     const cached = await readRecord(publicSlug);
-    if (!cached || cached.fingerprint !== publicArAssetFingerprint(manifest)) return null;
-    if (!isUsableBlob(cached.poster) || !isUsableBlob(cached.video) || !isUsableBlob(cached.trackingAsset)) {
+    if (!cached || cached.version !== CACHE_VERSION || cached.fingerprint !== publicArAssetFingerprint(manifest))
+      return null;
+    if (
+      !Array.isArray(cached.targets) ||
+      cached.targets.length !== publicArTargets(manifest).length ||
+      cached.targets.some(
+        (target) => !isUsableBlob(target.poster) || !isUsableBlob(target.video) || !isUsableBlob(target.trackingAsset),
+      )
+    ) {
       return null;
     }
     return cached;
@@ -54,12 +68,19 @@ export async function cachePublicArProject(
   onStep: (step: 1 | 2 | 3 | 4) => void,
   signal?: AbortSignal,
 ): Promise<CachedPublicArProject> {
+  const targets = publicArTargets(manifest);
   onStep(1);
-  const poster = await fetchAsset(manifest.assets.posterUrl, signal, 30 * 1024 * 1024);
+  const posters = await Promise.all(
+    targets.map((target) => fetchAsset(target.assets.posterUrl, signal, 30 * 1024 * 1024)),
+  );
   onStep(2);
-  const video = await fetchAsset(manifest.assets.videoUrl, signal, 500 * 1024 * 1024);
+  const videos = await Promise.all(
+    targets.map((target) => fetchAsset(target.assets.videoUrl, signal, 500 * 1024 * 1024)),
+  );
   onStep(3);
-  const trackingAsset = await fetchAsset(manifest.assets.trackingAssetUrl, signal, 10 * 1024 * 1024);
+  const trackingAssets = await Promise.all(
+    targets.map((target) => fetchAsset(target.assets.trackingAssetUrl, signal, 10 * 1024 * 1024)),
+  );
   onStep(4);
 
   const record: CachedPublicArProject = {
@@ -67,9 +88,11 @@ export async function cachePublicArProject(
     publicSlug,
     fingerprint: publicArAssetFingerprint(manifest),
     savedAt: new Date().toISOString(),
-    poster,
-    video,
-    trackingAsset,
+    targets: targets.map((_, index) => ({
+      poster: posters[index],
+      video: videos[index],
+      trackingAsset: trackingAssets[index],
+    })),
   };
   memoryCache.set(publicSlug, record);
   if (typeof indexedDB !== "undefined") {
@@ -87,19 +110,29 @@ export function materializeCachedPublicArProject(
   manifest: PublicArManifest,
   cached: CachedPublicArProject,
 ): MaterializedPublicArProject {
-  const posterUrl = URL.createObjectURL(cached.poster);
-  const videoUrl = URL.createObjectURL(cached.video);
-  const trackingAssetUrl = URL.createObjectURL(cached.trackingAsset);
+  const objectUrls = cached.targets.map((target) => ({
+    posterUrl: URL.createObjectURL(target.poster),
+    videoUrl: URL.createObjectURL(target.video),
+    trackingAssetUrl: URL.createObjectURL(target.trackingAsset),
+  }));
+  const targets = publicArTargets(manifest).map((target, index) => ({ ...target, assets: objectUrls[index] }));
+  const primary = targets[0];
   return {
     manifest: {
       ...manifest,
-      assets: { posterUrl, videoUrl, trackingAssetUrl },
+      marker: primary.marker,
+      behavior: primary.behavior,
+      fallbackEnabled: primary.fallbackEnabled,
+      assets: primary.assets,
+      ...(manifest.version === 2 ? { targets } : {}),
       signedUrlsExpireAt: new Date(Date.now() + 24 * 60 * 60 * 1_000).toISOString(),
     },
     dispose() {
-      URL.revokeObjectURL(posterUrl);
-      URL.revokeObjectURL(videoUrl);
-      URL.revokeObjectURL(trackingAssetUrl);
+      for (const urls of objectUrls) {
+        URL.revokeObjectURL(urls.posterUrl);
+        URL.revokeObjectURL(urls.videoUrl);
+        URL.revokeObjectURL(urls.trackingAssetUrl);
+      }
     },
   };
 }

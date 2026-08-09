@@ -19,7 +19,7 @@ import {
   type PublicArManifest,
 } from "./publicManifest";
 import {
-  createPublicArPlaybackVideo,
+  createPublicArPlaybackVideos,
   startPublicMindAr,
   type PublicArSession,
   type PublicArTrackingState,
@@ -48,7 +48,7 @@ export function PublicArViewerRoute() {
   const scannerStreamRef = useRef<MediaStream | null>(null);
   const sessionRef = useRef<PublicArSession | null>(null);
   const materializedRef = useRef<MaterializedPublicArProject | null>(null);
-  const preparedVideoRef = useRef<HTMLVideoElement | null>(null);
+  const preparedVideosRef = useRef<HTMLVideoElement[]>([]);
   const flowControllerRef = useRef<AbortController | null>(null);
   const telemetry = useMemo(() => createPublicArTelemetry(publicSlug), [publicSlug]);
 
@@ -109,8 +109,8 @@ export function PublicArViewerRoute() {
       sessionRef.current = null;
       materializedRef.current?.dispose();
       materializedRef.current = null;
-      releasePreparedVideo(preparedVideoRef.current);
-      preparedVideoRef.current = null;
+      releasePreparedVideos(preparedVideosRef.current);
+      preparedVideosRef.current = [];
     },
     [],
   );
@@ -131,8 +131,8 @@ export function PublicArViewerRoute() {
     setMessage("");
     setRecordingNotice("");
     telemetry.track("camera_started");
-    const playbackVideo = createPublicArPlaybackVideo(manifest, muted);
-    preparedVideoRef.current = playbackVideo;
+    const playbackVideos = createPublicArPlaybackVideos(manifest, muted);
+    preparedVideosRef.current = playbackVideos;
 
     try {
       let project = cachedProject;
@@ -155,13 +155,13 @@ export function PublicArViewerRoute() {
         scannerStreamRef.current = null;
         scannerVideo.srcObject = null;
       }
-      await beginAr(project, playbackVideo);
+      await beginAr(project, playbackVideos);
     } catch (error) {
       if (controller.signal.aborted) return;
       stopMediaStream(scannerStreamRef.current);
       scannerStreamRef.current = null;
-      releasePreparedVideo(playbackVideo);
-      if (preparedVideoRef.current === playbackVideo) preparedVideoRef.current = null;
+      releasePreparedVideos(playbackVideos);
+      if (preparedVideosRef.current === playbackVideos) preparedVideosRef.current = [];
       sessionRef.current?.stop();
       sessionRef.current = null;
       materializedRef.current?.dispose();
@@ -172,7 +172,7 @@ export function PublicArViewerRoute() {
     }
   };
 
-  const beginAr = async (project: CachedPublicArProject, playbackVideo: HTMLVideoElement) => {
+  const beginAr = async (project: CachedPublicArProject, playbackVideos: HTMLVideoElement[]) => {
     if (!manifest || !containerRef.current) return;
     setMode("starting");
     sessionRef.current?.stop();
@@ -184,7 +184,7 @@ export function PublicArViewerRoute() {
       container: containerRef.current,
       manifest: materialized.manifest,
       muted,
-      playbackVideo,
+      playbackVideos,
       onTrackingState: (state: PublicArTrackingState) => {
         setMode(state);
         if (state === "tracking") telemetry.track("marker_detected");
@@ -471,11 +471,12 @@ function nextPaint() {
   return new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
-function releasePreparedVideo(video?: HTMLVideoElement | null) {
-  if (!video) return;
-  video.pause();
-  video.removeAttribute("src");
-  video.load();
+function releasePreparedVideos(videos: HTMLVideoElement[]) {
+  for (const video of videos) {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+  }
 }
 
 function formatDuration(seconds: number) {

@@ -64,6 +64,18 @@ export class DemoArItemRepository implements ArItemRepository {
     if (input.title.trim().length < 2 || input.title.trim().length > 160) {
       throw new ArItemRepositoryError("conflict", "Название должно содержать от 2 до 160 символов");
     }
+    const bundleRoot = input.bundleRootItemId
+      ? state.items.find(
+          (item) =>
+            item.id === input.bundleRootItemId &&
+            item.account_id === accountId &&
+            item.project_id === input.projectId &&
+            item.group_id === input.groupId,
+        )
+      : undefined;
+    if (input.bundleRootItemId && !bundleRoot) {
+      throw new ArItemRepositoryError("not_found", "Основное AR-фото набора не найдено");
+    }
 
     const timestamp = new Date(this.now()).toISOString();
     const item: ArItem = {
@@ -75,6 +87,7 @@ export class DemoArItemRepository implements ArItemRepository {
       title: input.title.trim(),
       description: input.description.trim() || null,
       public_slug: randomPublicSlug(),
+      qr_bundle_id: bundleRoot?.qr_bundle_id ?? crypto.randomUUID(),
       status: "draft",
       visibility: "private",
       marker_asset_id: null,
@@ -241,7 +254,9 @@ export class DemoArItemRepository implements ArItemRepository {
     item.expires_at = expiresAt ?? null;
     item.updated_at = timestamp;
     const publicUrl = buildPublicArUrl(publicBaseUrl, item.public_slug, true);
-    let qrCode = state.qrCodes.find((candidate) => candidate.account_id === accountId && candidate.ar_item_id === itemId);
+    let qrCode = state.qrCodes.find(
+      (candidate) => candidate.account_id === accountId && candidate.ar_item_id === itemId,
+    );
     if (qrCode) qrCode.public_url = publicUrl;
     else {
       qrCode = {
@@ -262,15 +277,46 @@ export class DemoArItemRepository implements ArItemRepository {
     return qrCode;
   }
 
+  async publishBundle(accountId: string, rootItemId: string, publicBaseUrl: string, expiresAt?: string) {
+    const root = await this.getItem(accountId, rootItemId);
+    const bundleItems = (await this.listItems(accountId)).filter((item) => item.qr_bundle_id === root.qr_bundle_id);
+    if (!bundleItems.length || bundleItems.length > 20) {
+      throw new ArItemRepositoryError("limit_reached", "В одном QR-коде может быть до 20 AR-фото");
+    }
+    await this.publish(accountId, root.id, publicBaseUrl, expiresAt);
+    for (const item of bundleItems) {
+      if (item.id !== root.id) await this.publish(accountId, item.id, publicBaseUrl, expiresAt);
+    }
+    const state = this.reconcile();
+    state.qrCodes = state.qrCodes.filter(
+      (qrCode) =>
+        qrCode.ar_item_id === root.id || !bundleItems.some((bundleItem) => bundleItem.id === qrCode.ar_item_id),
+    );
+    this.store.write(state);
+    const qrCode = state.qrCodes.find(
+      (candidate) => candidate.account_id === accountId && candidate.ar_item_id === root.id,
+    );
+    if (!qrCode) throw new ArItemRepositoryError("unexpected", "QR-код набора не создан");
+    return qrCode;
+  }
+
   async unpublish(accountId: string, itemId: string) {
     const state = this.reconcile();
     const item = state.items.find((candidate) => candidate.account_id === accountId && candidate.id === itemId);
     if (!item) throw new ArItemRepositoryError("not_found", "AR-работа не найдена");
-    if (item.status !== "published") throw new ArItemRepositoryError("conflict", "AR-работа не опубликована");
-    item.status = "ready";
-    item.visibility = "private";
-    item.published_at = null;
-    item.updated_at = new Date(this.now()).toISOString();
+    const bundleItems = state.items.filter(
+      (candidate) => candidate.account_id === accountId && candidate.qr_bundle_id === item.qr_bundle_id,
+    );
+    if (!bundleItems.some((candidate) => candidate.status === "published")) {
+      throw new ArItemRepositoryError("conflict", "AR-работа не опубликована");
+    }
+    for (const bundleItem of bundleItems) {
+      if (bundleItem.status !== "published") continue;
+      bundleItem.status = "ready";
+      bundleItem.visibility = "private";
+      bundleItem.published_at = null;
+      bundleItem.updated_at = new Date(this.now()).toISOString();
+    }
     this.store.write(state);
     return item;
   }
@@ -278,7 +324,9 @@ export class DemoArItemRepository implements ArItemRepository {
   async rotatePublicSlug(accountId: string, itemId: string, publicBaseUrl: string) {
     const state = this.reconcile();
     const item = state.items.find((candidate) => candidate.account_id === accountId && candidate.id === itemId);
-    const qrCode = state.qrCodes.find((candidate) => candidate.account_id === accountId && candidate.ar_item_id === itemId);
+    const qrCode = state.qrCodes.find(
+      (candidate) => candidate.account_id === accountId && candidate.ar_item_id === itemId,
+    );
     if (!item || !qrCode) throw new ArItemRepositoryError("not_found", "Публикация не найдена");
     if (item.status !== "published") throw new ArItemRepositoryError("conflict", "Сначала опубликуйте AR-работу");
     item.public_slug = randomPublicSlug();
@@ -295,7 +343,9 @@ export class DemoArItemRepository implements ArItemRepository {
   async updateQrStyle(accountId: string, itemId: string, style: QrStyle) {
     const state = this.reconcile();
     const item = state.items.find((candidate) => candidate.account_id === accountId && candidate.id === itemId);
-    const qrCode = state.qrCodes.find((candidate) => candidate.account_id === accountId && candidate.ar_item_id === itemId);
+    const qrCode = state.qrCodes.find(
+      (candidate) => candidate.account_id === accountId && candidate.ar_item_id === itemId,
+    );
     if (!item || !qrCode) throw new ArItemRepositoryError("not_found", "Публикация не найдена");
     if (item.status !== "published") throw new ArItemRepositoryError("conflict", "Сначала опубликуйте AR-работу");
     qrCode.style = parseQrStyle(style);
@@ -403,7 +453,7 @@ function browserStore(): DemoArItemStore {
   return {
     read() {
       try {
-        return normalizeState(JSON.parse(localStorage.getItem(DEMO_AR_ITEMS_KEY) ?? '{}'));
+        return normalizeState(JSON.parse(localStorage.getItem(DEMO_AR_ITEMS_KEY) ?? "{}"));
       } catch {
         return { items: [], jobs: [], qrCodes: [] };
       }
@@ -416,8 +466,9 @@ function browserStore(): DemoArItemStore {
 
 function normalizeState(value: unknown): DemoArItemState {
   const candidate = value as Partial<DemoArItemState> | null;
+  const items = Array.isArray(candidate?.items) ? candidate.items : [];
   return {
-    items: Array.isArray(candidate?.items) ? candidate.items : [],
+    items: items.map((item) => ({ ...item, qr_bundle_id: item.qr_bundle_id || item.id })),
     jobs: Array.isArray(candidate?.jobs) ? candidate.jobs : [],
     qrCodes: Array.isArray(candidate?.qrCodes) ? candidate.qrCodes : [],
   };

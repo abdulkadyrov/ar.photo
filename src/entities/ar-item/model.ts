@@ -27,6 +27,7 @@ export type ArItemSettings = {
 export type CreateArItemInput = {
   projectId: string;
   groupId: string;
+  bundleRootItemId?: string;
   title: string;
   description: string;
   requestId: string;

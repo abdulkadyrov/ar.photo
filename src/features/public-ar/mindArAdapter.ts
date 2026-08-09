@@ -1,5 +1,5 @@
 import type * as ThreeModule from "three";
-import type { PublicArManifest } from "./publicManifest";
+import { publicArTargets, type PublicArManifest, type PublicArTarget } from "./publicManifest";
 import { videoMilestones, type PublicArAnalyticsEvent } from "./telemetry";
 import { createArRecordingEngine, type ArRecording, type ArRecordingEngine } from "./arRecording";
 
@@ -139,17 +139,22 @@ export async function startPublicMindAr(options: {
   manifest: PublicArManifest;
   muted: boolean;
   playbackVideo?: HTMLVideoElement;
+  playbackVideos?: HTMLVideoElement[];
   onTrackingState(state: PublicArTrackingState): void;
   onPlaybackEvent(event: PublicArAnalyticsEvent, valueSeconds?: number | null, errorCode?: string | null): void;
 }): Promise<PublicArSession> {
   const { container, manifest, onTrackingState, onPlaybackEvent } = options;
-  const video = options.playbackVideo ?? createPublicArPlaybackVideo(manifest, options.muted);
-  configurePlaybackVideo(video, manifest, options.muted);
+  const targets = publicArTargets(manifest);
+  const videos =
+    options.playbackVideos ??
+    (options.playbackVideo ? [options.playbackVideo] : createPublicArPlaybackVideos(manifest, options.muted));
+  if (videos.length !== targets.length) throw new Error("AR playback target count mismatch");
+  targets.forEach((target, index) => configurePlaybackVideo(videos[index], target, options.muted));
 
-  const [{ MindARThree }, THREE, trackingAsset] = await Promise.all([
+  const [{ MindARThree }, THREE, trackingAssets] = await Promise.all([
     import("mind-ar/dist/mindar-image-three.prod.js"),
     import("three"),
-    fetchTrackingAsset(options.manifest.assets.trackingAssetUrl),
+    Promise.all(targets.map((target) => fetchTrackingAsset(target.assets.trackingAssetUrl))),
   ]);
   const Three = THREE as typeof ThreeModule;
 
@@ -158,7 +163,8 @@ export async function startPublicMindAr(options: {
   // renderer, then explicitly keep both renderer output and video input in sRGB.
   installMindArColorCompatibility(Three);
 
-  const trackingAssetUrl = URL.createObjectURL(trackingAsset);
+  const mergedTrackingAsset = await mergeTrackingAssets(trackingAssets);
+  const trackingAssetUrl = URL.createObjectURL(mergedTrackingAsset);
 
   const mindar = new MindARThree({
     container,
@@ -172,79 +178,108 @@ export async function startPublicMindAr(options: {
   const { renderer, scene, camera } = mindar;
   renderer.setPixelRatio?.(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setClearColor(0x000000, 0);
-  const texture = new Three.VideoTexture(video);
-  configureSrgbVideoOutput(renderer, texture, Three.SRGBColorSpace);
-  let activeMarker: MarkerDimensions = manifest.marker;
-  let markerGeometry = markerPlaneGeometry(activeMarker);
-  // The unit plane is scaled after the .mind dataset loads. This lets the
-  // compiled target remain authoritative if manifest metadata ever drifts.
-  const geometry = new Three.PlaneGeometry(markerGeometry.width, markerGeometry.width);
-  const material = new Three.MeshBasicMaterial({
-    map: texture,
-    transparent: false,
-    depthTest: false,
-    depthWrite: false,
-    toneMapped: false,
-  });
-  const plane = new Three.Mesh(geometry, material);
-  plane.position.set(0, 0, markerGeometry.z);
-  plane.scale.set(1, markerGeometry.height, 1);
-  plane.frustumCulled = false;
-  plane.renderOrder = 1;
-  const anchor = mindar.addAnchor(0);
-  // Keep the video attached to MindAR's own anchor. The anchor matrix is
-  // updated every render frame; copying it from onTargetUpdate made the plane
-  // lag behind during side-to-side movement and close camera approaches.
-  anchor.group.add(plane);
-
-  const fitVideoToMarker = () => {
-    if (!video.videoWidth || !video.videoHeight) return;
-    const transform = coverTextureTransform(
-      video.videoWidth / video.videoHeight,
-      activeMarker.width / activeMarker.height,
-    );
-    texture.repeat.set(transform.repeatX, transform.repeatY);
-    texture.offset.set(transform.offsetX, transform.offsetY);
-    texture.needsUpdate = true;
-  };
-  video.addEventListener("loadedmetadata", fitVideoToMarker);
-  fitVideoToMarker();
-
   let stopped = false;
+  let activeTargetIndex = 0;
   let targetVisible = false;
-  const playbackStarted = () => onPlaybackEvent("playback_started", video.currentTime);
-  const playbackProgress = () => {
-    for (const event of videoMilestones(video.currentTime, video.duration)) {
-      onPlaybackEvent(event, video.currentTime);
-    }
-  };
-  const playbackEnded = () => onPlaybackEvent("completed", video.duration || video.currentTime);
-  const playbackError = () => onPlaybackEvent("error", null, "playback_failed");
-  video.addEventListener("play", playbackStarted);
-  video.addEventListener("timeupdate", playbackProgress);
-  video.addEventListener("ended", playbackEnded);
-  video.addEventListener("error", playbackError);
-  anchor.onTargetFound = () => {
-    targetVisible = true;
-    anchor.group.visible = true;
-    onTrackingState("tracking");
-    if (manifest.behavior.autoplay) video.play().catch(() => undefined);
-  };
-  anchor.onTargetLost = () => {
-    targetVisible = false;
-    anchor.group.visible = false;
-    onTrackingState("searching");
-    if (manifest.behavior.markerLost === "pause_hide") video.pause();
-    if (manifest.behavior.markerLost === "stop_reset") {
-      video.pause();
-      video.currentTime = 0;
-    }
-  };
+  const runtimes = targets.map((target, index) => {
+    const video = videos[index];
+    const texture = new Three.VideoTexture(video);
+    configureSrgbVideoOutput(renderer, texture, Three.SRGBColorSpace);
+    let activeMarker: MarkerDimensions = target.marker;
+    const markerGeometry = markerPlaneGeometry(activeMarker);
+    const geometry = new Three.PlaneGeometry(markerGeometry.width, markerGeometry.width);
+    const material = new Three.MeshBasicMaterial({
+      map: texture,
+      transparent: false,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    const plane = new Three.Mesh(geometry, material);
+    plane.position.set(0, 0, markerGeometry.z);
+    plane.scale.set(1, markerGeometry.height, 1);
+    plane.frustumCulled = false;
+    plane.renderOrder = 1;
+    const anchor = mindar.addAnchor(index);
+    anchor.group.add(plane);
+    const fitVideoToMarker = () => {
+      if (!video.videoWidth || !video.videoHeight) return;
+      const transform = coverTextureTransform(
+        video.videoWidth / video.videoHeight,
+        activeMarker.width / activeMarker.height,
+      );
+      texture.repeat.set(transform.repeatX, transform.repeatY);
+      texture.offset.set(transform.offsetX, transform.offsetY);
+      texture.needsUpdate = true;
+    };
+    const playbackStarted = () => onPlaybackEvent("playback_started", video.currentTime);
+    const playbackProgress = () => {
+      for (const event of videoMilestones(video.currentTime, video.duration)) {
+        onPlaybackEvent(event, video.currentTime);
+      }
+    };
+    const playbackEnded = () => onPlaybackEvent("completed", video.duration || video.currentTime);
+    const playbackError = () => onPlaybackEvent("error", null, "playback_failed");
+    video.addEventListener("loadedmetadata", fitVideoToMarker);
+    video.addEventListener("play", playbackStarted);
+    video.addEventListener("timeupdate", playbackProgress);
+    video.addEventListener("ended", playbackEnded);
+    video.addEventListener("error", playbackError);
+    fitVideoToMarker();
+    anchor.onTargetFound = () => {
+      activeTargetIndex = index;
+      targetVisible = true;
+      videos.forEach((candidate, candidateIndex) => {
+        if (candidateIndex !== index) candidate.pause();
+      });
+      anchor.group.visible = true;
+      onTrackingState("tracking");
+      if (target.behavior.autoplay) video.play().catch(() => undefined);
+    };
+    anchor.onTargetLost = () => {
+      anchor.group.visible = false;
+      if (activeTargetIndex === index) {
+        targetVisible = false;
+        onTrackingState("searching");
+      }
+      if (target.behavior.markerLost === "pause_hide") video.pause();
+      if (target.behavior.markerLost === "stop_reset") {
+        video.pause();
+        video.currentTime = 0;
+      }
+    };
+    return {
+      target,
+      video,
+      texture,
+      geometry,
+      material,
+      plane,
+      setMarker(marker: MarkerDimensions) {
+        activeMarker = marker;
+      },
+      fitVideoToMarker,
+      dispose() {
+        video.pause();
+        video.removeEventListener("loadedmetadata", fitVideoToMarker);
+        video.removeEventListener("play", playbackStarted);
+        video.removeEventListener("timeupdate", playbackProgress);
+        video.removeEventListener("ended", playbackEnded);
+        video.removeEventListener("error", playbackError);
+        video.removeAttribute("src");
+        video.load();
+        texture.dispose();
+        geometry.dispose();
+        material.dispose();
+      },
+    };
+  });
   const visibility = () => {
     if (document.hidden) {
-      video.pause();
-    } else if (targetVisible && manifest.behavior.autoplay) {
-      video.play().catch(() => undefined);
+      videos.forEach((video) => video.pause());
+    } else if (targetVisible) {
+      const runtime = runtimes[activeTargetIndex];
+      if (runtime.target.behavior.autoplay) runtime.video.play().catch(() => undefined);
     }
   };
   document.addEventListener("visibilitychange", visibility);
@@ -252,16 +287,22 @@ export async function startPublicMindAr(options: {
   let recordingEngine: ArRecordingEngine | null = null;
   try {
     await startMindArWithVisibleCamera(mindar);
-    activeMarker = resolveMarkerDimensions(manifest.marker, mindar.controller?.markerDimensions);
-    markerGeometry = markerPlaneGeometry(activeMarker);
-    plane.scale.set(1, markerGeometry.height, 1);
-    fitVideoToMarker();
+    runtimes.forEach((runtime, index) => {
+      const marker = resolveMarkerDimensions(
+        runtime.target.marker,
+        mindar.controller?.markerDimensions?.slice(index, index + 1),
+      );
+      const markerGeometry = markerPlaneGeometry(marker);
+      runtime.setMarker(marker);
+      runtime.plane.scale.set(1, markerGeometry.height, 1);
+      runtime.fitVideoToMarker();
+    });
     keepCameraVisible(mindar);
     if (mindar.video && renderer.domElement) {
       recordingEngine = createArRecordingEngine({
         cameraVideo: mindar.video,
         rendererCanvas: renderer.domElement,
-        playbackVideo: video,
+        playbackVideo: () => runtimes[activeTargetIndex].video,
       });
     }
     renderer.setAnimationLoop(() => {
@@ -273,14 +314,7 @@ export async function startPublicMindAr(options: {
     document.removeEventListener("visibilitychange", visibility);
     renderer.setAnimationLoop(null);
     stopMindAr(mindar);
-    video.pause();
-    removePlaybackListeners();
-    video.removeEventListener("loadedmetadata", fitVideoToMarker);
-    video.removeAttribute("src");
-    video.load();
-    texture.dispose();
-    geometry.dispose();
-    material.dispose();
+    runtimes.forEach((runtime) => runtime.dispose());
     URL.revokeObjectURL(trackingAssetUrl);
     container.replaceChildren();
     throw error;
@@ -291,12 +325,15 @@ export async function startPublicMindAr(options: {
       return recordingEngine?.supported ?? false;
     },
     setMuted(muted) {
-      video.muted = muted;
-      video.defaultMuted = muted;
-      video.toggleAttribute("muted", muted);
-      if (!muted && targetVisible) video.play().catch(() => undefined);
+      videos.forEach((video) => {
+        video.muted = muted;
+        video.defaultMuted = muted;
+        video.toggleAttribute("muted", muted);
+      });
+      if (!muted && targetVisible) runtimes[activeTargetIndex].video.play().catch(() => undefined);
     },
     async togglePlayback() {
+      const video = runtimes[activeTargetIndex].video;
       if (video.paused) {
         await video.play();
         return true;
@@ -320,30 +357,24 @@ export async function startPublicMindAr(options: {
       renderer.setAnimationLoop(null);
       recordingEngine?.dispose();
       stopMindAr(mindar);
-      video.pause();
-      removePlaybackListeners();
-      video.removeEventListener("loadedmetadata", fitVideoToMarker);
-      video.removeAttribute("src");
-      video.load();
-      texture.dispose();
-      geometry.dispose();
-      material.dispose();
+      runtimes.forEach((runtime) => runtime.dispose());
       URL.revokeObjectURL(trackingAssetUrl);
       container.replaceChildren();
     },
   };
-
-  function removePlaybackListeners() {
-    video.removeEventListener("play", playbackStarted);
-    video.removeEventListener("timeupdate", playbackProgress);
-    video.removeEventListener("ended", playbackEnded);
-    video.removeEventListener("error", playbackError);
-  }
 }
 
 export function createPublicArPlaybackVideo(manifest: PublicArManifest, muted: boolean) {
+  return createPublicArPlaybackVideos(manifest, muted)[0];
+}
+
+export function createPublicArPlaybackVideos(manifest: PublicArManifest, muted: boolean) {
+  return publicArTargets(manifest).map((target) => createPlaybackVideo(target, muted));
+}
+
+function createPlaybackVideo(target: PublicArTarget, muted: boolean) {
   const video = document.createElement("video");
-  configurePlaybackVideo(video, manifest, muted);
+  configurePlaybackVideo(video, target, muted);
   // This function is called directly from the camera permission gesture. A
   // play/pause on the final media element preserves Safari's audio grant while
   // QR pairing and asset caching continue asynchronously.
@@ -359,8 +390,8 @@ export function createPublicArPlaybackVideo(manifest: PublicArManifest, muted: b
   return video;
 }
 
-function configurePlaybackVideo(video: HTMLVideoElement, manifest: PublicArManifest, muted: boolean) {
-  video.loop = manifest.behavior.loop;
+function configurePlaybackVideo(video: HTMLVideoElement, target: PublicArTarget, muted: boolean) {
+  video.loop = target.behavior.loop;
   video.muted = muted;
   video.defaultMuted = muted;
   video.toggleAttribute("muted", muted);
@@ -370,8 +401,8 @@ function configurePlaybackVideo(video: HTMLVideoElement, manifest: PublicArManif
   video.crossOrigin = "anonymous";
   video.disablePictureInPicture = true;
   video.setAttribute("webkit-playsinline", "");
-  if (video.src !== manifest.assets.videoUrl) {
-    video.src = manifest.assets.videoUrl;
+  if (video.src !== target.assets.videoUrl) {
+    video.src = target.assets.videoUrl;
     video.load();
   }
 }
@@ -464,6 +495,22 @@ async function fetchTrackingAsset(url: string) {
     throw new DOMException("Tracking asset is invalid", "DataError");
   }
   return blob;
+}
+
+export async function mergeTrackingAssets(assets: Blob[]) {
+  if (!assets.length) throw new DOMException("Tracking asset is missing", "DataError");
+  if (assets.length === 1) return assets[0];
+  const { decode, encode } = await import("@msgpack/msgpack");
+  const dataList: unknown[] = [];
+  for (const asset of assets) {
+    const content = decode(new Uint8Array(await asset.arrayBuffer())) as { v?: unknown; dataList?: unknown };
+    if (content.v !== 2 || !Array.isArray(content.dataList) || !content.dataList.length) {
+      throw new DOMException("Tracking asset is invalid", "DataError");
+    }
+    dataList.push(...content.dataList);
+  }
+  const bytes = encode({ v: 2, dataList });
+  return new Blob([new Uint8Array(bytes).buffer], { type: "application/octet-stream" });
 }
 
 function installBoundedCameraRequest() {

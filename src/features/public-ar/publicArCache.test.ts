@@ -42,7 +42,7 @@ describe("public AR device cache", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(steps).toEqual([1, 2, 3, 4]);
     expect(restored?.fingerprint).toBe(cached.fingerprint);
-    expect(restored?.video.size).toBeGreaterThan(0);
+    expect(restored?.targets[0].video.size).toBeGreaterThan(0);
   });
 
   it("invalidates a cache entry when a republished asset path changes", () => {

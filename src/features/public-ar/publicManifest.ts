@@ -2,38 +2,53 @@ import { z } from "zod";
 import { getPublicRuntimeConfig } from "../../shared/config/env";
 
 const assetUrl = z.string().url();
-const publicManifestSchema = z
+const markerSchema = z
   .object({
-    version: z.literal(1),
-    title: z.string().min(1).max(160),
-    marker: z
-      .object({
-        width: z.number().int().positive(),
-        height: z.number().int().positive(),
-        aspectRatio: z.number().positive(),
-      })
-      .strict(),
-    behavior: z
-      .object({
-        autoplay: z.boolean(),
-        loop: z.boolean(),
-        markerLost: z.enum(["pause_hide", "continue_audio_hide", "stop_reset"]),
-        audioDefault: z.enum(["muted", "user_enabled"]),
-      })
-      .strict(),
-    fallbackEnabled: z.boolean(),
-    assets: z
-      .object({
-        trackingAssetUrl: assetUrl,
-        videoUrl: assetUrl,
-        posterUrl: assetUrl,
-      })
-      .strict(),
-    signedUrlsExpireAt: z.string().datetime({ offset: true }),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    aspectRatio: z.number().positive(),
   })
   .strict();
+const behaviorSchema = z
+  .object({
+    autoplay: z.boolean(),
+    loop: z.boolean(),
+    markerLost: z.enum(["pause_hide", "continue_audio_hide", "stop_reset"]),
+    audioDefault: z.enum(["muted", "user_enabled"]),
+  })
+  .strict();
+const assetsSchema = z
+  .object({
+    trackingAssetUrl: assetUrl,
+    videoUrl: assetUrl,
+    posterUrl: assetUrl,
+  })
+  .strict();
+const targetSchema = z
+  .object({
+    targetId: z.string().min(1).max(64),
+    title: z.string().min(1).max(160),
+    marker: markerSchema,
+    behavior: behaviorSchema,
+    fallbackEnabled: z.boolean(),
+    assets: assetsSchema,
+  })
+  .strict();
+const commonManifestShape = {
+  title: z.string().min(1).max(160),
+  marker: markerSchema,
+  behavior: behaviorSchema,
+  fallbackEnabled: z.boolean(),
+  assets: assetsSchema,
+  signedUrlsExpireAt: z.string().datetime({ offset: true }),
+};
+const publicManifestSchema = z.union([
+  z.object({ version: z.literal(1), ...commonManifestShape }).strict(),
+  z.object({ version: z.literal(2), ...commonManifestShape, targets: z.array(targetSchema).min(2).max(20) }).strict(),
+]);
 
 export type PublicArManifest = z.infer<typeof publicManifestSchema>;
+export type PublicArTarget = z.infer<typeof targetSchema>;
 export type PublicManifestErrorCode = "not_found" | "rate_limited" | "unavailable" | "invalid_response";
 
 export class PublicManifestError extends Error {
@@ -47,7 +62,21 @@ export class PublicManifestError extends Error {
 }
 
 export function initialArMuted(manifest: PublicArManifest) {
-  return manifest.behavior.audioDefault !== "user_enabled";
+  return publicArTargets(manifest).every((target) => target.behavior.audioDefault !== "user_enabled");
+}
+
+export function publicArTargets(manifest: PublicArManifest): PublicArTarget[] {
+  if (manifest.version === 2) return manifest.targets;
+  return [
+    {
+      targetId: "target-0",
+      title: manifest.title,
+      marker: manifest.marker,
+      behavior: manifest.behavior,
+      fallbackEnabled: manifest.fallbackEnabled,
+      assets: manifest.assets,
+    },
+  ];
 }
 
 export async function loadPublicManifest(publicSlug: string, signal?: AbortSignal): Promise<PublicArManifest> {

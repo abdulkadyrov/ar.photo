@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { decode } from "@msgpack/msgpack";
 import {
   boundedCameraConstraints,
   configureSrgbVideoOutput,
@@ -7,6 +10,7 @@ import {
   isIosWebKit,
   keepCameraVisible,
   markerPlaneGeometry,
+  mergeTrackingAssets,
   publicArTrackingConfig,
   resolveMarkerDimensions,
   startMindArWithVisibleCamera,
@@ -91,6 +95,16 @@ describe("public AR alignment contract", () => {
       width: 1200,
       height: 1600,
     });
+  });
+
+  it("merges separately processed photos into one ordered MindAR dataset", async () => {
+    const bytes = await readFile(resolve(process.cwd(), "public/test-assets/test.mind"));
+    const source = new Blob([new Uint8Array(bytes).buffer]);
+    const merged = await mergeTrackingAssets([source, source]);
+    const content = decode(new Uint8Array(await merged.arrayBuffer())) as { dataList: Array<{ targetImage: unknown }> };
+
+    expect(content.dataList).toHaveLength(2);
+    expect(content.dataList[0].targetImage).toEqual(content.dataList[1].targetImage);
   });
 
   it("center-crops wide and tall video without stretching it", () => {

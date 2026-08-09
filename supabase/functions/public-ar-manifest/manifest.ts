@@ -2,6 +2,7 @@ export const PUBLIC_SLUG_PATTERN = /^[a-f0-9]{36}$/;
 export const SIGNED_URL_TTL_SECONDS = 300;
 
 export type PublicManifestSource = {
+  target_index: number;
   title: string;
   marker_width: number;
   marker_height: number;
@@ -64,12 +65,28 @@ export function corsHeaders(requestOrigin: string | null, allowedOrigins: Set<st
 }
 
 export function createPublicManifest(
-  source: PublicManifestSource,
-  assets: SignedManifestAssets,
+  sources: PublicManifestSource[],
+  assets: SignedManifestAssets[],
   signedUrlsExpireAt: string,
 ) {
+  if (!sources.length || sources.length !== assets.length) throw new Error("Invalid public AR bundle");
+  const targets = sources.map((source, index) => createTarget(source, assets[index]));
+  const primary = targets[0];
   return {
-    version: 1 as const,
+    version: targets.length > 1 ? (2 as const) : (1 as const),
+    title: primary.title,
+    marker: primary.marker,
+    behavior: primary.behavior,
+    fallbackEnabled: primary.fallbackEnabled,
+    assets: primary.assets,
+    ...(targets.length > 1 ? { targets } : {}),
+    signedUrlsExpireAt,
+  };
+}
+
+function createTarget(source: PublicManifestSource, assets: SignedManifestAssets) {
+  return {
+    targetId: `target-${source.target_index}`,
     title: source.title,
     marker: {
       width: source.marker_width,
@@ -84,7 +101,6 @@ export function createPublicManifest(
     },
     fallbackEnabled: source.fallback_enabled,
     assets,
-    signedUrlsExpireAt,
   };
 }
 

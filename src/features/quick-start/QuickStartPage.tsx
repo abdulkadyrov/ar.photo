@@ -11,6 +11,7 @@ import {
   LockKeyhole,
   LoaderCircle,
   Maximize2,
+  Plus,
   QrCode,
   RefreshCw,
   ScanLine,
@@ -42,6 +43,13 @@ import "./QuickStartPage.css";
 
 const mediaRepository = getMediaRepository();
 const arItemRepository = getArItemRepository();
+const MAX_QUICK_AR_PHOTOS = 10;
+
+type QuickMediaPair = {
+  id: string;
+  markerFile?: File;
+  videoFile?: File;
+};
 
 type QuickStage =
   "form" | "preparing" | "uploading-marker" | "uploading-video" | "processing" | "publishing" | "done" | "error";
@@ -72,38 +80,50 @@ function QuickCreatePage({ userId }: { userId: string }) {
   const [title, setTitle] = useState(restoredAttempt?.title ?? "");
   const [markerFile, setMarkerFile] = useState<File>();
   const [videoFile, setVideoFile] = useState<File>();
+  const [additionalPairs, setAdditionalPairs] = useState<QuickMediaPair[]>([]);
   const [stage, setStage] = useState<QuickStage>(restoredAttempt ? "processing" : "form");
   const [, setStageProgress] = useState(0);
-  const [itemId, setItemId] = useState(restoredAttempt?.itemId ?? "");
+  const [itemIds, setItemIds] = useState<string[]>(
+    restoredAttempt?.itemIds ?? (restoredAttempt?.itemId ? [restoredAttempt.itemId] : []),
+  );
+  const itemId = itemIds[0] ?? "";
   const [result, setResult] = useState<QrCodeRecord>();
   const [error, setError] = useState("");
   const [startedAt, setStartedAt] = useState<number | undefined>(restoredAttempt?.startedAt);
   const [finishedAt, setFinishedAt] = useState<number | undefined>();
   const [pickerVersion, setPickerVersion] = useState(0);
-  const requestId = useRef(crypto.randomUUID());
-  const activeItemId = useRef(restoredAttempt?.itemId ?? "");
+  const requestIds = useRef<string[]>([crypto.randomUUID()]);
+  const activeItemIds = useRef<string[]>(
+    restoredAttempt?.itemIds ?? (restoredAttempt?.itemId ? [restoredAttempt.itemId] : []),
+  );
   const uploadController = useRef<AbortController | undefined>(undefined);
-  const finishingItemId = useRef("");
+  const finishingBundleId = useRef("");
 
   const workspaceQuery = useQuery({
     queryKey: ["quick-start", "workspace", userId],
     queryFn: () => getQuickStartWorkspace(userId),
     staleTime: Number.POSITIVE_INFINITY,
   });
-  const itemQuery = useQuery({
-    queryKey: ["quick-start", "item", workspaceQuery.data?.accountId, itemId],
-    queryFn: () => arItemRepository.getItem(workspaceQuery.data!.accountId, itemId),
-    enabled: Boolean(workspaceQuery.data?.accountId && itemId),
+  const itemsQuery = useQuery({
+    queryKey: ["quick-start", "items", workspaceQuery.data?.accountId, itemIds],
+    queryFn: () => Promise.all(itemIds.map((id) => arItemRepository.getItem(workspaceQuery.data!.accountId, id))),
+    enabled: Boolean(workspaceQuery.data?.accountId && itemIds.length),
     refetchInterval: (query) =>
-      query.state.data && ["ready", "published", "failed"].includes(query.state.data.status) ? false : 2_500,
+      query.state.data?.every((item) => ["ready", "published", "failed"].includes(item.status)) ? false : 2_500,
   });
   const markerPreview = useObjectUrl(markerFile);
   const videoPreview = useObjectUrl(videoFile);
-  const itemFailed = itemQuery.data?.status === "failed";
-  const itemLookupError = itemId ? itemQuery.error : null;
+  const itemFailed = itemsQuery.data?.some((item) => item.status === "failed");
+  const itemLookupError = itemId ? itemsQuery.error : null;
   const visibleStage: QuickStage = itemFailed || itemLookupError ? "error" : stage;
   const processing = !["form", "done", "error"].includes(visibleStage);
-  const canSubmit = Boolean(title.trim().length >= 2 && markerFile && videoFile && workspaceQuery.data && !processing);
+  const mediaPairs = [{ markerFile, videoFile }, ...additionalPairs];
+  const canSubmit = Boolean(
+    title.trim().length >= 2 &&
+    workspaceQuery.data &&
+    !processing &&
+    mediaPairs.every((pair) => pair.markerFile && pair.videoFile),
+  );
   const elapsedSeconds = useElapsedSeconds(startedAt, finishedAt);
   function showError(cause: unknown) {
     setStage("error");
@@ -119,18 +139,19 @@ function QuickCreatePage({ userId }: { userId: string }) {
 
   useEffect(() => {
     const workspace = workspaceQuery.data;
-    const item = itemQuery.data;
-    if (!workspace || !item || item.id !== itemId || finishingItemId.current === item.id) return;
-    if (item.status !== "ready" && item.status !== "published") return;
+    const items = itemsQuery.data;
+    if (!workspace || !items?.length || !itemId || finishingBundleId.current === itemId) return;
+    if (!items.every((item) => item.status === "ready" || item.status === "published")) return;
 
-    finishingItemId.current = item.id;
+    finishingBundleId.current = itemId;
     void (async () => {
       setStage("publishing");
       try {
+        const rootItem = items.find((item) => item.id === itemId);
         const qr =
-          item.status === "published"
-            ? await arItemRepository.getQrCode(workspace.accountId, item.id)
-            : await arItemRepository.publish(workspace.accountId, item.id, resolvePublicBaseUrl());
+          rootItem?.status === "published" && items.every((item) => item.status === "published")
+            ? await arItemRepository.getQrCode(workspace.accountId, itemId)
+            : await arItemRepository.publishBundle(workspace.accountId, itemId, resolvePublicBaseUrl());
         if (!qr) throw new Error("QR-код не создан");
         setFinishedAt(currentTimestamp());
         setResult(qr);
@@ -140,13 +161,13 @@ function QuickCreatePage({ userId }: { userId: string }) {
         setStage("error");
         setError(readableError(publishError));
       } finally {
-        finishingItemId.current = "";
+        finishingBundleId.current = "";
       }
     })();
-  }, [itemId, itemQuery.data, userId, workspaceQuery.data]);
+  }, [itemId, itemsQuery.data, userId, workspaceQuery.data]);
 
   const submit = async () => {
-    if (!workspaceQuery.data || !markerFile || !videoFile || !canSubmit) return;
+    if (!workspaceQuery.data || !canSubmit) return;
     const attemptStartedAt = currentTimestamp();
     setStartedAt(attemptStartedAt);
     setFinishedAt(undefined);
@@ -160,89 +181,108 @@ function QuickCreatePage({ userId }: { userId: string }) {
       // may have been archived/deleted after this page first loaded; the RPC
       // restores it and prevents uploads from targeting stale group ids.
       const workspace = await getQuickStartWorkspace(userId);
-      const preparedMarker = await prepareMediaFile(markerFile, "marker");
-      const preparedVideo = await prepareMediaFile(videoFile, "video", {
-        onProgress: (progress) => setStageProgress(Math.round(progress * 0.35)),
-      });
-      const item = await ensureDraft(workspace);
+      const createdItemIds: string[] = [];
+      let bundleRootItemId = activeItemIds.current[0];
+      for (const [pairIndex, pair] of mediaPairs.entries()) {
+        if (!pair.markerFile || !pair.videoFile) throw new Error("Добавьте фото и видео для каждого AR-фото");
+        const preparedMarker = await prepareMediaFile(pair.markerFile, "marker");
+        const preparedVideo = await prepareMediaFile(pair.videoFile, "video", {
+          onProgress: (progress) =>
+            setStageProgress(Math.round(((pairIndex + progress * 0.35) / mediaPairs.length) * 100)),
+        });
+        const item = await ensureDraft(workspace, pairIndex, bundleRootItemId);
+        bundleRootItemId ??= item.id;
 
-      setStage("uploading-marker");
-      const marker = await mediaRepository.upload(
-        {
-          ...workspace,
-          kind: "marker",
-          file: preparedMarker.file,
-          requestId: crypto.randomUUID(),
-        },
-        preparedMarker,
-        ({ uploadedBytes, totalBytes }) => setStageProgress(percent(uploadedBytes, totalBytes)),
-        controller.signal,
-      );
+        setStage("uploading-marker");
+        const marker = await mediaRepository.upload(
+          {
+            ...workspace,
+            kind: "marker",
+            file: preparedMarker.file,
+            requestId: crypto.randomUUID(),
+          },
+          preparedMarker,
+          ({ uploadedBytes, totalBytes }) =>
+            setStageProgress(
+              Math.round(((pairIndex + percent(uploadedBytes, totalBytes) / 100) / mediaPairs.length) * 100),
+            ),
+          controller.signal,
+        );
 
-      setStage("uploading-video");
-      setStageProgress(0);
-      const video = await mediaRepository.upload(
-        {
-          ...workspace,
-          kind: "video",
-          file: preparedVideo.file,
-          requestId: crypto.randomUUID(),
-        },
-        preparedVideo,
-        ({ uploadedBytes, totalBytes }) => setStageProgress(percent(uploadedBytes, totalBytes)),
-        controller.signal,
-      );
+        setStage("uploading-video");
+        const video = await mediaRepository.upload(
+          {
+            ...workspace,
+            kind: "video",
+            file: preparedVideo.file,
+            requestId: crypto.randomUUID(),
+          },
+          preparedVideo,
+          ({ uploadedBytes, totalBytes }) =>
+            setStageProgress(
+              Math.round(((pairIndex + percent(uploadedBytes, totalBytes) / 100) / mediaPairs.length) * 100),
+            ),
+          controller.signal,
+        );
 
-      await arItemRepository.prepare(workspace.accountId, item.id, {
-        markerAssetId: marker.id,
-        videoAssetId: video.id,
-        autoplay: true,
-        loopVideo: true,
-        markerLostBehavior: "pause_hide",
-        audioDefault: "user_enabled",
-        fallbackEnabled: true,
-      });
+        await arItemRepository.prepare(workspace.accountId, item.id, {
+          markerAssetId: marker.id,
+          videoAssetId: video.id,
+          autoplay: true,
+          loopVideo: true,
+          markerLostBehavior: "pause_hide",
+          audioDefault: "user_enabled",
+          fallbackEnabled: true,
+        });
+        createdItemIds.push(item.id);
+        try {
+          await arItemRepository.overrideMarkerQuality(
+            workspace.accountId,
+            item.id,
+            "Быстрое создание: пользователь запустил автоматическую обработку и подтвердил продолжение с выбранной фотографией",
+          );
+        } catch (overrideError) {
+          const latestItem = await arItemRepository.getItem(workspace.accountId, item.id);
+          const overrideSatisfied =
+            Boolean(latestItem.marker_quality_overridden_at) ||
+            (latestItem.marker_quality_score !== null && latestItem.marker_quality_score >= 60);
+          if (!overrideSatisfied) throw overrideError;
+        }
+      }
       savePendingQuickStart({
         userId,
         ...workspace,
-        itemId: item.id,
+        itemId: createdItemIds[0],
+        itemIds: createdItemIds,
         title: title.trim(),
         startedAt: attemptStartedAt,
       });
-      setItemId(item.id);
+      setItemIds(createdItemIds);
       setStage("processing");
       setStageProgress(0);
-      try {
-        await arItemRepository.overrideMarkerQuality(
-          workspace.accountId,
-          item.id,
-          "Быстрое создание: пользователь запустил автоматическую обработку и подтвердил продолжение с выбранной фотографией",
-        );
-      } catch (overrideError) {
-        // Analysis can finish between prepare() and this RPC. A strong marker
-        // no longer needs an override; a successfully persisted override also
-        // makes a lost RPC response safe to continue.
-        const latestItem = await arItemRepository.getItem(workspace.accountId, item.id);
-        const overrideSatisfied =
-          Boolean(latestItem.marker_quality_overridden_at) ||
-          (latestItem.marker_quality_score !== null && latestItem.marker_quality_score >= 60);
-        if (!overrideSatisfied) throw overrideError;
-      }
     } catch (submitError) {
       showError(submitError);
     }
   };
 
-  const ensureDraft = async (workspace: QuickStartWorkspace): Promise<ArItem> => {
-    if (activeItemId.current) return arItemRepository.getItem(workspace.accountId, activeItemId.current);
+  const ensureDraft = async (
+    workspace: QuickStartWorkspace,
+    pairIndex: number,
+    bundleRootItemId?: string,
+  ): Promise<ArItem> => {
+    if (activeItemIds.current[pairIndex]) {
+      return arItemRepository.getItem(workspace.accountId, activeItemIds.current[pairIndex]);
+    }
+    requestIds.current[pairIndex] ??= crypto.randomUUID();
     const item = await arItemRepository.createDraft(workspace.accountId, {
       projectId: workspace.projectId,
       groupId: workspace.groupId,
-      title: title.trim(),
+      bundleRootItemId: pairIndex ? bundleRootItemId : undefined,
+      title: pairIndex ? `${title.trim()} · фото ${pairIndex + 1}` : title.trim(),
       description: "",
-      requestId: requestId.current,
+      requestId: requestIds.current[pairIndex],
     });
-    activeItemId.current = item.id;
+    activeItemIds.current[pairIndex] = item.id;
     return item;
   };
 
@@ -252,8 +292,11 @@ function QuickCreatePage({ userId }: { userId: string }) {
     setStage("processing");
     try {
       const workspace = await getQuickStartWorkspace(userId);
-      await arItemRepository.retry(workspace.accountId, itemId);
-      await itemQuery.refetch();
+      const failedItemIds = itemsQuery.data?.filter((item) => item.status === "failed").map((item) => item.id) ?? [];
+      await Promise.all(
+        (failedItemIds.length ? failedItemIds : [itemId]).map((id) => arItemRepository.retry(workspace.accountId, id)),
+      );
+      await itemsQuery.refetch();
     } catch (retryError) {
       showError(retryError);
     }
@@ -264,17 +307,18 @@ function QuickCreatePage({ userId }: { userId: string }) {
     setTitle("");
     setMarkerFile(undefined);
     setVideoFile(undefined);
+    setAdditionalPairs([]);
     setStage("form");
     setStageProgress(0);
-    setItemId("");
+    setItemIds([]);
     setResult(undefined);
     setError("");
     setStartedAt(undefined);
     setFinishedAt(undefined);
     clearPendingQuickStart(userId);
     setPickerVersion((current) => current + 1);
-    requestId.current = crypto.randomUUID();
-    activeItemId.current = "";
+    requestIds.current = [crypto.randomUUID()];
+    activeItemIds.current = [];
   };
 
   if (workspaceQuery.isPending) {
@@ -301,6 +345,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
         markerPreview={markerPreview}
         videoPreview={videoPreview}
         qr={result}
+        itemCount={itemIds.length}
         elapsedSeconds={elapsedSeconds}
         onReset={reset}
       />
@@ -331,27 +376,67 @@ function QuickCreatePage({ userId }: { userId: string }) {
           />
         </label>
 
-        <div className="quick-media-pair">
-          <MediaPicker
-            key={`marker-${pickerVersion}`}
-            kind="marker"
-            file={markerFile}
-            previewUrl={markerPreview}
-            disabled={processing || Boolean(itemId)}
-            onPick={setMarkerFile}
-          />
-          <span className="quick-media-link" aria-hidden="true">
-            <ArrowRightLeft size={20} />
-          </span>
-          <MediaPicker
-            key={`video-${pickerVersion}`}
-            kind="video"
-            file={videoFile}
-            previewUrl={videoPreview}
-            disabled={processing || Boolean(itemId)}
-            onPick={setVideoFile}
-          />
+        <div className="quick-ar-photo-list">
+          <section className="quick-ar-photo-block" aria-labelledby="quick-ar-photo-1">
+            <header className="quick-ar-photo-heading">
+              <div>
+                <span id="quick-ar-photo-1">AR-фото 1</span>
+                <small>Основное</small>
+              </div>
+            </header>
+            <div className="quick-media-pair">
+              <MediaPicker
+                key={`marker-${pickerVersion}`}
+                kind="marker"
+                file={markerFile}
+                previewUrl={markerPreview}
+                disabled={processing || Boolean(itemId)}
+                onPick={setMarkerFile}
+              />
+              <span className="quick-media-link" aria-hidden="true">
+                <ArrowRightLeft size={20} />
+              </span>
+              <MediaPicker
+                key={`video-${pickerVersion}`}
+                kind="video"
+                file={videoFile}
+                previewUrl={videoPreview}
+                disabled={processing || Boolean(itemId)}
+                onPick={setVideoFile}
+              />
+            </div>
+          </section>
+
+          {additionalPairs.map((pair, index) => (
+            <AdditionalArPhotoPair
+              key={pair.id}
+              index={index + 2}
+              pair={pair}
+              disabled={processing || Boolean(itemId)}
+              onChange={(nextPair) =>
+                setAdditionalPairs((current) =>
+                  current.map((candidate) => (candidate.id === pair.id ? nextPair : candidate)),
+                )
+              }
+              onRemove={() => setAdditionalPairs((current) => current.filter((candidate) => candidate.id !== pair.id))}
+            />
+          ))}
         </div>
+
+        {visibleStage === "form" && additionalPairs.length + 1 < MAX_QUICK_AR_PHOTOS ? (
+          <button
+            className="quick-add-ar-photo"
+            type="button"
+            disabled={processing || Boolean(itemId)}
+            onClick={() => setAdditionalPairs((current) => [...current, { id: crypto.randomUUID() }])}
+          >
+            <Plus size={18} />
+            <span>
+              <strong>Добавить ещё AR-фото</strong>
+              <small>Ещё одна фотография и своё видео — в том же QR-коде</small>
+            </span>
+          </button>
+        ) : null}
 
         {startedAt ? <QuickStopwatch elapsedSeconds={elapsedSeconds} running={!finishedAt} /> : null}
         {visibleStage !== "form" && visibleStage !== "error" ? <ProgressStatus step={progressStep} /> : null}
@@ -388,6 +473,56 @@ function QuickCreatePage({ userId }: { userId: string }) {
         <span>Файлы доступны только вашему аккаунту. Публичная ссылка защищена случайным идентификатором.</span>
       </div>
     </QuickShell>
+  );
+}
+
+export function AdditionalArPhotoPair({
+  index,
+  pair,
+  disabled,
+  onChange,
+  onRemove,
+}: {
+  index: number;
+  pair: QuickMediaPair;
+  disabled: boolean;
+  onChange(pair: QuickMediaPair): void;
+  onRemove(): void;
+}) {
+  const markerPreview = useObjectUrl(pair.markerFile);
+  const videoPreview = useObjectUrl(pair.videoFile);
+  const headingId = useId();
+  return (
+    <section className="quick-ar-photo-block quick-ar-photo-block-extra" aria-labelledby={headingId}>
+      <header className="quick-ar-photo-heading">
+        <div>
+          <span id={headingId}>AR-фото {index}</span>
+          <small>Тот же QR-код</small>
+        </div>
+        <button type="button" disabled={disabled} onClick={onRemove} aria-label={`Удалить AR-фото ${index}`}>
+          <X size={17} /> Удалить
+        </button>
+      </header>
+      <div className="quick-media-pair">
+        <MediaPicker
+          kind="marker"
+          file={pair.markerFile}
+          previewUrl={markerPreview}
+          disabled={disabled}
+          onPick={(file) => onChange({ ...pair, markerFile: file })}
+        />
+        <span className="quick-media-link" aria-hidden="true">
+          <ArrowRightLeft size={20} />
+        </span>
+        <MediaPicker
+          kind="video"
+          file={pair.videoFile}
+          previewUrl={videoPreview}
+          disabled={disabled}
+          onPick={(file) => onChange({ ...pair, videoFile: file })}
+        />
+      </div>
+    </section>
   );
 }
 
@@ -645,6 +780,7 @@ export function QuickResult({
   markerPreview,
   videoPreview,
   qr,
+  itemCount = 1,
   elapsedSeconds,
   onReset,
 }: {
@@ -652,6 +788,7 @@ export function QuickResult({
   markerPreview?: string;
   videoPreview?: string;
   qr: QrCodeRecord;
+  itemCount?: number;
   elapsedSeconds?: number;
   onReset(): void;
 }) {
@@ -677,7 +814,11 @@ export function QuickResult({
       currentStep={3}
       eyebrow="Готово к просмотру"
       title="Всё готово"
-      description="Фотография ожила. Скачайте QR-код или сразу откройте AR, чтобы проверить результат."
+      description={
+        itemCount > 1
+          ? `${itemCount} AR-фото привязаны к одному QR-коду. Наведите камеру на любое из них.`
+          : "Фотография ожила. Скачайте QR-код или сразу откройте AR, чтобы проверить результат."
+      }
     >
       <div className="quick-result-grid">
         <section className="quick-result-card quick-result-media" aria-labelledby="quick-result-title">

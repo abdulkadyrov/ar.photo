@@ -11,6 +11,7 @@ import {
 
 const slug = "ab".repeat(18);
 const source: PublicManifestSource = {
+  target_index: 0,
   title: "Выпускной портрет",
   marker_width: 1600,
   marker_height: 1200,
@@ -35,9 +36,7 @@ describe("public AR manifest helpers", () => {
   });
 
   it("uses only the first forwarded network identifier", () => {
-    expect(requestNetworkIdentifier(new Headers({ "x-forwarded-for": "203.0.113.7, 10.0.0.1" }))).toBe(
-      "203.0.113.7",
-    );
+    expect(requestNetworkIdentifier(new Headers({ "x-forwarded-for": "203.0.113.7, 10.0.0.1" }))).toBe("203.0.113.7");
     expect(requestNetworkIdentifier(new Headers())).toBe("missing");
   });
 
@@ -50,20 +49,20 @@ describe("public AR manifest helpers", () => {
 
   it("allows configured HTTPS and local origins only", () => {
     const allowed = parseAllowedOrigins("https://ar.example, http://127.0.0.1:5173, javascript:alert(1)");
-    expect(corsHeaders("https://ar.example/path", allowed)?.["access-control-allow-origin"]).toBe(
-      "https://ar.example",
-    );
+    expect(corsHeaders("https://ar.example/path", allowed)?.["access-control-allow-origin"]).toBe("https://ar.example");
     expect(corsHeaders("https://evil.example", allowed)).toBeNull();
   });
 
   it("maps only the minimal public contract", () => {
     const manifest = createPublicManifest(
-      source,
-      {
-        trackingAssetUrl: "https://storage.test/tracking?token=one",
-        videoUrl: "https://storage.test/video?token=two",
-        posterUrl: "https://storage.test/poster?token=three",
-      },
+      [source],
+      [
+        {
+          trackingAssetUrl: "https://storage.test/tracking?token=one",
+          videoUrl: "https://storage.test/video?token=two",
+          posterUrl: "https://storage.test/poster?token=three",
+        },
+      ],
       "2026-08-03T00:05:00.000Z",
     );
     const serialized = JSON.stringify(manifest);
@@ -73,5 +72,28 @@ describe("public AR manifest helpers", () => {
     expect(serialized).not.toContain("accounts/internal");
     expect(serialized).not.toContain("generated-private");
     expect(serialized).not.toContain("account_id");
+  });
+
+  it("returns an ordered multi-target manifest for one shared QR", () => {
+    const manifest = createPublicManifest(
+      [source, { ...source, target_index: 1, title: "Второе фото" }],
+      [
+        {
+          trackingAssetUrl: "https://storage.test/one.mind",
+          videoUrl: "https://storage.test/one.mp4",
+          posterUrl: "https://storage.test/one.webp",
+        },
+        {
+          trackingAssetUrl: "https://storage.test/two.mind",
+          videoUrl: "https://storage.test/two.mp4",
+          posterUrl: "https://storage.test/two.webp",
+        },
+      ],
+      "2026-08-03T00:05:00.000Z",
+    );
+
+    expect(manifest.version).toBe(2);
+    expect(manifest.targets).toHaveLength(2);
+    expect(manifest.targets?.[1].title).toBe("Второе фото");
   });
 });

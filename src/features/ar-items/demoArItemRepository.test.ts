@@ -86,7 +86,9 @@ describe("demo AR item repository", () => {
     const { repository } = createFixture();
     const draft = await repository.createDraft(accountId, draftInput);
 
-    await expect(repository.updateDraft(accountId, draft.id, "Новый заголовок", "Новое описание")).resolves.toMatchObject({
+    await expect(
+      repository.updateDraft(accountId, draft.id, "Новый заголовок", "Новое описание"),
+    ).resolves.toMatchObject({
       id: draft.id,
       title: "Новый заголовок",
       description: "Новое описание",
@@ -180,5 +182,27 @@ describe("demo AR item repository", () => {
       published_at: null,
     });
     expect(await repository.getQrCode(accountId, draft.id)).not.toBeNull();
+  });
+
+  it("publishes several photo-video pairs behind the root QR", async () => {
+    const { repository, advance } = createFixture();
+    const root = await repository.createDraft(accountId, draftInput);
+    const child = await repository.createDraft(accountId, {
+      ...draftInput,
+      requestId: "84000000-0000-4000-8000-000000000002",
+      title: "Портрет Алексея · фото 2",
+      bundleRootItemId: root.id,
+    });
+    expect(child.qr_bundle_id).toBe(root.qr_bundle_id);
+
+    await repository.prepare(accountId, root.id, prepareInput);
+    await repository.prepare(accountId, child.id, prepareInput);
+    advance(1_000);
+    await Promise.all([repository.getItem(accountId, root.id), repository.getItem(accountId, child.id)]);
+
+    const qr = await repository.publishBundle(accountId, root.id, "http://localhost:4173/ar.photo/");
+    expect(qr.ar_item_id).toBe(root.id);
+    await expect(repository.getItem(accountId, child.id)).resolves.toMatchObject({ status: "published" });
+    await expect(repository.getQrCode(accountId, child.id)).resolves.toBeNull();
   });
 });

@@ -1,5 +1,23 @@
 /// <reference types="vite/client" />
 
+declare module "mind-ar/src/image-target/compiler.js" {
+  type CompiledTarget = {
+    targetImage: { width: number; height: number };
+    matchingData: unknown[];
+    trackingData: unknown[];
+  };
+
+  export class Compiler {
+    data: CompiledTarget[];
+    compileImageTargets(
+      images: Array<HTMLImageElement | HTMLCanvasElement>,
+      progressCallback: (progress: number) => void,
+    ): Promise<unknown>;
+    exportData(): Uint8Array;
+    importData(buffer: ArrayBuffer): CompiledTarget[];
+  }
+}
+
 declare module "qrcode" {
   export function toDataURL(
     value: string,

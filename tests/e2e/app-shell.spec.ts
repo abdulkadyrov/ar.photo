@@ -42,6 +42,28 @@ test("times and automatically publishes quick creation", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Открыть AR" })).toBeEnabled();
 });
 
+test("publishes two photo-video pairs behind one quick-start QR", async ({ page }) => {
+  await page.goto("./");
+  await signInToDemo(page);
+  await page.getByRole("link", { name: "Создать AR-фото" }).first().click();
+
+  await page.getByLabel("Название").fill("Групповое оживление");
+  await page.getByRole("button", { name: /Добавить ещё AR-фото/ }).click();
+
+  const markerInputs = page.getByLabel("Выбрать фотографию-маркер");
+  const videoInputs = page.getByLabel("Выбрать видео");
+  await markerInputs.nth(0).setInputFiles("public/test-assets/test.jpg");
+  await videoInputs.nth(0).setInputFiles("test-assets/fixtures/h264-aac.mp4");
+  await markerInputs.nth(1).setInputFiles("test-assets/test2.jpg");
+  await videoInputs.nth(1).setInputFiles("test-assets/fixtures/h264-aac.mp4");
+  await page.getByRole("button", { name: "Оживить фото" }).click();
+
+  await expect(page.getByRole("heading", { name: "Всё готово" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("2 AR-фото привязаны к одному QR-коду.")).toBeVisible();
+  await expect(page.getByRole("img", { name: "QR: Групповое оживление" })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Открыть AR" })).toBeEnabled();
+});
+
 test("renders the responsive SaaS navigation", async ({ page }) => {
   await page.goto("./dashboard");
   await expect(page).toHaveURL(/\/ar\.photo\/login$/);
@@ -94,6 +116,7 @@ test("keeps the dashboard and project catalog compact on a narrow phone", async 
   await signInToDemo(page);
 
   const mobileNav = page.getByRole("navigation", { name: "Мобильная навигация" });
+  await expect(mobileNav).toBeVisible();
   const [heroBox, recentHeadingBox, navBox] = await Promise.all([
     page.locator(".dashboard-hero").boundingBox(),
     page.getByRole("heading", { name: "Недавние проекты" }).boundingBox(),
