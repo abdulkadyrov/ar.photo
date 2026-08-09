@@ -402,9 +402,7 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   await expect(page.getByText("Видео загружено", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Обработать и продолжить" }).click();
 
-  await expect(page.getByRole("heading", { name: "Все артефакты готовы" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "AR-работа готова к публикации" })).toBeVisible();
-  await page.getByRole("button", { name: "Опубликовать и создать QR" }).click();
+  // Processing completion now publishes and opens the QR without another click.
   await expect(page.getByRole("heading", { name: "Портрет Алексея", level: 1 })).toBeVisible();
   await expect(page.getByTestId("qr-preview")).toBeVisible();
 

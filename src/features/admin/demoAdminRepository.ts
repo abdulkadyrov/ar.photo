@@ -171,6 +171,27 @@ export class DemoAdminRepository implements AdminRepository {
     this.audit(accountId, "admin.account.status", "accounts", accountId, reason, { status });
   }
 
+  async deleteAccount(accountId: string, confirmation: "УДАЛИТЬ АККАУНТ", rawReason: string) {
+    const reason = adminReasonSchema.parse(rawReason);
+    if (confirmation !== "УДАЛИТЬ АККАУНТ") throw new AdminError("invalid", "Введите подтверждение УДАЛИТЬ АККАУНТ");
+    const account = this.account(accountId);
+    const detail = this.detail(accountId);
+    detail.users.forEach((user) => {
+      user.isActive = false;
+    });
+    detail.subscription.status = "cancelled";
+    this.audit(accountId, "admin.account.close", "accounts", accountId, reason, {
+      accountName: account.name,
+      accountSlug: account.slug,
+      deactivatedUsers: detail.users.length,
+    });
+    this.state.snapshot.accounts.items = this.state.snapshot.accounts.items.filter((item) => item.id !== accountId);
+    this.state.snapshot.errors.items = this.state.snapshot.errors.items.filter((item) => item.accountId !== accountId);
+    this.state.snapshot.errors.total = this.state.snapshot.errors.items.length;
+    this.state.content = this.state.content.filter((item) => item.accountId !== accountId);
+    delete this.state.details[accountId];
+  }
+
   async setUserActive(accountId: string, userId: string, active: boolean, rawReason: string) {
     const reason = adminReasonSchema.parse(rawReason);
     const user = this.detail(accountId).users.find((candidate) => candidate.id === userId);

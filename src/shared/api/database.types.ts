@@ -1158,6 +1158,14 @@ export type Database = {
         };
         Returns: Json;
       };
+      admin_close_account: {
+        Args: {
+          p_confirmation: string;
+          p_reason: string;
+          p_target_account_id: string;
+        };
+        Returns: Json;
+      };
       admin_create_account: {
         Args: {
           p_account_name: string;

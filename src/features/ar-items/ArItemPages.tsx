@@ -172,10 +172,14 @@ export function ArItemsRoute() {
 
 export function ArItemDetailRoute() {
   const auth = useAuth();
+  const queryClient = useQueryClient();
   const { itemId = "" } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const [notice, setNotice] = useState<string | null>(null);
+  const [completionBusy, setCompletionBusy] = useState(false);
+  const [completionError, setCompletionError] = useState("");
+  const completionAttempt = useRef("");
   const workspaceQuery = useQuery({
     queryKey: ["catalog", "workspace", auth.session!.user.id],
     queryFn: () => catalogRepository.getWorkspace(auth.session!.user.id),
@@ -185,6 +189,7 @@ export function ArItemDetailRoute() {
     queryKey: ["ar-item", accountId, itemId],
     queryFn: () => arItemRepository.getItem(accountId!, itemId),
     enabled: Boolean(accountId && itemId),
+    refetchInterval: (query) => (query.state.data?.status === "processing" ? 3_000 : false),
   });
   const assetsQuery = useQuery({
     queryKey: ["media-assets", accountId, itemQuery.data?.project_id],
@@ -196,6 +201,27 @@ export function ArItemDetailRoute() {
     queryFn: () => arItemRepository.getQrCode(accountId!, itemId),
     enabled: Boolean(accountId && itemId),
   });
+
+  useEffect(() => {
+    const item = itemQuery.data;
+    if (!accountId || !item || item.status !== "ready" || qrQuery.data) return;
+    const attemptKey = `${item.id}:${item.version}`;
+    if (completionAttempt.current === attemptKey) return;
+    completionAttempt.current = attemptKey;
+    setCompletionBusy(true);
+    setCompletionError("");
+    void arItemRepository
+      .publish(accountId, item.id, resolvePublicBaseUrl())
+      .then(async (qr) => {
+        queryClient.setQueryData(["ar-item", "qr", accountId, item.id], qr);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["ar-item", accountId, item.id] }),
+          queryClient.invalidateQueries({ queryKey: ["ar-items"] }),
+        ]);
+      })
+      .catch((error: unknown) => setCompletionError(readableError(error)))
+      .finally(() => setCompletionBusy(false));
+  }, [accountId, itemQuery.data, qrQuery.data, queryClient]);
 
   if (workspaceQuery.error || itemQuery.error || assetsQuery.error || qrQuery.error) {
     return (
@@ -237,6 +263,28 @@ export function ArItemDetailRoute() {
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       setNotice("Не удалось поделиться ссылкой");
+    }
+  };
+  const retryBackgroundWork = async () => {
+    setCompletionBusy(true);
+    setCompletionError("");
+    try {
+      if (item.status === "failed") {
+        await arItemRepository.retry(accountId!, item.id);
+        completionAttempt.current = "";
+        await itemQuery.refetch();
+      } else {
+        const qr = await arItemRepository.publish(accountId!, item.id, resolvePublicBaseUrl());
+        queryClient.setQueryData(["ar-item", "qr", accountId, item.id], qr);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["ar-item", accountId, item.id] }),
+          queryClient.invalidateQueries({ queryKey: ["ar-items"] }),
+        ]);
+      }
+    } catch (error) {
+      setCompletionError(readableError(error));
+    } finally {
+      setCompletionBusy(false);
     }
   };
 
@@ -310,6 +358,41 @@ export function ArItemDetailRoute() {
               </span>
             )}
           </div>
+          {!qrCode && item.status === "processing" ? (
+            <div
+              className="mt-4 flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/10 p-4 text-sm text-muted"
+              role="status"
+            >
+              <LoaderCircle className="mt-0.5 shrink-0 animate-spin text-primary" size={18} />
+              <span>
+                Фото обрабатывается на сервере. Можно закрыть страницу — при следующем открытии готовый QR-код создастся
+                автоматически.
+              </span>
+            </div>
+          ) : null}
+          {!qrCode && (completionBusy || (item.status === "ready" && !completionError)) ? (
+            <div
+              className="mt-4 flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/10 p-4 text-sm text-muted"
+              role="status"
+            >
+              <LoaderCircle className="mt-0.5 shrink-0 animate-spin text-primary" size={18} />
+              <span>Обработка готова. Публикуем AR-фото и создаём QR-код автоматически…</span>
+            </div>
+          ) : null}
+          {!qrCode && (item.status === "failed" || completionError) ? (
+            <div
+              className="mt-4 rounded-2xl border border-rose-300/40 bg-rose-50 p-4 text-sm text-rose-800"
+              role="alert"
+            >
+              <strong className="block">Автоматическая подготовка остановилась</strong>
+              <span className="mt-1 block">
+                {completionError || "Повторите обработку — загружать фото и видео заново не нужно."}
+              </span>
+              <Button className="mt-3" disabled={completionBusy} onClick={() => void retryBackgroundWork()}>
+                <RefreshCw size={16} /> {item.status === "failed" ? "Повторить обработку" : "Повторить создание QR"}
+              </Button>
+            </div>
+          ) : null}
         </section>
       </main>
       {notice ? (
@@ -428,6 +511,7 @@ function ArItemWizard() {
   const requestId = useRef(crypto.randomUUID());
   const uploadedFiles = useRef(new Map<string, File>());
   const initializedItemId = useRef("");
+  const autoPublicationAttempt = useRef("");
 
   const workspaceQuery = useQuery({
     queryKey: ["catalog", "workspace", auth.session!.user.id],
@@ -627,6 +711,28 @@ function ArItemWizard() {
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (!accountId || !currentItemId || currentItem?.status !== "ready") return;
+    const attemptKey = `${currentItem.id}:${currentItem.version}`;
+    if (autoPublicationAttempt.current === attemptKey) return;
+    autoPublicationAttempt.current = attemptKey;
+    setBusy(true);
+    void arItemRepository
+      .publish(accountId, currentItemId, resolvePublicBaseUrl())
+      .then(async () => {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["ar-item", accountId, currentItemId] }),
+          queryClient.invalidateQueries({ queryKey: ["ar-item", "qr", accountId, currentItemId] }),
+          queryClient.invalidateQueries({ queryKey: ["ar-items"] }),
+        ]);
+        navigate(`/items/${currentItemId}/qr`);
+      })
+      .catch((error: unknown) =>
+        setNotice({ title: "QR не создался автоматически", message: readableError(error), tone: "error" }),
+      )
+      .finally(() => setBusy(false));
+  }, [accountId, currentItem, currentItemId, navigate, queryClient]);
 
   const next = async () => {
     if (step === 1) {
@@ -1031,7 +1137,9 @@ function ProcessingStep({
         <div className="mt-5 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-5">
           <CheckCircle2 className="text-emerald-300" />
           <h3 className="mt-3 text-xl font-semibold">Все артефакты готовы</h3>
-          <p className="mt-2 text-sm text-muted">Фото и видео готовы. Теперь работу можно сразу опубликовать.</p>
+          <p className="mt-2 text-sm text-muted">
+            Фото и видео готовы. Публикуем работу и создаём QR-код автоматически.
+          </p>
         </div>
       ) : null}
       {item?.status === "failed" ? (
@@ -1061,16 +1169,18 @@ function PublicationStep({ busy, published, onPublish }: { busy: boolean; publis
         <CheckCircle2 size={34} />
       </span>
       <h3 className="mt-5 text-2xl font-semibold">
-        {published ? "AR-работа опубликована" : "AR-работа готова к публикации"}
+        {published ? "AR-работа опубликована" : busy ? "Создаём QR-код автоматически" : "Готово к публикации"}
       </h3>
       <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted">
         {published
           ? "Откройте готовый QR-код, чтобы скачать, распечатать или проверить ожившее фото."
-          : "Одно нажатие активирует просмотр, создаст QR-код и откроет его для скачивания."}
+          : busy
+            ? "Ничего нажимать не нужно — после публикации готовый QR откроется сам."
+            : "Автоматическая публикация не завершилась. Можно безопасно повторить: файлы уже загружены."}
       </p>
       <Button className="mt-5" disabled={busy} onClick={onPublish}>
         {busy ? <LoaderCircle className="animate-spin" size={16} /> : <ScanLine size={16} />}
-        {published ? "Открыть QR" : "Опубликовать и создать QR"}
+        {published ? "Открыть QR" : "Повторить создание QR"}
       </Button>
     </div>
   );

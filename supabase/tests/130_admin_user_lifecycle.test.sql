@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(17);
+select plan(26);
 
 select ok(
   not pg_catalog.has_function_privilege('anon', 'public.admin_set_user_active(uuid,uuid,boolean,text)', 'EXECUTE'),
@@ -19,6 +19,14 @@ select ok(
 select ok(
   pg_catalog.has_function_privilege('authenticated', 'public.admin_authorize_user_deletion(uuid,uuid,text,text)', 'EXECUTE'),
   'authenticated callers reach the MFA-protected deletion authorization RPC'
+);
+select ok(
+  not pg_catalog.has_function_privilege('anon', 'public.admin_close_account(uuid,text,text)', 'EXECUTE'),
+  'anonymous callers cannot close accounts'
+);
+select ok(
+  pg_catalog.has_function_privilege('authenticated', 'public.admin_close_account(uuid,text,text)', 'EXECUTE'),
+  'authenticated callers reach the MFA-protected account closing RPC'
 );
 
 set local role authenticated;
@@ -149,6 +157,57 @@ select is(
   (select count(*) from private.admin_audit_logs where action = 'admin.user.delete.authorized'),
   1::bigint,
   'user deletion authorization is audit logged'
+);
+
+set local role authenticated;
+select throws_ok(
+  $$ select public.admin_close_account(
+    '20000000-0000-4000-8000-000000000002',
+    'УДАЛИТЬ',
+    'Закрытие аккаунта с неверным подтверждением должно завершиться ошибкой'
+  ) $$,
+  '22023',
+  'Account deletion confirmation is invalid',
+  'account closing requires the exact localized confirmation'
+);
+select is(
+  (public.admin_close_account(
+    '20000000-0000-4000-8000-000000000002',
+    'УДАЛИТЬ АККАУНТ',
+    'Закрытие аккаунта по подтверждённому запросу владельца OWNER-901'
+  ) ->> 'closed')::boolean,
+  true,
+  'MFA-verified superadmin can close an account'
+);
+reset role;
+select is(
+  (select status from public.accounts where id = '20000000-0000-4000-8000-000000000002'),
+  'closed'::public.account_status,
+  'closed account is no longer active'
+);
+select ok(
+  (select closed_at is not null from public.accounts where id = '20000000-0000-4000-8000-000000000002'),
+  'account closure records its timestamp'
+);
+select is(
+  (select count(*) from public.account_members where account_id = '20000000-0000-4000-8000-000000000002' and is_active),
+  0::bigint,
+  'all memberships in the closed account are disabled'
+);
+select is(
+  (select status from public.subscriptions where account_id = '20000000-0000-4000-8000-000000000002'),
+  'cancelled'::public.subscription_status,
+  'the closed account subscription is cancelled'
+);
+select is(
+  (select is_active from public.profiles where id = '10000000-0000-4000-8000-000000000020'),
+  false,
+  'a user without another active account is disabled'
+);
+select is(
+  (select count(*) from private.admin_audit_logs where action = 'admin.account.close'),
+  1::bigint,
+  'account closure is audit logged'
 );
 
 select * from finish();

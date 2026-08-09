@@ -49,6 +49,7 @@ export interface AdminRepository {
   createAccount(input: CreateAdminAccountInput): Promise<void>;
   updateSubscription(accountId: string, input: SubscriptionAdminInput): Promise<void>;
   setAccountStatus(accountId: string, status: "active" | "suspended", reason: string): Promise<void>;
+  deleteAccount(accountId: string, confirmation: "УДАЛИТЬ АККАУНТ", reason: string): Promise<void>;
   setUserActive(accountId: string, userId: string, active: boolean, reason: string): Promise<void>;
   deleteUser(accountId: string, userId: string, confirmation: "УДАЛИТЬ", reason: string): Promise<void>;
   setItemSuspended(accountId: string, itemId: string, suspended: boolean, reason: string): Promise<void>;
@@ -142,6 +143,15 @@ export class SupabaseAdminRepository implements AdminRepository {
     const { error } = await this.client.rpc("admin_set_account_status", {
       p_target_account_id: accountId,
       p_status: status,
+      p_reason: adminReasonSchema.parse(rawReason),
+    });
+    if (error) throw mapAdminError(error);
+  }
+
+  async deleteAccount(accountId: string, confirmation: "УДАЛИТЬ АККАУНТ", rawReason: string) {
+    const { error } = await this.client.rpc("admin_close_account", {
+      p_target_account_id: accountId,
+      p_confirmation: confirmation,
       p_reason: adminReasonSchema.parse(rawReason),
     });
     if (error) throw mapAdminError(error);

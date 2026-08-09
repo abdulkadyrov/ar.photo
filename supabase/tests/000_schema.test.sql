@@ -150,6 +150,7 @@ select is(
         'admin_list_plans', 'admin_get_processing_errors', 'admin_search_content',
         'admin_get_audit_logs', 'admin_get_system_settings', 'admin_update_system_setting',
         'admin_upsert_plan', 'admin_update_subscription_with_reason', 'admin_set_account_status',
+        'admin_close_account',
         'admin_set_ar_item_suspended', 'admin_retry_processing_job',
         'admin_authorize_password_reset', 'admin_create_account_with_reason',
         'bootstrap_self_service_account'

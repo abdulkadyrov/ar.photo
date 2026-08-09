@@ -3,6 +3,7 @@ import { AdminError } from "./adminSchemas";
 import { createDemoAdminRepository } from "./demoAdminRepository";
 
 const alphaId = "20000000-0000-4000-8000-000000000001";
+const betaId = "20000000-0000-4000-8000-000000000002";
 const alphaOwnerId = "10000000-0000-4000-8000-000000000010";
 const alphaEditorId = "10000000-0000-4000-8000-000000000011";
 
@@ -37,6 +38,21 @@ describe("DemoAdminRepository", () => {
     expect(
       snapshot.audit.items.filter((item) => item.action === "admin.account.status" && item.accountId === alphaId),
     ).toHaveLength(2);
+  });
+
+  it("closes an account, removes it from the console and keeps audit evidence", async () => {
+    const repository = createDemoAdminRepository();
+    await repository.deleteAccount(betaId, "УДАЛИТЬ АККАУНТ", "Закрытие аккаунта по подтверждённому запросу OWNER-901");
+    const snapshot = await repository.getSnapshot();
+    expect(snapshot.accounts.items.some((item) => item.id === betaId)).toBe(false);
+    expect(snapshot.audit.items[0]).toMatchObject({
+      action: "admin.account.close",
+      accountId: betaId,
+      entityId: betaId,
+    });
+    await expect(repository.getAccountDetail(betaId, "Проверка закрытого аккаунта OWNER-901")).rejects.toBeInstanceOf(
+      AdminError,
+    );
   });
 
   it("finds and suspends a public AR item", async () => {

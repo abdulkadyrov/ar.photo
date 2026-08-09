@@ -51,6 +51,7 @@ type TabId = (typeof tabs)[number]["id"];
 
 type ConfirmAction =
   | { kind: "account"; account: AdminAccount; nextStatus: "active" | "suspended" }
+  | { kind: "account-delete"; account: AdminAccount }
   | { kind: "item"; item: AdminContentResult; suspended: boolean }
   | { kind: "retry"; accountId: string; jobId: number; label: string }
   | { kind: "reset"; accountId: string; userId: string; label: string }
@@ -102,6 +103,8 @@ export function AdminRoute() {
       if (!confirmAction) return;
       if (confirmAction.kind === "account") {
         await adminRepository.setAccountStatus(confirmAction.account.id, confirmAction.nextStatus, reason);
+      } else if (confirmAction.kind === "account-delete") {
+        await adminRepository.deleteAccount(confirmAction.account.id, "УДАЛИТЬ АККАУНТ", reason);
       } else if (confirmAction.kind === "item") {
         await adminRepository.setItemSuspended(
           confirmAction.item.accountId,
@@ -156,6 +159,9 @@ export function AdminRoute() {
         setDetail((current) =>
           current ? { ...current, users: current.users.filter((user) => user.id !== completedAction.userId) } : current,
         );
+      }
+      if (completedAction?.kind === "account-delete") {
+        setDetail((current) => (current?.account.id === completedAction.account.id ? null : current));
       }
       setToast({ title: "Операция выполнена", message: "Изменение записано в admin audit.", tone: "success" });
       closeConfirmation();
@@ -251,6 +257,7 @@ export function AdminRoute() {
               nextStatus: account.status === "suspended" ? "active" : "suspended",
             })
           }
+          onDelete={(account) => openConfirm({ kind: "account-delete", account })}
         />
       ) : null}
       {tab === "users" ? (
@@ -422,6 +429,7 @@ function AccountsSection({
   onCreate,
   onSupport,
   onStatus,
+  onDelete,
 }: {
   accounts: AdminAccount[];
   search: string;
@@ -430,13 +438,16 @@ function AccountsSection({
   onCreate: () => void;
   onSupport: (account: AdminAccount) => void;
   onStatus: (account: AdminAccount) => void;
+  onDelete: (account: AdminAccount) => void;
 }) {
   return (
     <Panel className="mt-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold">Аккаунты пользователей</h2>
-          <p className="mt-1 text-sm text-muted">Поиск, просмотр по указанной причине и безопасная блокировка.</p>
+          <p className="mt-1 text-sm text-muted">
+            Поиск, просмотр по указанной причине, блокировка и закрытие аккаунтов.
+          </p>
         </div>
         <Button icon={<UserPlus size={17} />} onClick={onCreate}>
           Создать аккаунт
@@ -482,6 +493,9 @@ function AccountsSection({
               </Button>
               <Button variant={account.status === "active" ? "danger" : "quiet"} onClick={() => onStatus(account)}>
                 {account.status === "active" ? "Приостановить" : "Восстановить"}
+              </Button>
+              <Button variant="danger" icon={<Trash2 size={16} />} onClick={() => onDelete(account)}>
+                Удалить аккаунт
               </Button>
             </div>
           </article>
@@ -928,12 +942,17 @@ function ConfirmModal({
     <Modal
       open={Boolean(action)}
       title={actionTitle(action)}
-      description={`Опасная операция требует причину и точный ввод «${word}».`}
+      description={
+        action?.kind === "account-delete"
+          ? `Аккаунт исчезнет из рабочих списков, его подписка и доступы пользователей будут отключены. Audit сохраняется. Введите «${word}».`
+          : `Опасная операция требует причину и точный ввод «${word}».`
+      }
       onClose={onClose}
       actions={
         <Button
           variant={
             action?.kind === "account" ||
+            action?.kind === "account-delete" ||
             action?.kind === "item" ||
             action?.kind === "user-status" ||
             action?.kind === "user-delete"
@@ -1191,6 +1210,7 @@ function actionWord(action: ConfirmAction | null) {
   if (action.kind === "retry") return "ПОВТОРИТЬ";
   if (action.kind === "reset") return "СБРОС";
   if (action.kind === "user-delete") return "УДАЛИТЬ";
+  if (action.kind === "account-delete") return "УДАЛИТЬ АККАУНТ";
   if (action.kind === "user-status") return action.active ? "РАЗБЛОКИРОВАТЬ" : "ЗАБЛОКИРОВАТЬ";
   if (action.kind === "setting" || action.kind === "subscription") return "ИЗМЕНИТЬ";
   return action.kind === "account"
@@ -1205,6 +1225,7 @@ function actionTitle(action: ConfirmAction | null) {
   if (!action) return "Подтвердить";
   if (action.kind === "account")
     return `${action.nextStatus === "suspended" ? "Приостановить" : "Восстановить"} ${action.account.name}?`;
+  if (action.kind === "account-delete") return `Удалить аккаунт ${action.account.name}?`;
   if (action.kind === "item")
     return `${action.suspended ? "Приостановить" : "Восстановить"} ${action.item.arItemTitle}?`;
   if (action.kind === "retry") return `Повторить processing: ${action.label}?`;
