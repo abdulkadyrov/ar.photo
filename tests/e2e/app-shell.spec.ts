@@ -442,6 +442,7 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   await expect(page.getByRole("heading", { name: "Фото", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Видео", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "QR-код", exact: true })).toBeVisible();
+  await expect(page.getByRole("timer")).toContainText("Готово за");
   await expect(page.getByLabel("Видео AR-работы")).toBeVisible();
   await expect(page.getByLabel("Открыть публичную ссылку")).toBeVisible();
   const mediaSections = page.locator(".ar-item-media-section");

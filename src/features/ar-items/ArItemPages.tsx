@@ -16,6 +16,7 @@ import {
   ScanLine,
   Share2,
   Sparkles,
+  Timer,
   Upload,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -31,6 +32,7 @@ import { markerAccept, prepareMediaFile, videoAccept } from "../media/mediaValid
 import { resolvePublicBaseUrl } from "../qr/qrDesign";
 import { getArItemRepository } from "./arItemRepository";
 import { analyzeMarkerFile, type MarkerQualityResult } from "./markerQuality";
+import { formatProcessingDuration, getProcessingTiming } from "./processingTiming";
 import "./ArItemPages.css";
 
 const catalogRepository = getCatalogRepository();
@@ -201,6 +203,12 @@ export function ArItemDetailRoute() {
     queryFn: () => arItemRepository.getQrCode(accountId!, itemId),
     enabled: Boolean(accountId && itemId),
   });
+  const jobsQuery = useQuery({
+    queryKey: ["ar-item", "jobs", accountId, itemId],
+    queryFn: () => arItemRepository.listJobs(accountId!, itemId),
+    enabled: Boolean(accountId && itemId),
+    refetchInterval: itemQuery.data?.status === "processing" ? 3_000 : false,
+  });
 
   useEffect(() => {
     const item = itemQuery.data;
@@ -223,18 +231,20 @@ export function ArItemDetailRoute() {
       .finally(() => setCompletionBusy(false));
   }, [accountId, itemQuery.data, qrQuery.data, queryClient]);
 
-  if (workspaceQuery.error || itemQuery.error || assetsQuery.error || qrQuery.error) {
+  if (workspaceQuery.error || itemQuery.error || assetsQuery.error || qrQuery.error || jobsQuery.error) {
     return (
       <AppShell title="AR-работа">
         <div className="mt-6">
           <ErrorState
-            text={readableError(workspaceQuery.error ?? itemQuery.error ?? assetsQuery.error ?? qrQuery.error)}
+            text={readableError(
+              workspaceQuery.error ?? itemQuery.error ?? assetsQuery.error ?? qrQuery.error ?? jobsQuery.error,
+            )}
           />
         </div>
       </AppShell>
     );
   }
-  if (workspaceQuery.isPending || itemQuery.isPending || assetsQuery.isPending || qrQuery.isPending) {
+  if (workspaceQuery.isPending || itemQuery.isPending || assetsQuery.isPending || qrQuery.isPending || jobsQuery.isPending) {
     return <ItemDetailLoading />;
   }
 
@@ -242,6 +252,7 @@ export function ArItemDetailRoute() {
   const marker = assetsQuery.data.find((asset) => asset.id === item.marker_asset_id);
   const video = assetsQuery.data.find((asset) => asset.id === item.video_asset_id);
   const qrCode = qrQuery.data;
+  const detailJobs = jobsQuery.data.filter((job) => jobRevision(job) === item.version);
   const canReturnToItems = Boolean((location.state as { fromArItems?: unknown } | null)?.fromArItems);
   const copyPublicUrl = async () => {
     if (!qrCode) return;
@@ -330,6 +341,7 @@ export function ArItemDetailRoute() {
             <div>
               <h2 id="ar-item-qr-title">QR-код</h2>
               <p>{qrCode ? "Для открытия работы в AR" : "Появится после публикации"}</p>
+              <ProcessingTimer item={item} jobs={detailJobs} />
             </div>
           </div>
           <label htmlFor="ar-item-public-url">Публичная ссылка</label>
@@ -1103,6 +1115,7 @@ function ProcessingStep({
 }) {
   return (
     <div>
+      {item ? <ProcessingTimer item={item} jobs={jobs} prominent /> : null}
       {item?.status === "processing" ? (
         <div className="mb-4 rounded-xl border border-primary/20 bg-primary/10 p-4 text-sm leading-6 text-muted">
           Обработка выполняется автоматически и обычно занимает несколько минут. Эту страницу можно оставить открытой —
@@ -1158,6 +1171,30 @@ function ProcessingStep({
           </Button>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function ProcessingTimer({ item, jobs, prominent = false }: { item: ArItem; jobs: ProcessingJob[]; prominent?: boolean }) {
+  const active = item.status === "processing";
+  const [now, setNow] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
+    const interval = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(interval);
+  }, [active]);
+
+  const timing = getProcessingTiming(item, jobs, now);
+  if (!timing) return null;
+  const label = active ? "Идёт обработка" : item.status === "failed" ? "Остановлено через" : "Готово за";
+
+  return (
+    <div className={`ar-item-processing-timer${prominent ? " ar-item-processing-timer-prominent" : ""}`} role="timer">
+      <Timer aria-hidden="true" size={prominent ? 20 : 16} />
+      <span>{label}</span>
+      <strong>{formatProcessingDuration(timing.elapsedMs)}</strong>
     </div>
   );
 }
