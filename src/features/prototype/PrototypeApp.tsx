@@ -1013,9 +1013,11 @@ async function startMindAr({
   onStatus: (status: string) => void;
 }) {
   if (!container) throw new Error("MindAR container не готов");
-  const [{ MindARThree }, THREE] = await Promise.all([
+  const [{ MindARThree }, THREE, { createStabilizedAnchor }, { publicArTrackingConfig }] = await Promise.all([
     import("mind-ar/dist/mindar-image-three.prod.js"),
     import("three"),
+    import("../public-ar/poseStabilizer"),
+    import("../public-ar/mindArAdapter"),
   ]);
   const Three = THREE as typeof ThreeModule;
   const targetAspect = await loadImageAspect(imageSrc);
@@ -1037,8 +1039,7 @@ async function startMindAr({
     uiScanning: "no",
     uiError: "no",
     maxTrack: 1,
-    warmupTolerance: 5,
-    missTolerance: 8,
+    ...publicArTrackingConfig,
   });
   const { renderer, scene, camera } = mindarThree;
   renderer.setClearColor(0x000000, 0);
@@ -1056,7 +1057,26 @@ async function startMindAr({
   window.addEventListener("ar-photo-calibration", onCalibration);
 
   const anchor = mindarThree.addAnchor(0);
-  anchor.group.add(plane);
+  const stabilizedAnchor = createStabilizedAnchor({
+    three: Three,
+    anchor,
+    scene,
+    isTracking: () => mindarThree.controller?.trackingStates?.[0]?.isTracking ?? anchor.visible,
+    onFound: () => {
+      onStatus("Фото найдено: test.mp4 воспроизводится поверх test.jpg");
+      video.play().catch(() => {
+        video.muted = true;
+        onMutedFallback?.();
+        onStatus("Фото найдено: Safari заблокировал автозвук, нажмите Звук");
+        video.play().catch(() => undefined);
+      });
+    },
+    onLost: () => {
+      onStatus("Фото потеряно: наведите камеру на test.jpg");
+      video.pause();
+    },
+  });
+  stabilizedAnchor.group.add(plane);
   if (calibration.center) {
     const ThreeDebug = Three as any;
     const centerDot = new Three.Mesh(
@@ -1064,30 +1084,21 @@ async function startMindAr({
       new ThreeDebug.MeshBasicMaterial({ color: 0xff2d55, depthTest: false }),
     );
     centerDot.position.set(0, 0, 0.03);
-    anchor.group.add(centerDot);
+    stabilizedAnchor.group.add(centerDot);
   }
-  anchor.onTargetFound = () => {
-    onStatus("Фото найдено: test.mp4 воспроизводится поверх test.jpg");
-    video.play().catch(() => {
-      video.muted = true;
-      onMutedFallback?.();
-      onStatus("Фото найдено: Safari заблокировал автозвук, нажмите Звук");
-      video.play().catch(() => undefined);
-    });
-  };
-  anchor.onTargetLost = () => {
-    onStatus("Фото потеряно: наведите камеру на test.jpg");
-    video.pause();
-  };
 
   await mindarThree.start();
   keepMindArCameraVisible(mindarThree);
   onStatus("Наведите камеру на распечатанное или открытое test.jpg");
-  renderer.setAnimationLoop(() => renderer.render(scene, camera));
+  renderer.setAnimationLoop(() => {
+    stabilizedAnchor.update();
+    renderer.render(scene, camera);
+  });
 
   return () => {
     window.removeEventListener("ar-photo-calibration", onCalibration);
     renderer.setAnimationLoop(null);
+    stabilizedAnchor.dispose();
     mindarThree.stop();
     video.pause();
   };

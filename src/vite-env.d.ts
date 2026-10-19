@@ -54,7 +54,11 @@ declare module "mind-ar/dist/mindar-image-three.prod.js" {
       dispose?: () => void;
       forceContextLoss?: () => void;
     };
-    controller?: { dispose?: () => void; markerDimensions?: Array<[number, number]> };
+    controller?: {
+      dispose?: () => void;
+      markerDimensions?: Array<[number, number]>;
+      trackingStates?: Array<{ isTracking: boolean }>;
+    };
     cssRenderer?: { domElement?: HTMLElement };
     scene: {
       add(object: unknown): void;
@@ -128,11 +132,15 @@ declare module "three" {
   }
 
   export class Matrix4 {
+    elements: number[];
+    copy(value: Matrix4): this;
     compose(position: Vector3, quaternion: Quaternion, scale: Vector3): this;
     decompose(position: Vector3, quaternion: Quaternion, scale: Vector3): this;
   }
 
   export class Vector3 {
+    constructor(x?: number, y?: number, z?: number);
+    set(x: number, y: number, z: number): this;
     x: number;
     y: number;
     z: number;
@@ -142,6 +150,12 @@ declare module "three" {
   }
 
   export class Quaternion {
+    x: number;
+    y: number;
+    z: number;
+    w: number;
+    normalize(): this;
+    setFromAxisAngle(axis: Vector3, angle: number): this;
     copy(value: Quaternion): this;
     angleTo(value: Quaternion): number;
     slerp(value: Quaternion, alpha: number): this;

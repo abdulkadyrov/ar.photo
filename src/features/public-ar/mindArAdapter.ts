@@ -2,12 +2,15 @@ import type * as ThreeModule from "three";
 import { publicArTargets, type PublicArManifest, type PublicArTarget } from "./publicManifest";
 import { videoMilestones, type PublicArAnalyticsEvent } from "./telemetry";
 import { createArRecordingEngine, type ArRecording, type ArRecordingEngine } from "./arRecording";
+import { createStabilizedAnchor } from "./poseStabilizer";
 
 export type PublicArTrackingState = "searching" | "tracking";
 
 export const publicArTrackingConfig = Object.freeze({
-  filterMinCF: 0.001,
-  filterBeta: 20,
+  // MindAR uses milliseconds: 1 is a near-pass-through at camera rates.
+  // Stabilization happens once, on decomposed poses, below.
+  filterMinCF: 1,
+  filterBeta: 0,
   warmupTolerance: 7,
   missTolerance: 10,
 });
@@ -201,7 +204,6 @@ export async function startPublicMindAr(options: {
     plane.frustumCulled = false;
     plane.renderOrder = 1;
     const anchor = mindar.addAnchor(index);
-    anchor.group.add(plane);
     const fitVideoToMarker = () => {
       if (!video.videoWidth || !video.videoHeight) return;
       const transform = coverTextureTransform(
@@ -226,18 +228,16 @@ export async function startPublicMindAr(options: {
     video.addEventListener("ended", playbackEnded);
     video.addEventListener("error", playbackError);
     fitVideoToMarker();
-    anchor.onTargetFound = () => {
+    const onFound = () => {
       activeTargetIndex = index;
       targetVisible = true;
       videos.forEach((candidate, candidateIndex) => {
         if (candidateIndex !== index) candidate.pause();
       });
-      anchor.group.visible = true;
       onTrackingState("tracking");
       if (target.behavior.autoplay) video.play().catch(() => undefined);
     };
-    anchor.onTargetLost = () => {
-      anchor.group.visible = false;
+    const onLost = () => {
       if (activeTargetIndex === index) {
         targetVisible = false;
         onTrackingState("searching");
@@ -248,6 +248,15 @@ export async function startPublicMindAr(options: {
         video.currentTime = 0;
       }
     };
+    const stabilizedAnchor = createStabilizedAnchor({
+      three: Three,
+      anchor,
+      scene,
+      isTracking: () => mindar.controller?.trackingStates?.[index]?.isTracking ?? anchor.visible,
+      onFound,
+      onLost,
+    });
+    stabilizedAnchor.group.add(plane);
     return {
       target,
       video,
@@ -259,7 +268,9 @@ export async function startPublicMindAr(options: {
         activeMarker = marker;
       },
       fitVideoToMarker,
+      updatePose: stabilizedAnchor.update,
       dispose() {
+        stabilizedAnchor.dispose();
         video.pause();
         video.removeEventListener("loadedmetadata", fitVideoToMarker);
         video.removeEventListener("play", playbackStarted);
@@ -306,6 +317,7 @@ export async function startPublicMindAr(options: {
       });
     }
     renderer.setAnimationLoop(() => {
+      runtimes.forEach((runtime) => runtime.updatePose());
       renderer.render(scene, camera);
       recordingEngine?.drawFrame();
     });

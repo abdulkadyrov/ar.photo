@@ -36,8 +36,8 @@ Worker вычисляет brightness, contrast, sharpness, feature density и en
 | `intro`                  | manifest загружен                                   | Камера ещё не запрошена; доступны «Начать AR», fallback и privacy link |
 | `starting`               | пользователь нажал «Начать AR»                      | Проверяются HTTPS, camera API и WebGL; lazy-load MindAR/Three          |
 | `searching`              | камера запущена, target не найден                   | Показана рамка и инструкция держать фото целиком                       |
-| `tracking`               | `onTargetFound`                                     | Plane становится видимым; autoplay запускает muted video               |
-| `searching` после потери | `onTargetLost`                                      | Применяется выбранное `markerLost` behavior                            |
+| `tracking`               | первое принятое измерение стабилизатора             | Plane становится видимым; autoplay запускает muted video               |
+| `searching` после потери | потеря anchor или 180 мс без принятой позы          | Применяется выбранное `markerLost` behavior                            |
 | `fallback`               | пользователь выбрал обычное видео или AR недоступен | `<video controls playsInline>` работает без камеры/tracking            |
 | `error`                  | permission/device/WebGL/tracking failure            | Безопасное сообщение, retry и fallback                                 |
 
@@ -52,7 +52,12 @@ Worker вычисляет brightness, contrast, sharpness, feature density и en
 - Один target на сессию: `maxTrack: 1`.
 - Plane имеет ширину 1 и высоту `marker.height / marker.width`, центр совпадает с anchor target, а `z = 0` исключает угловой параллакс. После загрузки `.mind` его target dimensions имеют приоритет над manifest metadata, поэтому случайный drift размеров не искажает overlay.
 - Видео не растягивается: UV координаты выполняют симметричный `cover` crop к пропорциям маркера; при одинаковом aspect UV остаётся 1:1.
-- MindAR OneEuroFilter использует профиль `filterMinCF=0.001`, `filterBeta=100`, warmup/miss по 5 кадров: дрожание ниже default beta=1000, а краткая потеря не оставляет overlay надолго в устаревшей позе.
+- MindAR работает с `filterMinCF=1`, `filterBeta=0` (единицы времени библиотеки — миллисекунды), warmup=7/miss=10. Его матричный фильтр почти прозрачен; основное сглаживание выполняет `poseStabilizer.ts`, чтобы не складывать задержку двух сильных фильтров.
+- Отдельная render group получает адаптивно сглаженные translation/scale и нормализованный quaternion через slerp. Дистанции нормированы к ширине маркера; коэффициент учитывает реальный интервал между измерениями. При малом движении фильтр сильнее, при большом — быстрее.
+- Одиночные скачки более 0.2 ширины маркера, 0.35 радиан или 0.18 log-scale ждут согласованного следующего измерения. Эти стартовые пороги проверены синтетически, но требуют проверки на физических устройствах.
+- Устаревшая поза удерживается максимум 180 мс от последнего принятого измерения, затем overlay скрывается и применяется `markerLost`. Повторные матрицы MindAR при `isTracking=false` не продлевают удержание. При восстановлении после таймаута/потери фильтр сбрасывается, без пролёта из старой позиции.
+- Чтение `controller.trackingStates[index].isTracking` привязано к закреплённой версии MindAR 1.2.5; при обновлении библиотеки проверить этот контракт. Если поле недоступно, используется стандартная видимость anchor, и ранний таймаут краткой потери не гарантируется.
+- Основной и тестовый viewer используют один стабилизатор. Synthetic tests проверяют шум при 15/30/60 Hz, задержку при движении, выбросы, потерю, повторный захват и независимость целей. Это не доказательство оптической стабильности на iPhone.
 - Scan guide использует реальные пропорции маркера и исчезает после `targetFound`, поэтому неподвижная рамка не конкурирует с tracked plane.
 - WebGL pixel ratio ограничен 2 для стабильного frame pacing на high-DPI телефонах; teardown освобождает controller worker, renderer и WebGL context.
 - Камера остаётся под прозрачным WebGL canvas.

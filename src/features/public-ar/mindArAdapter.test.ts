@@ -128,10 +128,10 @@ describe("public AR alignment contract", () => {
     });
   });
 
-  it("uses the proven stable smoothing and visibility hysteresis profile", () => {
+  it("leaves pose smoothing to the separate stabilizer and retains acquisition hysteresis", () => {
     expect(publicArTrackingConfig).toEqual({
-      filterMinCF: 0.001,
-      filterBeta: 20,
+      filterMinCF: 1,
+      filterBeta: 0,
       warmupTolerance: 7,
       missTolerance: 10,
     });
