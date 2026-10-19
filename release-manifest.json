@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "product": "AR Photo",
-  "generatedAt": "2026-08-09T21:22:36.998Z",
+  "generatedAt": "2026-10-19T08:31:21.233Z",
   "source": {
-    "commit": "5dad26b612b33691fa800c38f75793e0a68ccc45",
+    "commit": "175519c4f5c86400308c6fe4ebfb023a012feb89",
     "dirty": false
   },
   "runtime": {
