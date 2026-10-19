@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "product": "AR Photo",
-  "generatedAt": "2026-10-19T08:31:21.233Z",
+  "generatedAt": "2026-10-19T08:36:48.672Z",
   "source": {
-    "commit": "175519c4f5c86400308c6fe4ebfb023a012feb89",
+    "commit": "c81c8fcff6ea238c771ebb6b09421241604f67f7",
     "dirty": false
   },
   "runtime": {
@@ -11,7 +11,7 @@
     "basePath": "/ar.photo/"
   },
   "inputs": {
-    "packageLockSha256": "9ef3a031366e522b64dfac29c8b62fb477c70d9ddc735788916913a837c2d487",
+    "packageLockSha256": "1d6fc0ab1d634d81366f85d40132273432ea509bf5b6a063187a8dae16caa2fc",
     "migrations": {
       "count": 27,
       "sha256": "1475787efc4df8e955934dd8231fbe8fa636a0cf986b84f58ad449a6ccbb5b63",
