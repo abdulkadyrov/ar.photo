@@ -57,12 +57,30 @@ describe("AR pose stabilization", () => {
     }
   });
 
-  it("accepts a confirmed large move and catches up promptly", () => {
+  it("requires three coherent samples for a large move and rate-limits the transition", () => {
     const filter = createPoseStabilizer(Three);
     filter.sample(pose(), 0);
     expect(filter.sample(pose(0.8, 0.6), 33)).toBe(false);
-    expect(filter.sample(pose(0.81, 0.61), 66)).toBe(true);
-    expect(unpack(filter.matrix).p.x).toBeCloseTo(0.81, 2);
+    expect(filter.sample(pose(0.81, 0.61), 66)).toBe(false);
+    expect(filter.sample(pose(0.82, 0.62), 99)).toBe(true);
+    const accepted = unpack(filter.matrix);
+    expect(accepted.p.x).toBeGreaterThan(0);
+    expect(accepted.p.x).toBeLessThan(0.13);
+    expect(accepted.q.angleTo(new Three.Quaternion())).toBeLessThan(0.15);
+  });
+
+  it("never renders a millisecond pose flip while sweeping across the target", () => {
+    const filter = createPoseStabilizer(Three);
+    filter.sample(pose(), 0);
+    filter.sample(pose(0.04, 0.04), 33);
+    const beforeFlip = [...filter.matrix.elements];
+    expect(filter.sample(pose(0.5, 0.9, 1.35), 66)).toBe(false);
+    expect(filter.sample(pose(0.52, 0.92, 1.36), 99)).toBe(false);
+    expect(filter.matrix.elements).toEqual(beforeFlip);
+    expect(filter.sample(pose(0.08, 0.08), 132)).toBe(true);
+    const recovered = unpack(filter.matrix);
+    expect(recovered.q.angleTo(new Three.Quaternion())).toBeLessThan(0.09);
+    expect(recovered.s.x).toBeLessThan(1.02);
   });
 
   it("does not let rejected samples refresh the hold deadline", () => {
@@ -70,8 +88,8 @@ describe("AR pose stabilization", () => {
     filter.sample(pose(), 0);
     filter.sample(pose(5), 100);
     expect(filter.fresh(POSE_HOLD_MS + 1)).toBe(false);
-    expect(filter.sample(pose(-2), POSE_HOLD_MS + 2)).toBe(true);
-    expect(unpack(filter.matrix).p.x).toBe(-2);
+    expect(filter.sample(pose(-2), POSE_HOLD_MS + 2)).toBe(false);
+    expect(filter.fresh(POSE_HOLD_MS + 2)).toBe(false);
   });
 
   it("ignores invalid matrices and duplicate or backwards timestamps", () => {
