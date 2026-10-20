@@ -71,6 +71,7 @@ export function createPoseStabilizer(three: typeof Three) {
         const distance = position.distanceTo(inputPosition) / width;
         const angle = rotation.angleTo(inputRotation);
         const resize = scaleDelta(inputScale, scale);
+        let confirmedDiscontinuity = false;
         // One bad solve must not throw the video across the page. A coherent
         // second sample confirms real movement instead of locking the anchor.
         if (distance > 0.2 || angle > 0.35 || resize > 0.18) {
@@ -93,26 +94,36 @@ export function createPoseStabilizer(three: typeof Three) {
           candidateRotation.copy(inputRotation);
           candidateScale.copy(inputScale);
           if (candidateSamples < 3 || now - (candidateAt ?? now) < 45) return false;
+          confirmedDiscontinuity = true;
         }
-        const boundedDt = Math.min(dt, 50);
-        const maxPositionStep = width * (0.02 + (2 * boundedDt) / 1000);
-        const positionStep = position.distanceTo(inputPosition);
-        boundedPosition.copy(position).lerp(inputPosition, Math.min(1, maxPositionStep / positionStep));
-        const maxRotationStep = 0.02 + (2 * boundedDt) / 1000;
-        const rotationStep = rotation.angleTo(inputRotation);
-        boundedRotation.copy(rotation).slerp(inputRotation, Math.min(1, maxRotationStep / rotationStep));
-        const maxScaleLogStep = 0.02 + boundedDt / 1000;
-        boundedScale.set(
-          scale.x * Math.exp(Math.max(-maxScaleLogStep, Math.min(maxScaleLogStep, Math.log(inputScale.x / scale.x)))),
-          scale.y * Math.exp(Math.max(-maxScaleLogStep, Math.min(maxScaleLogStep, Math.log(inputScale.y / scale.y)))),
-          scale.z * Math.exp(Math.max(-maxScaleLogStep, Math.min(maxScaleLogStep, Math.log(inputScale.z / scale.z)))),
-        );
+        boundedPosition.copy(inputPosition);
+        boundedRotation.copy(inputRotation);
+        boundedScale.copy(inputScale);
+        if (confirmedDiscontinuity) {
+          const boundedDt = Math.min(dt, 50);
+          const maxPositionStep = width * (0.02 + (2 * boundedDt) / 1000);
+          const positionStep = position.distanceTo(inputPosition);
+          boundedPosition.copy(position).lerp(inputPosition, Math.min(1, maxPositionStep / positionStep));
+          const maxRotationStep = 0.02 + (2 * boundedDt) / 1000;
+          const rotationStep = rotation.angleTo(inputRotation);
+          boundedRotation.copy(rotation).slerp(inputRotation, Math.min(1, maxRotationStep / rotationStep));
+          const maxScaleLogStep = 0.02 + boundedDt / 1000;
+          boundedScale.set(
+            scale.x * Math.exp(Math.max(-maxScaleLogStep, Math.min(maxScaleLogStep, Math.log(inputScale.x / scale.x)))),
+            scale.y * Math.exp(Math.max(-maxScaleLogStep, Math.min(maxScaleLogStep, Math.log(inputScale.y / scale.y)))),
+            scale.z * Math.exp(Math.max(-maxScaleLogStep, Math.min(maxScaleLogStep, Math.log(inputScale.z / scale.z)))),
+          );
+        }
         // Quiet poses receive strong smoothing. Larger changes rapidly raise
-        // the cutoff. A rate limit prevents a short-lived planar-pose flip
-        // from becoming a visibly crooked frame even after several bad solves.
-        position.lerp(boundedPosition, alpha(dt, Math.min(30, 1.2 + Math.max(0, distance - 0.003) * 100)));
-        rotation.slerp(boundedRotation, alpha(dt, Math.min(30, 1 + Math.max(0, angle - 0.008) * 50)));
-        scale.lerp(boundedScale, alpha(dt, Math.min(20, 0.8 + Math.max(0, resize - 0.003) * 60)));
+        // the cutoff. Continuous camera motion follows almost immediately;
+        // rate limiting is reserved for confirmed discontinuities only.
+        const positionCutoff = distance > 0.02 ? 30 : 1.2 + Math.max(0, distance - 0.003) * 100;
+        const rotationCutoff =
+          distance > 0.02 || resize > 0.02 || angle > 0.03 ? 30 : 1 + Math.max(0, angle - 0.008) * 50;
+        const scaleCutoff = resize > 0.02 ? 20 : 0.8 + Math.max(0, resize - 0.003) * 60;
+        position.lerp(boundedPosition, alpha(dt, positionCutoff));
+        rotation.slerp(boundedRotation, alpha(dt, rotationCutoff));
+        scale.lerp(boundedScale, alpha(dt, scaleCutoff));
       }
       candidateAt = null;
       candidateSamples = 0;

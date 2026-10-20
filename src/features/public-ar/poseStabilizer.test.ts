@@ -46,6 +46,18 @@ describe("AR pose stabilization", () => {
     }
   });
 
+  it("tracks a smooth fast camera sweep within one frame", () => {
+    const filter = createPoseStabilizer(Three);
+    filter.sample(pose(), 0);
+    for (let i = 1; i <= 30; i++) {
+      const expected = pose(i * 0.08, i * 0.025);
+      expect(filter.sample(expected, i * (1000 / 30))).toBe(true);
+      const current = unpack(filter.matrix);
+      expect(Math.abs(current.p.x - i * 0.08)).toBeLessThan(0.01);
+      expect(current.q.angleTo(unpack(expected).q)).toBeLessThan(0.004);
+    }
+  });
+
   it("rejects one-frame translation, rotation and scale spikes", () => {
     for (const badPose of [pose(2), pose(0, 1), pose(0, 0, 2)]) {
       const filter = createPoseStabilizer(Three);
