@@ -28,6 +28,7 @@
     "sbom": "npm sbom --sbom-format cyclonedx",
     "release:manifest": "node scripts/create-release-manifest.mjs",
     "build": "tsc -b && vite build",
+    "build:beget": "tsc -b && vite build --mode beget",
     "build:demo": "tsc -b && vite build --mode demo",
     "build:unconfigured": "tsc -b && vite build --mode unconfigured",
     "build:worker": "tsc -p tsconfig.worker.json --pretty false",

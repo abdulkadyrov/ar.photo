@@ -217,3 +217,7 @@ Production launch запрещён при любом из условий:
 - фактические response headers отличаются от security contract;
 - legal/privacy/data residency/retention не одобрены;
 - есть P0/P1 security issue или unexplained release manifest mismatch.
+
+### Beget frontend build
+
+Use `npm run build:beget` with an ignored `.env.beget.local` containing the server's browser-safe configuration. Set `VITE_PUBLIC_APP_URL` to the public HTTPS address (including `/ar.photo/`). The Beget mode overrides development values from `.env.local`; plain `npm run build` can otherwise embed a localhost URL and block QR publication. Never include server secrets in `VITE_*` variables.
