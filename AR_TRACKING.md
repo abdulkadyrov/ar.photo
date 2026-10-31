@@ -97,3 +97,13 @@ Camera frames обрабатываются локально библиотеко
 - Матрица минимум из 10 реальных маркеров остаётся обязательной перед launch approval.
 - Runtime зависит от `unsafe-eval` в CSP из-за текущего MindAR bundle; исключение ограничено `script-src 'self'` и должно пересматриваться при обновлении провайдера.
 - Долгосрочная замена MindAR должна реализовать тот же `MarkerTrackingProvider` contract и пройти ту же device matrix.
+
+### Close-range corner stabilization (2026-10-31)
+
+The planar corner filter separates coherent translation/scale/in-plane rotation from
+perspective deformation. Approaching the photo can therefore follow quickly without
+also passing independent corner wobble. Directionally consistent deformation is
+promoted to fast following after confirmation; alternating corner noise stays damped.
+Regression tests cover 30/60 Hz approach with noisy corners and retain the existing
+quiet-camera, fast-sweep, perspective, outlier and reacquisition checks. Physical
+Safari camera acceptance remains required; synthetic tests do not replace it.

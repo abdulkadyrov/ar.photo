@@ -15,6 +15,7 @@ on:
       - "package-lock.json"
       - "tsconfig.worker.json"
       - "workers/**"
+      - "src/features/media/mediaEdits.ts"
       - "src/features/ar-items/markerQuality.ts"
       - "src/shared/api/database.types.ts"
   push:
@@ -26,6 +27,7 @@ on:
       - "package-lock.json"
       - "tsconfig.worker.json"
       - "workers/**"
+      - "src/features/media/mediaEdits.ts"
       - "src/features/ar-items/markerQuality.ts"
       - "src/shared/api/database.types.ts"
 
@@ -50,7 +52,8 @@ jobs:
         run: >-
           docker run --rm --entrypoint sh ar-photo-processing-worker:test -c
           'node --check dist-worker/workers/processing/index.js &&
-          ffmpeg -version >/dev/null && ffprobe -version >/dev/null && cwebp -version >/dev/null'
+          ffmpeg -version >/dev/null && ffprobe -version >/dev/null && cwebp -version >/dev/null &&
+          node dist-worker/workers/processing/videoEditingCheck.js'
       - name: Drain production processing queue
         if: github.event_name != 'pull_request' && vars.PROCESSING_RUNNER_MODE != 'server'
         env:

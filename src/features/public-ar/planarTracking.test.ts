@@ -123,6 +123,28 @@ describe("four-corner planar tracking", () => {
     }
   });
 
+  it.each([30, 60])("damps corner wobble while approaching the photo at %i Hz", (fps) => {
+    const filter = createCornerFilter();
+    filter.sample(tilted, 0);
+    let rawError = 0,
+      outputError = 0;
+    for (let frame = 1; frame <= 90; frame++) {
+      const scale = 1 + frame * 0.012;
+      const expected = tilted.map((p) => ({ x: 0.5 + (p.x - 0.5) * scale, y: 0.5 + (p.y - 0.5) * scale })) as Quad;
+      const noisy = expected.map((p, i) => ({
+        x: p.x + Math.sin(frame * 2.1 + i * 2) * 0.004 * scale,
+        y: p.y + Math.cos(frame * 2.4 + i * 2.7) * 0.004 * scale,
+      })) as Quad;
+      const actual = filter.sample(noisy, (frame * 1000) / fps);
+      expect(actual).not.toBeNull();
+      if (frame > 10) {
+        rawError += error(noisy, expected);
+        outputError += error(actual!, expected);
+      }
+    }
+    expect(outputError / rawError).toBeLessThan(0.72);
+  });
+
   it("rejects a single corner slipping while the other three stay in place", () => {
     const filter = createCornerFilter();
     filter.sample(tilted, 0);

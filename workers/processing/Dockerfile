@@ -16,6 +16,7 @@ RUN npm ci
 COPY tsconfig.worker.json ./
 COPY workers ./workers
 COPY src/features/ar-items/markerQuality.ts ./src/features/ar-items/markerQuality.ts
+COPY src/features/media/mediaEdits.ts ./src/features/media/mediaEdits.ts
 COPY src/shared/api/database.types.ts ./src/shared/api/database.types.ts
 RUN npm run build:worker
 

@@ -1,3 +1,4 @@
+import { parseVideoEdits, segmentsDuration, type VideoEdits } from "./mediaEdits";
 import type { MarkerMetadata, MediaKind, PreparedMedia, VideoMetadata } from "../../entities/media/model";
 import { detectCoverFormat } from "../catalog/coverFile";
 import {
@@ -34,6 +35,7 @@ type DecodedVideoMetadata = {
 };
 
 export type PrepareMediaOptions = {
+  videoEdits?: VideoEdits;
   onProgress?: (progress: number) => void;
 };
 
@@ -151,7 +153,7 @@ async function prepareVideo(file: File, options: PrepareMediaOptions): Promise<P
   const codec = inspectMp4CodecTokens(concatBytes(head, tail));
   let inspected: Awaited<ReturnType<typeof inspectVideoSource>>;
   try {
-    inspected = await inspectVideoSource(file);
+    inspected = await inspectVideoSource(file, !options.videoEdits);
   } catch (error) {
     const claimsMp4 = file.type.toLowerCase() === "video/mp4" || /\.mp4$/i.test(file.name);
     if (claimsMp4 && !hasMp4Signature(head)) {
@@ -160,7 +162,21 @@ async function prepareVideo(file: File, options: PrepareMediaOptions): Promise<P
         error instanceof Error ? error.message : "MP4-файл повреждён или имеет неверное расширение",
       );
     }
+    if (options.videoEdits)
+      throw new MediaValidationError(
+        "decode_failed",
+        "Не удалось проверить монтаж. Выберите видео, доступное для предпросмотра, или сбросьте изменения.",
+      );
     return prepareServerTranscode(file);
+  }
+  if (options.videoEdits) {
+    const edits = parseVideoEdits(options.videoEdits, inspected.durationSeconds);
+    const prepared = await prepareServerTranscode(file, inspected);
+    if (prepared.kind === "video") {
+      prepared.metadata.edits = edits;
+      if (edits.segments) prepared.metadata.durationSeconds = segmentsDuration(edits.segments);
+    }
+    return prepared;
   }
   const sourceIsCompatible =
     hasMp4Signature(head) &&

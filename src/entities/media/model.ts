@@ -1,3 +1,4 @@
+import type { VideoEdits } from "../../features/media/mediaEdits";
 import type { Json, Tables } from "../../shared/api/database.types";
 
 export type MediaKind = "marker" | "video";
@@ -16,6 +17,7 @@ export type MarkerMetadata = {
 };
 
 export type VideoMetadata = {
+  edits?: VideoEdits;
   width: number | null;
   height: number | null;
   durationSeconds: number | null;

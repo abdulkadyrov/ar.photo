@@ -40,12 +40,16 @@ import {
 } from "./quickStartRepository";
 import { currentTimestamp, formatElapsedTime } from "./quickStartTimer";
 import "./QuickStartPage.css";
+import { MediaPairEditor } from "../media/MediaPairEditor";
+import type { PairEdits } from "../media/mediaEdits";
+import { cropImageFile } from "../media/cropImage";
 
 const mediaRepository = getMediaRepository();
 const arItemRepository = getArItemRepository();
 const MAX_QUICK_AR_PHOTOS = 10;
 
 type QuickMediaPair = {
+  edits?: PairEdits;
   id: string;
   markerFile?: File;
   videoFile?: File;
@@ -78,6 +82,7 @@ export function QuickStartRoute() {
 function QuickCreatePage({ userId }: { userId: string }) {
   const restoredAttempt = useMemo(() => getPendingQuickStart(userId), [userId]);
   const [title, setTitle] = useState(restoredAttempt?.title ?? "");
+  const [edits, setEdits] = useState<PairEdits>({});
   const [markerFile, setMarkerFile] = useState<File>();
   const [videoFile, setVideoFile] = useState<File>();
   const [additionalPairs, setAdditionalPairs] = useState<QuickMediaPair[]>([]);
@@ -111,13 +116,33 @@ function QuickCreatePage({ userId }: { userId: string }) {
     refetchInterval: (query) =>
       query.state.data?.every((item) => ["ready", "published", "failed"].includes(item.status)) ? false : 2_500,
   });
+  const resultMediaQuery = useQuery({
+    queryKey: ["quick-start", "result-media", workspaceQuery.data?.accountId, itemIds],
+    enabled: stage === "done" && Boolean(workspaceQuery.data && itemsQuery.data?.length),
+    staleTime: 240_000,
+    refetchInterval: 300_000,
+    queryFn: async () => {
+      const workspace = workspaceQuery.data!;
+      const assets = await mediaRepository.listAssets(workspace.accountId, workspace.projectId, workspace.groupId);
+      return Promise.all(
+        itemsQuery.data!.map(async (item) => {
+          const marker = assets.find((asset) => asset.id === item.marker_asset_id);
+          const video = assets.find((asset) => asset.id === item.video_asset_id);
+          return {
+            markerUrl: marker ? await mediaRepository.getAssetUrl(marker) : undefined,
+            videoUrl: video ? await mediaRepository.getAssetUrl(video) : undefined,
+          };
+        }),
+      );
+    },
+  });
   const markerPreview = useObjectUrl(markerFile);
   const videoPreview = useObjectUrl(videoFile);
   const itemFailed = itemsQuery.data?.some((item) => item.status === "failed");
   const itemLookupError = itemId ? itemsQuery.error : null;
   const visibleStage: QuickStage = itemFailed || itemLookupError ? "error" : stage;
   const processing = !["form", "done", "error"].includes(visibleStage);
-  const mediaPairs = [{ markerFile, videoFile }, ...additionalPairs];
+  const mediaPairs = [{ markerFile, videoFile, edits }, ...additionalPairs];
   const canSubmit = Boolean(
     title.trim().length >= 2 &&
     workspaceQuery.data &&
@@ -185,8 +210,12 @@ function QuickCreatePage({ userId }: { userId: string }) {
       let bundleRootItemId = activeItemIds.current[0];
       for (const [pairIndex, pair] of mediaPairs.entries()) {
         if (!pair.markerFile || !pair.videoFile) throw new Error("Добавьте фото и видео для каждого AR-фото");
-        const preparedMarker = await prepareMediaFile(pair.markerFile, "marker");
+        const croppedMarker = pair.edits?.markerCrop
+          ? await cropImageFile(pair.markerFile, pair.edits.markerCrop)
+          : pair.markerFile;
+        const preparedMarker = await prepareMediaFile(croppedMarker, "marker");
         const preparedVideo = await prepareMediaFile(pair.videoFile, "video", {
+          videoEdits: pair.edits?.video,
           onProgress: (progress) =>
             setStageProgress(Math.round(((pairIndex + progress * 0.35) / mediaPairs.length) * 100)),
         });
@@ -306,6 +335,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
     uploadController.current?.abort();
     setTitle("");
     setMarkerFile(undefined);
+    setEdits({});
     setVideoFile(undefined);
     setAdditionalPairs([]);
     setStage("form");
@@ -342,8 +372,16 @@ function QuickCreatePage({ userId }: { userId: string }) {
     return (
       <QuickResult
         title={title}
-        markerPreview={markerPreview}
-        videoPreview={videoPreview}
+        markerPreview={resultMediaQuery.data?.[0]?.markerUrl ?? (edits.markerCrop ? undefined : markerPreview)}
+        videoPreview={resultMediaQuery.data?.[0]?.videoUrl ?? (edits.video ? undefined : videoPreview)}
+        preparedPhotos={resultMediaQuery.data?.flatMap((media, index) =>
+          media.markerUrl ? [{ url: media.markerUrl, name: `Фото ${index + 1} для печати` }] : [],
+        )}
+        mediaLoading={resultMediaQuery.isFetching}
+        mediaError={
+          resultMediaQuery.error ? "Не удалось загрузить готовые файлы. Откройте AR или повторите загрузку." : undefined
+        }
+        onReloadMedia={() => void resultMediaQuery.refetch()}
         qr={result}
         itemCount={itemIds.length}
         elapsedSeconds={elapsedSeconds}
@@ -391,7 +429,10 @@ function QuickCreatePage({ userId }: { userId: string }) {
                 file={markerFile}
                 previewUrl={markerPreview}
                 disabled={processing || Boolean(itemId)}
-                onPick={setMarkerFile}
+                onPick={(file) => {
+                  setMarkerFile(file);
+                  setEdits((current) => ({ ...current, markerCrop: undefined }));
+                }}
               />
               <span className="quick-media-link" aria-hidden="true">
                 <ArrowRightLeft size={20} />
@@ -402,9 +443,19 @@ function QuickCreatePage({ userId }: { userId: string }) {
                 file={videoFile}
                 previewUrl={videoPreview}
                 disabled={processing || Boolean(itemId)}
-                onPick={setVideoFile}
+                onPick={(file) => {
+                  setVideoFile(file);
+                  setEdits((current) => ({ ...current, video: undefined }));
+                }}
               />
             </div>
+            <MediaPairEditor
+              markerFile={markerFile}
+              videoFile={videoFile}
+              value={edits}
+              onChange={setEdits}
+              disabled={processing || Boolean(itemId)}
+            />
           </section>
 
           {additionalPairs.map((pair, index) => (
@@ -509,7 +560,7 @@ export function AdditionalArPhotoPair({
           file={pair.markerFile}
           previewUrl={markerPreview}
           disabled={disabled}
-          onPick={(file) => onChange({ ...pair, markerFile: file })}
+          onPick={(file) => onChange({ ...pair, markerFile: file, edits: { ...pair.edits, markerCrop: undefined } })}
         />
         <span className="quick-media-link" aria-hidden="true">
           <ArrowRightLeft size={20} />
@@ -519,9 +570,16 @@ export function AdditionalArPhotoPair({
           file={pair.videoFile}
           previewUrl={videoPreview}
           disabled={disabled}
-          onPick={(file) => onChange({ ...pair, videoFile: file })}
+          onPick={(file) => onChange({ ...pair, videoFile: file, edits: { ...pair.edits, video: undefined } })}
         />
       </div>
+      <MediaPairEditor
+        markerFile={pair.markerFile}
+        videoFile={pair.videoFile}
+        value={pair.edits ?? {}}
+        onChange={(edits) => onChange({ ...pair, edits })}
+        disabled={disabled}
+      />
     </section>
   );
 }
@@ -781,6 +839,10 @@ export function QuickResult({
   videoPreview,
   qr,
   itemCount = 1,
+  preparedPhotos,
+  mediaLoading,
+  mediaError,
+  onReloadMedia,
   elapsedSeconds,
   onReset,
 }: {
@@ -789,6 +851,10 @@ export function QuickResult({
   videoPreview?: string;
   qr: QrCodeRecord;
   itemCount?: number;
+  preparedPhotos?: { url: string; name: string }[];
+  mediaLoading?: boolean;
+  mediaError?: string;
+  onReloadMedia?: () => void;
   elapsedSeconds?: number;
   onReset(): void;
 }) {
@@ -855,6 +921,24 @@ export function QuickResult({
             </figure>
           </div>
 
+          {mediaLoading ? <p className="media-edit-note">Загружаем готовые файлы…</p> : null}
+          {mediaError ? (
+            <div role="alert">
+              <p>{mediaError}</p>
+              <Button variant="quiet" onClick={onReloadMedia}>
+                Повторить загрузку файлов
+              </Button>
+            </div>
+          ) : null}
+          {preparedPhotos?.length ? (
+            <div className="media-edit-actions">
+              {preparedPhotos.map((photo) => (
+                <a className="media-print-download" key={photo.url} href={photo.url} download>
+                  <Download size={17} /> {photo.name}
+                </a>
+              ))}
+            </div>
+          ) : null}
           <div className="quick-result-instruction">
             <ScanLine size={20} />
             <div>

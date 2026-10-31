@@ -1,0 +1,311 @@
+.media-pair-editor {
+  margin-top: 18px;
+  color: #34352f;
+}
+.media-ratio-warning {
+  border: 1px solid #e3c888;
+  background: #fff7e5;
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+.media-ratio-warning p,
+.media-edit-note {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 8px 0;
+  color: #62635e;
+}
+.media-ratio-match {
+  color: #176b4d;
+  font-size: 14px;
+}
+.media-edit-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+.media-pair-editor button,
+.media-editor-dialog button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid #d7d5ce;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: #fff;
+  color: #34352f;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.media-pair-editor button:disabled,
+.media-editor-dialog button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.media-pair-editor button:focus-visible,
+.media-editor-dialog :focus-visible {
+  outline: 3px solid #8060e4;
+  outline-offset: 3px;
+}
+.media-edit-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 13px;
+  color: #62635e;
+}
+.media-editor-dialog {
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: #faf9f6;
+  color: #252622;
+  width: min(1080px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  box-shadow: 0 24px 100px #0006;
+}
+.media-editor-dialog::backdrop {
+  background: #111b;
+  backdrop-filter: blur(6px);
+}
+.media-editor-header,
+.media-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
+  background: #faf9f6;
+  position: sticky;
+  z-index: 2;
+}
+.media-editor-header {
+  top: 0;
+  border-bottom: 1px solid #e2e0d9;
+}
+.media-editor-header span {
+  font-size: 12px;
+  color: #62635e;
+}
+.media-editor-header h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 4px 0;
+}
+.media-editor-body {
+  padding: 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 24px;
+}
+.media-editor-body h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 12px;
+}
+.media-crop-stage {
+  background: #20211e;
+  min-height: 220px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.media-crop-preview {
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+  cursor: move;
+}
+.media-crop-preview img,
+.media-crop-preview video {
+  position: absolute;
+  max-width: none;
+  object-fit: fill;
+  pointer-events: none;
+}
+.media-crop-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid #fffb;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 33.2%,
+      #fff5 33.3%,
+      transparent 33.5%,
+      transparent 66.5%,
+      #fff5 66.6%,
+      transparent 66.8%
+    ),
+    linear-gradient(
+      transparent 33.2%,
+      #fff5 33.3%,
+      transparent 33.5%,
+      transparent 66.5%,
+      #fff5 66.6%,
+      transparent 66.8%
+    );
+}
+.media-aspect-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.media-editor-dialog button[aria-pressed="true"],
+.media-editor-dialog .media-match-aspect {
+  border-color: #8060e4;
+  background: #eee8fc;
+  color: #5131aa;
+}
+.media-range-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 18px 0 10px;
+}
+.media-range-label output {
+  float: right;
+}
+.media-range-label input {
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  accent-color: #7351cd;
+}
+.media-video-playback,
+.media-timeline-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.media-timeline-section {
+  grid-column: 1/-1;
+  border-top: 1px solid #ddd;
+  padding-top: 20px;
+}
+.media-segment-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 10px;
+}
+.media-editor-dialog .media-segment-strip button {
+  display: flex;
+  flex-direction: column;
+  min-width: 120px;
+  gap: 4px;
+  background: #ebe8e0;
+}
+.media-segment-strip small {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.media-trim-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.media-trim-fields label {
+  font-size: 13px;
+}
+.media-trim-fields input {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  background: white;
+  border: 1px solid #d7d5ce;
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 8px;
+  font-size: 16px;
+  color: #252622;
+}
+.media-editor-footer {
+  bottom: 0;
+  border-top: 1px solid #e2e0d9;
+}
+.media-editor-dialog .media-editor-apply {
+  background: #6d45cb;
+  border-color: #6d45cb;
+  color: white;
+}
+.media-editor-controls {
+  min-width: 0;
+}
+@media (max-width: 700px) {
+  .media-editor-dialog {
+    width: calc(100vw - 12px);
+    max-height: calc(100dvh - 12px);
+    border-radius: 18px;
+  }
+  .media-editor-body {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px;
+    gap: 18px;
+  }
+  .media-editor-header,
+  .media-editor-footer {
+    padding: 14px 16px;
+  }
+  .media-editor-header h2 {
+    font-size: 18px;
+  }
+  .media-editor-footer button {
+    font-size: 13px;
+    padding: 10px;
+  }
+  .media-trim-fields {
+    gap: 10px;
+  }
+  .media-edit-actions button {
+    flex: 1 1 auto;
+  }
+}
+
+.media-prepared-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 16px 0;
+}
+.media-prepared-pair figure {
+  min-width: 0;
+  margin: 0;
+}
+.media-prepared-pair figcaption {
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.media-prepared-pair .media-crop-stage {
+  min-height: 180px;
+}
+.media-prepared-pair .media-crop-preview {
+  cursor: default;
+}
+
+.media-print-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid #d7d5ce;
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: #5131aa;
+  font-size: 14px;
+}
+
+.media-editor-body > * {
+  min-width: 0;
+}

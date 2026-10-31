@@ -121,11 +121,15 @@ export function createCornerFilter() {
   let corners: Quad | null = null,
     acceptedAt = -Infinity;
   let candidate: Quad | null = null;
+  let previousResidual: Quad | null = null;
+  let consistentShape = 0;
   const distance = (a: Quad, b: Quad) => Math.max(...a.map((p, i) => Math.hypot(p.x - b[i].x, p.y - b[i].y)));
   return {
     reset() {
       corners = null;
       candidate = null;
+      previousResidual = null;
+      consistentShape = 0;
       acceptedAt = -Infinity;
     },
     fresh(now: number) {
@@ -135,6 +139,8 @@ export function createCornerFilter() {
       if (!validQuad(next) || !Number.isFinite(now) || now <= acceptedAt) return null;
       if (!corners || now - acceptedAt > PLANAR_HOLD_MS) {
         corners = next.map((p) => ({ ...p })) as Quad;
+        previousResidual = null;
+        consistentShape = 0;
       } else {
         const size = Math.max(0.02, Math.hypot(corners[0].x - corners[2].x, corners[0].y - corners[2].y));
         const delta = distance(corners, next) / size;
@@ -146,13 +152,34 @@ export function createCornerFilter() {
           candidate = next;
           return null;
         }
-        // One shared coefficient preserves the measured shape. Normal camera
-        // motion follows immediately; only subpixel noise is damped strongly.
-        const cutoff = delta > 0.008 ? 35 : 3;
-        const alpha = 1 - Math.exp((-2 * Math.PI * cutoff * (now - acceptedAt)) / 1000);
+        // Approach/retreat is mostly one coherent scale + translation. Let
+        // that motion follow quickly without also opening the noise gate for
+        // independent corner wobble (especially magnified near the photograph).
+        const coherent = fitCornerSimilarity(corners, next);
+        const motion = distance(corners, coherent) / size;
+        const deformation = distance(coherent, next) / size;
+        const dt = (now - acceptedAt) / 1000;
+        const coefficient = (amount: number, quiet: number, moving: number, start: number, end: number) => {
+          const t = Math.max(0, Math.min(1, (amount - start) / (end - start)));
+          const smooth = t * t * (3 - 2 * t);
+          return 1 - Math.exp(-2 * Math.PI * (quiet + (moving - quiet) * smooth) * dt);
+        };
+        const residual = next.map((p, i) => ({ x: p.x - coherent[i].x, y: p.y - coherent[i].y })) as Quad;
+        const energy = (q: Quad) => q.reduce((sum, p) => sum + p.x * p.x + p.y * p.y, 0);
+        const correlation = previousResidual
+          ? residual.reduce((sum, p, i) => sum + p.x * previousResidual![i].x + p.y * previousResidual![i].y, 0) /
+            Math.max(1e-12, Math.sqrt(energy(residual) * energy(previousResidual)))
+          : 0;
+        consistentShape = correlation > 0.85 && deformation > 0.0005 ? consistentShape + 1 : 0;
+        previousResidual = residual;
+        const motionAlpha = coefficient(motion, 3, 35, 0.002, 0.004);
+        // A sustained perspective change is motion, not noise. Alternating
+        // corner errors do not pass this directional consistency check.
+        const shapeAlpha =
+          consistentShape >= 2 ? 1 - Math.exp(-2 * Math.PI * 35 * dt) : coefficient(deformation, 1.5, 35, 0.004, 0.025);
         corners = corners.map((p, i) => ({
-          x: p.x + alpha * (next[i].x - p.x),
-          y: p.y + alpha * (next[i].y - p.y),
+          x: p.x + motionAlpha * (coherent[i].x - p.x) + shapeAlpha * (next[i].x - coherent[i].x),
+          y: p.y + motionAlpha * (coherent[i].y - p.y) + shapeAlpha * (next[i].y - coherent[i].y),
         })) as Quad;
       }
       candidate = null;
@@ -183,4 +210,33 @@ export function cornerProjectionMatrix(
   return new three.Matrix4().set(
     ...([...row(rowX), ...row(rowY), 0, 0, 0, 0, ...row([h[6], h[7], 1])] as Parameters<Three.Matrix4["set"]>),
   );
+}
+
+// Least-squares similarity across all corners; it preserves their perspective
+// shape while isolating shared pan, zoom and in-plane rotation from deformation.
+function fitCornerSimilarity(previous: Quad, next: Quad): Quad {
+  const center = (points: Quad) => ({
+    x: points.reduce((sum, p) => sum + p.x, 0) / 4,
+    y: points.reduce((sum, p) => sum + p.y, 0) / 4,
+  });
+  const a = center(previous),
+    b = center(next);
+  let dot = 0,
+    cross = 0,
+    norm = 0;
+  previous.forEach((p, i) => {
+    const x = p.x - a.x,
+      y = p.y - a.y,
+      u = next[i].x - b.x,
+      v = next[i].y - b.y;
+    dot += x * u + y * v;
+    cross += x * v - y * u;
+    norm += x * x + y * y;
+  });
+  const real = dot / norm,
+    imaginary = cross / norm;
+  return previous.map((p) => ({
+    x: b.x + real * (p.x - a.x) - imaginary * (p.y - a.y),
+    y: b.y + imaginary * (p.x - a.x) + real * (p.y - a.y),
+  })) as Quad;
 }

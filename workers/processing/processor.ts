@@ -22,6 +22,7 @@ import {
   type ProcessingInput,
   type ProcessingJob,
 } from "./jobContract.js";
+import { buildEditedVideoArgs } from "./videoEditing.js";
 import { buildVideoFilter, parseVideoColorMetadata } from "./videoTranscode.js";
 
 type WorkerClient = SupabaseClient<Database>;
@@ -75,11 +76,7 @@ async function loadMarkerImage(sourcePath: string, decodedPath: string) {
     return await loadImage(sourcePath);
   } catch {
     try {
-      await command(
-        "ffmpeg",
-        ["-v", "error", "-i", sourcePath, "-frames:v", "1", "-y", decodedPath],
-        2 * 60 * 1000,
-      );
+      await command("ffmpeg", ["-v", "error", "-i", sourcePath, "-frames:v", "1", "-y", decodedPath], 2 * 60 * 1000);
       return await loadImage(decodedPath);
     } catch {
       throw new WorkerFault("marker_decode_failed");
@@ -196,7 +193,7 @@ async function generateThumbnail(sourcePath: string, outputPath: string) {
   }
 }
 
-async function transcodeVideo(sourcePath: string, outputPath: string) {
+async function transcodeVideo(sourcePath: string, outputPath: string, edits?: unknown) {
   try {
     const colorProbe = await command(
       "ffprobe",
@@ -214,6 +211,27 @@ async function transcodeVideo(sourcePath: string, outputPath: string) {
       2 * 60 * 1000,
     );
     const videoFilter = buildVideoFilter(parseVideoColorMetadata(colorProbe), await supportsZscale());
+    let mapping = ["-map", "0:v:0", "-map", "0:a:0?", "-vf", videoFilter];
+    if (edits !== undefined) {
+      const raw = await command(
+        "ffprobe",
+        ["-v", "error", "-show_entries", "stream=codec_type,duration:format=duration", "-of", "json", sourcePath],
+        120000,
+      );
+      const probe = JSON.parse(raw) as {
+        streams: { codec_type: string; duration?: string }[];
+        format?: { duration?: string };
+      };
+      const streamDuration = Number(probe.streams.find((s) => s.codec_type === "video")?.duration);
+      const duration =
+        Number.isFinite(streamDuration) && streamDuration > 0 ? streamDuration : Number(probe.format?.duration);
+      mapping = buildEditedVideoArgs(
+        edits,
+        duration,
+        probe.streams.some((s) => s.codec_type === "audio"),
+        videoFilter,
+      );
+    }
     await command(
       "ffmpeg",
       [
@@ -222,12 +240,7 @@ async function transcodeVideo(sourcePath: string, outputPath: string) {
         "-y",
         "-i",
         sourcePath,
-        "-map",
-        "0:v:0",
-        "-map",
-        "0:a:0?",
-        "-vf",
-        videoFilter,
+        ...mapping,
         "-c:v",
         "libx264",
         "-preset",
@@ -307,7 +320,21 @@ async function executeJob(
   const storagePath = buildGeneratedObjectPath(job, input);
   if (job.type === "video_transcode") {
     const outputPath = join(tempDirectory, "video.mp4");
-    await transcodeVideo(sourcePath, outputPath);
+    const asset = await client
+      .from("media_assets")
+      .select("metadata")
+      .eq("id", input.assetId)
+      .eq("account_id", job.account_id)
+      .eq("storage_bucket", input.bucket)
+      .eq("storage_path", input.path)
+      .single();
+    if (asset.error || !asset.data) throw new WorkerFault("invalid_job_asset");
+    const metadataValue = asset.data.metadata;
+    const edits =
+      metadataValue && typeof metadataValue === "object" && !Array.isArray(metadataValue)
+        ? metadataValue.edits
+        : undefined;
+    await transcodeVideo(sourcePath, outputPath, edits);
     await reportProgress(client, job, workerId, 75);
     const metadata = await inspectVideo(outputPath);
     const digest = await uploadGeneratedObject(client, storagePath, outputPath, "video/mp4");

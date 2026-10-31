@@ -54,7 +54,7 @@ export function audioConversionOptions() {
   };
 }
 
-export async function inspectVideoSource(file: File): Promise<InspectedVideoSource> {
+export async function inspectVideoSource(file: File, requireDecoding = true): Promise<InspectedVideoSource> {
   try {
     const { ALL_FORMATS, BlobSource, Input } = await import("mediabunny");
     const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(file) });
@@ -73,10 +73,10 @@ export async function inspectVideoSource(file: File): Promise<InspectedVideoSour
           videoTrack.getDisplayHeight(),
           input.getDurationFromMetadata(),
         ]);
-      if (!videoCodec || !videoDecodable) {
+      if (!videoCodec || (requireDecoding && !videoDecodable)) {
         throw new VideoOptimizationUnavailableError("Видеокодек не поддерживается этим браузером");
       }
-      if (audioTrack && (!audioCodec || !audioDecodable)) {
+      if (audioTrack && (!audioCodec || (requireDecoding && !audioDecodable))) {
         throw new VideoOptimizationUnavailableError("Аудиокодек не поддерживается этим браузером");
       }
       const durationSeconds = metadataDuration ?? (await input.computeDuration());

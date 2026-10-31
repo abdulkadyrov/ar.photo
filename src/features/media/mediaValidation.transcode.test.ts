@@ -35,6 +35,30 @@ describe("media video transcoding", () => {
       });
   });
 
+  it("preserves source bytes and queues exact crop/cut instructions instead of dropping edits during optimization", async () => {
+    vi.mocked(inspectVideoSource)
+      .mockReset()
+      .mockResolvedValue({ width: 1920, height: 1080, durationSeconds: 10, videoCodec: "avc", audioCodec: "aac" });
+    const source = new File(["....ftypisom....avc1....mp4a"], "source.mp4", { type: "video/mp4" });
+    const edits = {
+      version: 1 as const,
+      crop: { x: 0.25, y: 0, width: 0.5, height: 1 },
+      segments: [
+        { start: 1, end: 3 },
+        { start: 6, end: 9 },
+      ],
+    };
+    const prepared = await prepareMediaFile(source, "video", { videoEdits: edits });
+    expect(optimizeVideoFile).not.toHaveBeenCalled();
+    expect(await prepared.file.text()).toBe(await source.text());
+    expect(prepared.metadata).toMatchObject({
+      edits,
+      serverTranscodeRequired: true,
+      videoCodec: "source",
+      durationSeconds: 5,
+    });
+  });
+
   it("converts a browser-decodable non-MP4 video before upload", async () => {
     const source = new File(["webm-source"], "clip.webm", { type: "video/webm" });
     const prepared = await prepareMediaFile(source);
