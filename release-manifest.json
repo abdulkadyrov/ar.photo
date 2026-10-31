@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "product": "AR Photo",
-  "generatedAt": "2026-10-31T18:05:13.474Z",
+  "generatedAt": "2026-10-31T18:18:24.378Z",
   "source": {
-    "commit": "e2c24607d153e85ab817e346d58dfe4eba2c109c",
+    "commit": "cb93afa2147714c603e98273a05d14481b0413d9",
     "dirty": false
   },
   "runtime": {
@@ -166,13 +166,13 @@
   },
   "artifact": {
     "fileCount": 100,
-    "bytes": 31780037,
-    "sha256": "94a8857d8694f218818f73be0dafd9c7b8bbf6cbe07215c4332da28ebae71be9",
+    "bytes": 31780043,
+    "sha256": "6550f21521f9d9c0aa08150eedad672e0c940def9d94de0d394bded3792e5568",
     "files": [
       {
         "path": "_headers",
-        "bytes": 978,
-        "sha256": "9d1e1fa0366528c0e78d9db90fb7ab9fe51b2f161775017e0bb0abacac5070a2"
+        "bytes": 984,
+        "sha256": "0fd388ee8729682ee4465ca20ddcb4c90290892356aa3229a761dfe34fa6ba72"
       },
       {
         "path": ".vite/manifest.json",
