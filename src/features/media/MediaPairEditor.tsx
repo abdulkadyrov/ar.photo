@@ -17,6 +17,8 @@ import {
   type VideoEdits,
   type VideoSegment,
 } from "./mediaEdits";
+import { MediaComparison } from "./MediaComparison";
+import { VideoTimeline } from "./VideoTimeline";
 import "./MediaPairEditor.css";
 
 type Info = MediaSize & { url: string; duration: number; file: File };
@@ -136,53 +138,14 @@ export function MediaPairEditor({
           </button>
         ) : null}
       </div>
-      {(value.markerCrop || value.video) && marker.info && video.info ? (
-        <div className="media-prepared-pair" aria-label="Подготовленные кадры">
-          {(
-            [
-              { kind: "marker", info: marker.info, crop: value.markerCrop },
-              { kind: "video", info: video.info, crop: value.video?.crop },
-            ] as const
-          ).map((item) => {
-            const rect = item.crop ?? fullCrop;
-            const aspect = editedAspect(item.info, rect);
-            const style: CSSProperties = {
-              width: `${100 / rect.width}%`,
-              height: `${100 / rect.height}%`,
-              left: `${(-100 * rect.x) / rect.width}%`,
-              top: `${(-100 * rect.y) / rect.height}%`,
-            };
-            return (
-              <figure key={item.kind}>
-                <figcaption>
-                  {item.kind === "marker" ? "Фото после кадрирования" : "Кадр видео после монтажа"}
-                </figcaption>
-                <div className="media-crop-stage">
-                  <div
-                    className="media-crop-preview"
-                    style={{ aspectRatio: aspect, width: `min(100%, ${180 * aspect}px)` }}
-                  >
-                    {item.kind === "marker" ? (
-                      <img src={item.info.url} alt="Подготовленная фотография" style={style} />
-                    ) : (
-                      <video
-                        key={`${item.info.url}-${value.video?.segments?.[0]?.start ?? 0}`}
-                        src={item.info.url}
-                        muted
-                        playsInline
-                        preload="auto"
-                        style={style}
-                        onLoadedMetadata={(e) => {
-                          e.currentTarget.currentTime = value.video?.segments?.[0]?.start ?? 0;
-                        }}
-                      />
-                    )}
-                  </div>
-                </div>
-              </figure>
-            );
-          })}
-        </div>
+      {marker.info && video.info ? (
+        <MediaComparison
+          key={`${marker.info.url}-${video.info.url}`}
+          photo={marker.info}
+          video={video.info}
+          edits={value}
+          editing={!!editing}
+        />
       ) : null}
       <div className="media-edit-summary">
         {marker.info ? (
@@ -313,14 +276,20 @@ function MediaEditor({
     seek(next[0].start);
     setError("");
   };
-  const updateEdge = (edge: "start" | "end", time: number) => {
+  const updateEdge = (edge: "start" | "end", time: number, recordHistory = true) => {
     if (!Number.isFinite(time)) return;
     const low = edge === "start" ? (segments[selected - 1]?.end ?? 0) : currentSegment.start + 0.1;
     const high = edge === "start" ? currentSegment.end - 0.1 : (segments[selected + 1]?.start ?? info.duration);
     const bounded = Math.max(low, Math.min(high, time));
-    changeSegments(segments.map((s, i) => (i === selected ? { ...s, [edge]: bounded } : s)));
+    const next = segments.map((s, i) => (i === selected ? { ...s, [edge]: bounded } : s));
+    if (recordHistory) changeSegments(next);
+    else {
+      pause();
+      setSegments(next);
+    }
+
     setSelected(selected);
-    seek(edge === "start" ? bounded : currentSegment.start);
+    seek(bounded);
   };
   const mediaStyle: CSSProperties = {
     width: `${100 / crop.width}%`,
@@ -347,7 +316,7 @@ function MediaEditor({
           <div className="media-crop-stage">
             <div
               className="media-crop-preview"
-              style={{ aspectRatio: ratio, maxHeight: "48vh", width: `min(100%, ${48 * ratio}vh)` }}
+              style={{ aspectRatio: ratio, width: `min(100%, calc(var(--media-preview-height) * ${ratio}))` }}
               onPointerDown={(e) => {
                 e.currentTarget.setPointerCapture(e.pointerId);
                 const rect = e.currentTarget.getBoundingClientRect();
@@ -401,9 +370,37 @@ function MediaEditor({
               <div className="media-crop-grid" aria-hidden="true" />
             </div>
           </div>
-          <p className="media-edit-note">
-            Перемещайте изображение в рамке или используйте ползунки. Пропорции содержимого сохраняются.
-          </p>
+          <div className="media-aspect-presets" aria-label="Формат кадра">
+            <div className="media-aspect-source">
+              <button type="button" aria-pressed={isOriginal} onClick={() => setCrop(fullCrop)}>
+                Оригинал
+              </button>
+              {otherAspect ? (
+                <button
+                  type="button"
+                  className="media-match-aspect"
+                  aria-pressed={Math.abs(ratio - otherAspect) < 0.001}
+                  onClick={() => setCrop(cropForAspect(info, otherAspect))}
+                >
+                  {isVideo ? "Соотношение фото" : "Соотношение видео"}
+                </button>
+              ) : null}
+            </div>
+            <div className="media-aspect-sizes">
+              {aspectPresets.map((preset) => (
+                <button
+                  type="button"
+                  key={preset.label}
+                  aria-label={preset.label}
+                  title={preset.label}
+                  aria-pressed={Math.abs(ratio - preset.ratio) < 0.001}
+                  onClick={() => setCrop(cropForAspect(info, preset.ratio))}
+                >
+                  {preset.label.startsWith("А4") ? (preset.ratio < 1 ? "A4 ↕" : "A4 ↔") : preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
           {isVideo ? (
             <div className="media-video-playback">
               <button
@@ -429,210 +426,170 @@ function MediaEditor({
             </div>
           ) : null}
         </div>
-        <div className="media-editor-controls">
-          <h3>Формат кадра</h3>
-          <div className="media-aspect-presets">
-            <button type="button" aria-pressed={isOriginal} onClick={() => setCrop(fullCrop)}>
-              Оригинал
-            </button>
-            {otherAspect ? (
-              <button
-                type="button"
-                className="media-match-aspect"
-                onClick={() => setCrop(cropForAspect(info, otherAspect))}
-              >
-                {isVideo ? "Соотношение фото" : "Соотношение видео"}
-              </button>
-            ) : null}
-            {aspectPresets.map((preset) => (
-              <button
-                type="button"
-                key={preset.label}
-                aria-pressed={Math.abs(ratio - preset.ratio) < 0.001}
-                onClick={() => setCrop(cropForAspect(info, preset.ratio))}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-          <label className="media-range-label">
-            Увеличение <output>{zoom.toFixed(1)}×</output>
-            <input
-              aria-label="Увеличение кадра"
-              type="range"
-              min="1"
-              max="4"
-              step="0.01"
-              value={zoom}
-              onChange={(e) =>
-                setCrop(
-                  cropForAspect(
-                    info,
-                    ratio,
-                    Number(e.target.value),
-                    crop.width < 1 ? crop.x / (1 - crop.width) : 0.5,
-                    crop.height < 1 ? crop.y / (1 - crop.height) : 0.5,
-                  ),
-                )
-              }
-            />
-          </label>
-          <label className="media-range-label">
-            По горизонтали
-            <input
-              aria-label="Положение кадра по горизонтали"
-              type="range"
-              min="0"
-              max="1"
-              step="0.001"
-              disabled={crop.width >= 0.9999}
-              value={crop.width < 1 ? crop.x / (1 - crop.width) : 0.5}
-              onChange={(e) => setCrop({ ...crop, x: Number(e.target.value) * (1 - crop.width) })}
-            />
-          </label>
-          <label className="media-range-label">
-            По вертикали
-            <input
-              aria-label="Положение кадра по вертикали"
-              type="range"
-              min="0"
-              max="1"
-              step="0.001"
-              disabled={crop.height >= 0.9999}
-              value={crop.height < 1 ? crop.y / (1 - crop.height) : 0.5}
-              onChange={(e) => setCrop({ ...crop, y: Number(e.target.value) * (1 - crop.height) })}
-            />
-          </label>
-          <p className="media-edit-note">
-            {Math.round(info.width * crop.width)} × {Math.round(info.height * crop.height)} пикселей
-            {!isVideo ? " · после кадрирования скачайте фото для печати" : " · звук сохранится"}
-          </p>
-        </div>
-        {isVideo ? (
-          <section className="media-timeline-section" aria-label="Монтаж видео">
-            <div className="media-timeline-heading">
-              <h3>Фрагменты видео</h3>
-              <strong>Итого {timeLabel(segmentsDuration(segments))}</strong>
-            </div>
-            <label className="media-range-label">
-              Позиция разреза: {timeLabel(cursor)}
-              <input
-                aria-label="Позиция разреза"
-                type="range"
-                min="0"
-                max={info.duration}
-                step="0.01"
-                value={cursor}
-                onChange={(e) => {
+        <div className="media-editor-tools">
+          {isVideo ? (
+            <section className="media-timeline-section" aria-label="Монтаж видео">
+              <div className="media-timeline-heading">
+                <h3>Фрагменты видео</h3>
+                <strong>Итого {timeLabel(segmentsDuration(segments))}</strong>
+              </div>
+              <VideoTimeline
+                url={info.url}
+                duration={info.duration}
+                segments={segments}
+                selected={selected}
+                cursor={cursor}
+                onSeek={(time) => {
                   pause();
-                  seek(Number(e.target.value));
+                  seek(time);
                 }}
+                onSelect={setSelected}
+                onTrim={(edge, time) => updateEdge(edge, time, false)}
+                onTrimCommit={(previous) => setHistory((h) => [...h.slice(-49), previous])}
               />
-            </label>
-            <div className="media-segment-strip">
-              {segments.map((segment, index) => (
+              <div className="media-edit-actions">
                 <button
                   type="button"
-                  key={`${index}-${segment.start}`}
-                  aria-pressed={index === selected}
-                  style={{ flexGrow: segment.end - segment.start }}
+                  disabled={segments.length >= MAX_SEGMENTS || splitSegment(segments, cursor) === segments}
+                  onClick={() => changeSegments(splitSegment(segments, cursor))}
+                >
+                  <Scissors size={18} /> Разрезать здесь
+                </button>
+                <button
+                  type="button"
+                  disabled={segments.length <= 1}
+                  onClick={() => changeSegments(segments.filter((_, i) => i !== selected))}
+                >
+                  <Trash2 size={18} /> Удалить фрагмент {selected + 1}
+                </button>
+                <button
+                  type="button"
+                  disabled={!history.length}
                   onClick={() => {
                     pause();
-                    setSelected(index);
-                    seek(segment.start);
+                    const previous = history.at(-1)!;
+                    setHistory(history.slice(0, -1));
+                    setSegments(previous);
+                    setSelected(0);
+                    seek(previous[0].start);
                   }}
                 >
-                  <span>Фрагмент {index + 1}</span>
-                  <small>
-                    {timeLabel(segment.start)} — {timeLabel(segment.end)}
-                  </small>
+                  <Undo2 size={18} /> Отменить
                 </button>
-              ))}
-            </div>
-            <div className="media-edit-actions">
-              <button
-                type="button"
-                disabled={segments.length >= MAX_SEGMENTS || splitSegment(segments, cursor) === segments}
-                onClick={() => changeSegments(splitSegment(segments, cursor))}
-              >
-                <Scissors size={18} /> Разрезать здесь
-              </button>
-              <button
-                type="button"
-                disabled={segments.length <= 1}
-                onClick={() => changeSegments(segments.filter((_, i) => i !== selected))}
-              >
-                <Trash2 size={18} /> Удалить фрагмент {selected + 1}
-              </button>
-              <button
-                type="button"
-                disabled={!history.length}
-                onClick={() => {
-                  pause();
-                  const previous = history.at(-1)!;
-                  setHistory(history.slice(0, -1));
-                  setSegments(previous);
-                  setSelected(0);
-                  seek(previous[0].start);
-                }}
-              >
-                <Undo2 size={18} /> Отменить
-              </button>
-              <button type="button" onClick={() => changeSegments([{ start: 0, end: info.duration }])}>
-                Восстановить всё видео
-              </button>
-            </div>
-            <div className="media-edit-actions">
-              <button
-                type="button"
-                disabled={cursor < (segments[selected - 1]?.end ?? 0) || cursor > currentSegment.end - 0.1}
-                onClick={() => updateEdge("start", cursor)}
-              >
-                Начать фрагмент здесь
-              </button>
-              <button
-                type="button"
-                disabled={
-                  cursor < currentSegment.start + 0.1 || cursor > (segments[selected + 1]?.start ?? info.duration)
+                <button type="button" onClick={() => changeSegments([{ start: 0, end: info.duration }])}>
+                  Восстановить всё видео
+                </button>
+              </div>
+              <details className="media-trim-details">
+                <summary>Точные границы фрагмента {selected + 1}</summary>
+                <div className="media-edit-actions">
+                  <button
+                    type="button"
+                    disabled={cursor < (segments[selected - 1]?.end ?? 0) || cursor > currentSegment.end - 0.1}
+                    onClick={() => updateEdge("start", cursor)}
+                  >
+                    Начать фрагмент здесь
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      cursor < currentSegment.start + 0.1 || cursor > (segments[selected + 1]?.start ?? info.duration)
+                    }
+                    onClick={() => updateEdge("end", cursor)}
+                  >
+                    Закончить фрагмент здесь
+                  </button>
+                </div>
+                <div className="media-trim-fields">
+                  <label>
+                    Начало фрагмента {selected + 1}, сек
+                    <input
+                      aria-label="Начало фрагмента, секунды"
+                      type="number"
+                      min={segments[selected - 1]?.end ?? 0}
+                      max={currentSegment.end - 0.1}
+                      step="0.01"
+                      value={Number(currentSegment.start.toFixed(2))}
+                      onChange={(e) => updateEdge("start", e.target.valueAsNumber)}
+                    />
+                  </label>
+                  <label>
+                    Конец фрагмента {selected + 1}, сек
+                    <input
+                      aria-label="Конец фрагмента, секунды"
+                      type="number"
+                      min={currentSegment.start + 0.1}
+                      max={segments[selected + 1]?.start ?? info.duration}
+                      step="0.01"
+                      value={Number(currentSegment.end.toFixed(2))}
+                      onChange={(e) => updateEdge("end", e.target.valueAsNumber)}
+                    />
+                  </label>
+                </div>
+              </details>
+              <p className="media-edit-note">
+                Поставьте разрезы по краям паузы, выберите этот фрагмент и удалите. Оставшиеся части соединятся по
+                порядку вместе со звуком. До {MAX_SEGMENTS} фрагментов.
+              </p>
+            </section>
+          ) : null}
+          <details className="media-editor-controls" open={!isVideo}>
+            <summary>Положение и увеличение кадра</summary>
+            <label className="media-range-label">
+              Увеличение <output>{zoom.toFixed(1)}×</output>
+              <input
+                aria-label="Увеличение кадра"
+                type="range"
+                min="1"
+                max="4"
+                step="0.01"
+                value={zoom}
+                onChange={(e) =>
+                  setCrop(
+                    cropForAspect(
+                      info,
+                      ratio,
+                      Number(e.target.value),
+                      crop.width < 1 ? crop.x / (1 - crop.width) : 0.5,
+                      crop.height < 1 ? crop.y / (1 - crop.height) : 0.5,
+                    ),
+                  )
                 }
-                onClick={() => updateEdge("end", cursor)}
-              >
-                Закончить фрагмент здесь
-              </button>
-            </div>
-            <div className="media-trim-fields">
-              <label>
-                Начало фрагмента {selected + 1}, сек
-                <input
-                  aria-label="Начало фрагмента, секунды"
-                  type="number"
-                  min={segments[selected - 1]?.end ?? 0}
-                  max={currentSegment.end - 0.1}
-                  step="0.01"
-                  value={Number(currentSegment.start.toFixed(2))}
-                  onChange={(e) => updateEdge("start", e.target.valueAsNumber)}
-                />
-              </label>
-              <label>
-                Конец фрагмента {selected + 1}, сек
-                <input
-                  aria-label="Конец фрагмента, секунды"
-                  type="number"
-                  min={currentSegment.start + 0.1}
-                  max={segments[selected + 1]?.start ?? info.duration}
-                  step="0.01"
-                  value={Number(currentSegment.end.toFixed(2))}
-                  onChange={(e) => updateEdge("end", e.target.valueAsNumber)}
-                />
-              </label>
-            </div>
+              />
+            </label>
+            <label className="media-range-label">
+              По горизонтали
+              <input
+                aria-label="Положение кадра по горизонтали"
+                type="range"
+                min="0"
+                max="1"
+                step="0.001"
+                disabled={crop.width >= 0.9999}
+                value={crop.width < 1 ? crop.x / (1 - crop.width) : 0.5}
+                onChange={(e) => setCrop({ ...crop, x: Number(e.target.value) * (1 - crop.width) })}
+              />
+            </label>
+            <label className="media-range-label">
+              По вертикали
+              <input
+                aria-label="Положение кадра по вертикали"
+                type="range"
+                min="0"
+                max="1"
+                step="0.001"
+                disabled={crop.height >= 0.9999}
+                value={crop.height < 1 ? crop.y / (1 - crop.height) : 0.5}
+                onChange={(e) => setCrop({ ...crop, y: Number(e.target.value) * (1 - crop.height) })}
+              />
+            </label>
             <p className="media-edit-note">
-              Поставьте разрезы по краям паузы, выберите этот фрагмент и удалите. Оставшиеся части соединятся по порядку
-              вместе со звуком. До {MAX_SEGMENTS} фрагментов.
+              {Math.round(info.width * crop.width)} × {Math.round(info.height * crop.height)} пикселей
+              {!isVideo ? " · после кадрирования скачайте фото для печати" : " · звук сохранится"}
             </p>
-          </section>
-        ) : null}
-        {error ? <p role="alert">{error}</p> : null}
+          </details>
+          {error ? <p role="alert">{error}</p> : null}
+        </div>
       </div>
       <footer className="media-editor-footer">
         <button type="button" onClick={onClose}>
