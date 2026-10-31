@@ -38,6 +38,7 @@ concurrency:
 
 jobs:
   container:
+    if: github.event_name != 'schedule' || vars.PROCESSING_RUNNER_MODE != 'server'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -51,7 +52,7 @@ jobs:
           'node --check dist-worker/workers/processing/index.js &&
           ffmpeg -version >/dev/null && ffprobe -version >/dev/null && cwebp -version >/dev/null'
       - name: Drain production processing queue
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && vars.PROCESSING_RUNNER_MODE != 'server'
         env:
           SUPABASE_URL: ${{ secrets.PROCESSING_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROCESSING_SUPABASE_SERVICE_ROLE_KEY }}
