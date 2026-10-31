@@ -2,7 +2,7 @@ export function getSignUpErrorMessage(error: unknown) {
   const code = getErrorCode(error);
 
   if (code === "weak_password") {
-    return "Пароль не соответствует требованиям: минимум 10 символов, строчная и заглавная латинские буквы и цифра.";
+    return "Пароль не соответствует требованиям: минимум 8 символов, строчная и заглавная латинские буквы и цифра.";
   }
   if (code === "user_already_exists" || code === "email_exists") {
     return "Аккаунт с этим email уже существует. Перейдите ко входу или восстановите пароль.";

@@ -168,10 +168,10 @@ export function RegisterRoute() {
             inputProps={register("password")}
             type="password"
             autoComplete="new-password"
-            placeholder="10+ символов, A–Z, a–z и цифра"
+            placeholder="8+ символов, A–Z, a–z и цифра"
           />
           <p className="-mt-2 text-xs leading-5 text-muted">
-            Минимум 10 символов: строчная и заглавная латинские буквы и хотя бы одна цифра.
+            Минимум 8 символов: строчная и заглавная латинские буквы и хотя бы одна цифра.
           </p>
           <AuthField
             label="Повторите пароль"
@@ -298,10 +298,10 @@ export function UpdatePasswordRoute() {
           inputProps={register("password")}
           type="password"
           autoComplete="new-password"
-          placeholder="10+ символов, A–Z, a–z и цифра"
+          placeholder="8+ символов, A–Z, a–z и цифра"
         />
         <p className="-mt-2 text-xs leading-5 text-muted">
-          Минимум 10 символов: строчная и заглавная латинские буквы и хотя бы одна цифра.
+          Минимум 8 символов: строчная и заглавная латинские буквы и хотя бы одна цифра.
         </p>
         <AuthField
           label="Повторите пароль"

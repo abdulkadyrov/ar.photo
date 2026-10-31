@@ -6,6 +6,11 @@ describe("auth schemas", () => {
     expect(loginSchema.parse({ email: " user@example.com ", password: "password123" }).email).toBe("user@example.com");
   });
 
+  it("accepts eight characters and rejects seven for password changes", () => {
+    expect(updatePasswordSchema.safeParse({ password: "Abcdefg1", confirmPassword: "Abcdefg1" }).success).toBe(true);
+    expect(updatePasswordSchema.safeParse({ password: "Abcdef1", confirmPassword: "Abcdef1" }).success).toBe(false);
+  });
+
   it("rejects weak and mismatched passwords", () => {
     expect(loginSchema.safeParse({ email: "invalid", password: "short" }).success).toBe(false);
     expect(

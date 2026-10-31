@@ -28,6 +28,8 @@ services:
     mem_limit: 384m
     logging: *logs
   auth:
+    environment:
+      GOTRUE_PASSWORD_MIN_LENGTH: "8"
     mem_limit: 256m
     logging: *logs
   rest:
