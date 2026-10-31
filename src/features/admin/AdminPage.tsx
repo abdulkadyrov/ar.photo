@@ -282,8 +282,16 @@ export function AdminRoute() {
           detail={detail}
           plans={snapshot.plans}
           onGranted={async () => {
-            await queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
-            setDetail(await adminRepository.getAccountDetail(detail!.account.id, "Проверка назначенного пакета"));
+            try {
+              await queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
+              setDetail(await adminRepository.getAccountDetail(detail!.account.id, "Проверка назначенного пакета"));
+            } catch {
+              setToast({
+                title: "Пакет начислен",
+                message: "Не удалось обновить данные. Нажмите «Обновить», не начисляя пакет повторно.",
+                tone: "error",
+              });
+            }
           }}
           onEdit={(planId, status, days) =>
             openConfirm({ kind: "subscription", detail: detail!, planId, status, days })
@@ -696,14 +704,19 @@ function PlansSection({
               </StatusPill>
             </div>
             <p className="mt-2 text-sm text-muted">
-              {plan.code} · {plan.projectLimit ?? "∞"} проектов · {plan.teamLimit ?? "∞"} сотрудников
+              {plan.code}
+              {plan.productKind === "subscription"
+                ? ` · ${plan.projectLimit ?? "∞"} проектов · ${plan.teamLimit ?? "∞"} сотрудников`
+                : ""}
             </p>
             <p className="mt-2 text-sm font-semibold">
               {plan.productKind === "addon" ? "Дополнительный пакет" : "Тариф"}
             </p>
             <p className="mt-2 text-sm text-muted">{packageSummary(plan)}</p>
             <p className="mt-2 text-sm text-muted">
-              Хранилище: {plan.storageLimitBytes === null ? "Без ограничений" : formatBytes(plan.storageLimitBytes)}
+              {plan.productKind === "addon"
+                ? "Хранилище и команда остаются по основному тарифу"
+                : `Хранилище: ${plan.storageLimitBytes === null ? "Без ограничений" : formatBytes(plan.storageLimitBytes)}`}
             </p>
             <Button className="mt-4" variant="quiet" onClick={() => onEdit(plan)}>
               Редактировать
