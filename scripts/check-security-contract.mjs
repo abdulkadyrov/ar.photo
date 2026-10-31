@@ -78,6 +78,7 @@ const failures = [
     .map(([, , label]) => `missing Supabase Auth contract: ${label}`),
 ];
 const connectSources = headers.match(/connect-src ([^;]+)/)?.[1].split(/\s+/) ?? [];
+if (!connectSources.includes("blob:")) failures.push("CSP connect-src must allow cached AR tracking blob URLs");
 if (connectSources.includes("*")) failures.push("CSP connect-src must not use a global wildcard origin");
 if (/respondWith\(\s*caches\.match\(event\.request\)/.test(worker))
   failures.push("SW must not cache arbitrary requests");
