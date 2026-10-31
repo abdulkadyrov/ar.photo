@@ -151,11 +151,12 @@ export function PublicArViewerRoute() {
         setMode("caching");
         project = await cachePublicArProject(publicSlug, manifest, setCacheStep, controller.signal);
         setCachedProject(project);
-        stopMediaStream(stream);
-        scannerStreamRef.current = null;
+        // Transfer the existing stream to AR; do not stop/reopen the iPhone camera.
         scannerVideo.srcObject = null;
       }
-      await beginAr(project, playbackVideos);
+      const stream = scannerStreamRef.current ?? undefined;
+      await beginAr(project, playbackVideos, controller.signal, stream);
+      scannerStreamRef.current = null;
     } catch (error) {
       if (controller.signal.aborted) return;
       stopMediaStream(scannerStreamRef.current);
@@ -172,25 +173,39 @@ export function PublicArViewerRoute() {
     }
   };
 
-  const beginAr = async (project: CachedPublicArProject, playbackVideos: HTMLVideoElement[]) => {
+  const beginAr = async (
+    project: CachedPublicArProject,
+    playbackVideos: HTMLVideoElement[],
+    signal: AbortSignal,
+    cameraStream?: MediaStream,
+  ) => {
     if (!manifest || !containerRef.current) return;
     setMode("starting");
+    await nextPaint();
+    signal.throwIfAborted();
     sessionRef.current?.stop();
     sessionRef.current = null;
     materializedRef.current?.dispose();
     const materialized = materializeCachedPublicArProject(manifest, project);
     materializedRef.current = materialized;
-    sessionRef.current = await startPublicMindAr({
+    const session = await startPublicMindAr({
       container: containerRef.current,
       manifest: materialized.manifest,
       muted,
       playbackVideos,
+      cameraStream,
+      signal,
       onTrackingState: (state: PublicArTrackingState) => {
         setMode(state);
         if (state === "tracking") telemetry.track("marker_detected");
       },
       onPlaybackEvent: (event, valueSeconds, errorCode) => telemetry.track(event, valueSeconds, errorCode),
     });
+    if (signal.aborted) {
+      session.stop();
+      return;
+    }
+    sessionRef.current = session;
   };
 
   const openFallback = () => {

@@ -2,13 +2,14 @@ import type * as ThreeModule from "three";
 import { publicArTargets, type PublicArManifest, type PublicArTarget } from "./publicManifest";
 import { videoMilestones, type PublicArAnalyticsEvent } from "./telemetry";
 import { createArRecordingEngine, type ArRecording, type ArRecordingEngine } from "./arRecording";
-import { createStabilizedAnchor } from "./poseStabilizer";
+import { createPlanarAnchor, installPlanarObservations } from "./planarTrackingBridge";
+import { abortable, constructWithManagedResize, prepareArCamera, stopCameraStream } from "./arCameraSession";
 
 export type PublicArTrackingState = "searching" | "tracking";
 
 export const publicArTrackingConfig = Object.freeze({
   // MindAR uses milliseconds: 1 is a near-pass-through at camera rates.
-  // Stabilization happens once, on decomposed poses, below.
+  // Public overlay stabilization happens once, on measured image corners.
   filterMinCF: 1,
   filterBeta: 0,
   warmupTolerance: 7,
@@ -143,10 +144,13 @@ export async function startPublicMindAr(options: {
   muted: boolean;
   playbackVideo?: HTMLVideoElement;
   playbackVideos?: HTMLVideoElement[];
+  cameraStream?: MediaStream;
+  signal?: AbortSignal;
   onTrackingState(state: PublicArTrackingState): void;
   onPlaybackEvent(event: PublicArAnalyticsEvent, valueSeconds?: number | null, errorCode?: string | null): void;
 }): Promise<PublicArSession> {
   const { container, manifest, onTrackingState, onPlaybackEvent } = options;
+  options.signal?.throwIfAborted();
   const targets = publicArTargets(manifest);
   const videos =
     options.playbackVideos ??
@@ -157,7 +161,7 @@ export async function startPublicMindAr(options: {
   const [{ MindARThree }, THREE, trackingAssets] = await Promise.all([
     import("mind-ar/dist/mindar-image-three.prod.js"),
     import("three"),
-    Promise.all(targets.map((target) => fetchTrackingAsset(target.assets.trackingAssetUrl))),
+    Promise.all(targets.map((target) => fetchTrackingAsset(target.assets.trackingAssetUrl, options.signal))),
   ]);
   const Three = THREE as typeof ThreeModule;
 
@@ -169,16 +173,56 @@ export async function startPublicMindAr(options: {
   const mergedTrackingAsset = await mergeTrackingAssets(trackingAssets);
   const trackingAssetUrl = URL.createObjectURL(mergedTrackingAsset);
 
-  const mindar = new MindARThree({
-    container,
-    imageTargetSrc: trackingAssetUrl,
-    uiLoading: "no",
-    uiScanning: "no",
-    uiError: "no",
-    maxTrack: 1,
-    ...publicArTrackingConfig,
-  });
+  options.signal?.throwIfAborted();
+  const mindar = constructWithManagedResize(
+    () =>
+      new MindARThree({
+        container,
+        imageTargetSrc: trackingAssetUrl,
+        uiLoading: "no",
+        uiScanning: "no",
+        uiError: "no",
+        maxTrack: 1,
+        ...publicArTrackingConfig,
+      }),
+  );
+  const lifetime = new AbortController();
+  const abort = () => lifetime.abort(options.signal?.reason);
+  options.signal?.addEventListener("abort", abort, { once: true });
+  if (options.signal?.aborted) abort();
+  const readObservation = installPlanarObservations(mindar, lifetime.signal, isIosWebKit(), (error) =>
+    lifetime.abort(error),
+  );
+  mindar._startVideo = async () => {
+    const video = document.createElement("video");
+    mindar.video = video;
+    container.appendChild(video);
+    await prepareArCamera({
+      video,
+      signal: lifetime.signal,
+      stream: options.cameraStream,
+      constraints: boundedCameraConstraints({ audio: false, video: { facingMode: { ideal: "environment" } } }),
+    });
+  };
   const { renderer, scene, camera } = mindar;
+  // Wait for valid camera dimensions and a committed, visible React container.
+  const libraryResize = mindar.resize?.bind(mindar);
+  mindar.resize = () => {
+    if (
+      lifetime.signal.aborted ||
+      !mindar.controller ||
+      !mindar.video?.videoWidth ||
+      !container.clientWidth ||
+      !container.clientHeight
+    )
+      return;
+    libraryResize?.();
+  };
+  const resize = () => mindar.resize?.();
+  const observer = new ResizeObserver(resize);
+  observer.observe(container);
+  window.addEventListener("resize", resize);
+  window.visualViewport?.addEventListener("resize", resize);
   renderer.setPixelRatio?.(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setClearColor(0x000000, 0);
   let stopped = false;
@@ -248,10 +292,13 @@ export async function startPublicMindAr(options: {
         video.currentTime = 0;
       }
     };
-    const stabilizedAnchor = createStabilizedAnchor({
+    const stabilizedAnchor = createPlanarAnchor({
       three: Three,
       anchor,
       scene,
+      camera: camera as ThreeModule.Camera,
+      container,
+      readObservation: () => readObservation(index),
       isTracking: () => mindar.controller?.trackingStates?.[index]?.isTracking ?? anchor.visible,
       onFound,
       onLost,
@@ -297,7 +344,8 @@ export async function startPublicMindAr(options: {
 
   let recordingEngine: ArRecordingEngine | null = null;
   try {
-    await startMindArWithVisibleCamera(mindar);
+    await startMindArWithVisibleCamera(mindar, PUBLIC_AR_START_TIMEOUT_MS, lifetime.signal);
+    lifetime.signal.throwIfAborted();
     runtimes.forEach((runtime, index) => {
       const marker = resolveMarkerDimensions(
         runtime.target.marker,
@@ -323,6 +371,11 @@ export async function startPublicMindAr(options: {
     });
     onTrackingState("searching");
   } catch (error) {
+    lifetime.abort();
+    options.signal?.removeEventListener("abort", abort);
+    observer.disconnect();
+    window.removeEventListener("resize", resize);
+    window.visualViewport?.removeEventListener("resize", resize);
     document.removeEventListener("visibilitychange", visibility);
     renderer.setAnimationLoop(null);
     stopMindAr(mindar);
@@ -365,6 +418,11 @@ export async function startPublicMindAr(options: {
     stop() {
       if (stopped) return;
       stopped = true;
+      lifetime.abort();
+      options.signal?.removeEventListener("abort", abort);
+      observer.disconnect();
+      window.removeEventListener("resize", resize);
+      window.visualViewport?.removeEventListener("resize", resize);
       document.removeEventListener("visibilitychange", visibility);
       renderer.setAnimationLoop(null);
       recordingEngine?.dispose();
@@ -421,7 +479,8 @@ function configurePlaybackVideo(video: HTMLVideoElement, target: PublicArTarget,
 
 function stopMindAr(mindar: {
   stop(): void;
-  controller?: { dispose?: () => void };
+  video?: HTMLVideoElement;
+  controller?: { dispose?: () => void; worker?: { terminate(): void } };
   renderer: { dispose?: () => void; forceContextLoss?: () => void };
 }) {
   try {
@@ -433,6 +492,12 @@ function stopMindAr(mindar: {
     mindar.controller?.dispose?.();
   } catch {
     // A partially initialized worker must not block the remaining teardown.
+  }
+  mindar.controller?.worker?.terminate();
+  stopCameraStream(mindar.video?.srcObject as MediaStream | null);
+  if (mindar.video) {
+    mindar.video.srcObject = null;
+    mindar.video.remove();
   }
   mindar.renderer.dispose?.();
   mindar.renderer.forceContextLoss?.();
@@ -458,9 +523,10 @@ export async function startMindArWithVisibleCamera(
     controller?: object;
   },
   timeoutMs = PUBLIC_AR_START_TIMEOUT_MS,
+  signal?: AbortSignal,
 ) {
+  signal?.throwIfAborted();
   const restoreCameraRequest = installBoundedCameraRequest();
-  const stopWarmupGuard = isIosWebKit() ? bypassIosWarmup(mindar) : () => undefined;
   let startPromise: Promise<void>;
   try {
     startPromise = mindar.start();
@@ -470,11 +536,7 @@ export async function startMindArWithVisibleCamera(
   // MindAR creates the camera video synchronously, then waits for target data
   // and its worker while the video still has the library's z-index of -2.
   keepCameraVisible(mindar);
-  try {
-    await withTimeout(startPromise, timeoutMs);
-  } finally {
-    stopWarmupGuard();
-  }
+  await withTimeout(signal ? abortable(startPromise, signal) : startPromise, timeoutMs);
   keepCameraVisible(mindar);
 }
 
@@ -494,10 +556,10 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
   });
 }
 
-async function fetchTrackingAsset(url: string) {
+async function fetchTrackingAsset(url: string, signal?: AbortSignal) {
   let response: Response;
   try {
-    response = await fetch(url, { cache: "no-store", credentials: "omit" });
+    response = await fetch(url, { cache: "no-store", credentials: "omit", signal });
   } catch {
     throw new DOMException("Tracking asset unavailable", "NetworkError");
   }
@@ -541,14 +603,4 @@ function installBoundedCameraRequest() {
       // The browser may expose mediaDevices as a read-only host object.
     }
   };
-}
-
-function bypassIosWarmup(mindar: { controller?: object }) {
-  const timer = window.setInterval(() => {
-    const controller = mindar.controller as { dummyRun?: (input: HTMLVideoElement) => Promise<void> } | undefined;
-    if (!controller) return;
-    controller.dummyRun = async () => undefined;
-    window.clearInterval(timer);
-  }, 16);
-  return () => window.clearInterval(timer);
 }

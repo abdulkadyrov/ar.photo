@@ -1,4 +1,5 @@
 import jsQR from "jsqr";
+import { prepareArCamera } from "./arCameraSession";
 
 const SCAN_INTERVAL_MS = 120;
 const MAX_SCAN_WIDTH = 720;
@@ -23,25 +24,32 @@ export async function startQrCamera(video: HTMLVideoElement, signal?: AbortSigna
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new DOMException("Camera unavailable", "NotFoundError");
   }
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: false,
-    video: {
-      facingMode: { ideal: "environment" },
-      width: { ideal: 1280, max: 1920 },
-      height: { ideal: 720, max: 1080 },
-      frameRate: { ideal: 30, max: 30 },
-    },
-  });
-  if (signal?.aborted) {
-    stopMediaStream(stream);
-    throw new DOMException("QR scan cancelled", "AbortError");
+  const lifetime = new AbortController();
+  const abort = () => lifetime.abort(signal?.reason);
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) abort();
+  const timer = window.setTimeout(
+    () => lifetime.abort(new DOMException("Camera startup timed out", "TimeoutError")),
+    30_000,
+  );
+  try {
+    return await prepareArCamera({
+      video,
+      signal: lifetime.signal,
+      constraints: {
+        audio: false,
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280, max: 1920 },
+          height: { ideal: 720, max: 1080 },
+          frameRate: { ideal: 30, max: 30 },
+        },
+      },
+    });
+  } finally {
+    window.clearTimeout(timer);
+    signal?.removeEventListener("abort", abort);
   }
-  video.srcObject = stream;
-  video.muted = true;
-  video.playsInline = true;
-  video.setAttribute("webkit-playsinline", "");
-  await video.play();
-  return stream;
 }
 
 export function waitForMatchingProjectQr(

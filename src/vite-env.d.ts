@@ -56,6 +56,7 @@ declare module "mind-ar/dist/mindar-image-three.prod.js" {
     };
     controller?: {
       dispose?: () => void;
+      worker?: { terminate(): void };
       markerDimensions?: Array<[number, number]>;
       trackingStates?: Array<{ isTracking: boolean }>;
     };
@@ -72,6 +73,7 @@ declare module "mind-ar/dist/mindar-image-three.prod.js" {
       onTargetLost?: () => void;
       onTargetUpdate?: () => void;
     };
+    _startVideo(): Promise<void>;
     start(): Promise<void>;
     stop(): void;
     resize?(): void;
@@ -131,7 +133,14 @@ declare module "three" {
     renderOrder: number;
   }
 
+  export class Camera {
+    projectionMatrix: Matrix4;
+    projectionMatrixInverse: Matrix4;
+  }
+
   export class Matrix4 {
+    set(...values: number[]): this;
+    multiplyMatrices(a: Matrix4, b: Matrix4): this;
     elements: number[];
     copy(value: Matrix4): this;
     compose(position: Vector3, quaternion: Quaternion, scale: Vector3): this;
