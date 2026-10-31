@@ -55,6 +55,7 @@ export interface AdminRepository {
   setItemSuspended(accountId: string, itemId: string, suspended: boolean, reason: string): Promise<void>;
   retryProcessingJob(accountId: string, jobId: number, reason: string): Promise<void>;
   upsertPlan(input: AdminPlanInput): Promise<void>;
+  applyPackage(accountId: string, planId: string, requestId: string, reason: string): Promise<void>;
   updateSetting(key: AdminSetting["key"], value: AdminSetting["value"], reason: string): Promise<void>;
   requestPasswordReset(accountId: string, userId: string, reason: string): Promise<void>;
 }
@@ -199,20 +200,20 @@ export class SupabaseAdminRepository implements AdminRepository {
   }
 
   async upsertPlan(input: AdminPlanInput) {
-    const { error } = await this.client.rpc("admin_upsert_plan", {
-      p_plan_id: (input.id ?? null) as string,
-      p_code: input.code,
-      p_name: input.name,
-      p_description: input.description ?? "",
-      p_storage_limit_bytes: input.storageLimitBytes as number,
-      p_project_limit: input.projectLimit as number,
-      p_group_limit: input.groupLimit as number,
-      p_ar_item_limit: input.arItemLimit as number,
-      p_video_duration_limit_seconds: input.videoDurationLimitSeconds as number,
-      p_max_video_size_bytes: input.maxVideoSizeBytes as number,
-      p_team_limit: input.teamLimit as number,
-      p_is_active: input.isActive,
-      p_reason: adminReasonSchema.parse(input.reason),
+    const { reason, ...plan } = input;
+    const { error } = await this.client.rpc("admin_save_plan", {
+      p_input: plan,
+      p_reason: adminReasonSchema.parse(reason),
+    });
+    if (error) throw mapAdminError(error);
+  }
+
+  async applyPackage(accountId: string, planId: string, requestId: string, reason: string) {
+    const { error } = await this.client.rpc("admin_apply_package", {
+      p_target_account_id: accountId,
+      p_plan_id: planId,
+      p_request_id: requestId,
+      p_reason: adminReasonSchema.parse(reason),
     });
     if (error) throw mapAdminError(error);
   }

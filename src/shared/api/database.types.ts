@@ -771,6 +771,9 @@ export type Database = {
           code: string;
           created_at: string;
           description: string | null;
+          duration_days: number | null;
+          price_kopecks: number;
+          product_kind: string;
           group_limit: number | null;
           id: string;
           is_active: boolean;
@@ -787,6 +790,9 @@ export type Database = {
           code: string;
           created_at?: string;
           description?: string | null;
+          duration_days?: number | null;
+          price_kopecks?: number;
+          product_kind?: string;
           group_limit?: number | null;
           id?: string;
           is_active?: boolean;
@@ -803,6 +809,9 @@ export type Database = {
           code?: string;
           created_at?: string;
           description?: string | null;
+          duration_days?: number | null;
+          price_kopecks?: number;
+          product_kind?: string;
           group_limit?: number | null;
           id?: string;
           is_active?: boolean;
@@ -1038,6 +1047,12 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      admin_save_plan: { Args: { p_input: Json; p_reason: string }; Returns: undefined };
+      admin_apply_package: {
+        Args: { p_target_account_id: string; p_plan_id: string; p_request_id: string; p_reason: string };
+        Returns: undefined;
+      };
+
       abort_media_upload: {
         Args: { p_session_id: string };
         Returns: {

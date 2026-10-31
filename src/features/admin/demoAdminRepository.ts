@@ -251,6 +251,33 @@ export class DemoAdminRepository implements AdminRepository {
     this.audit(null, "admin.plan.upsert", "subscription_plans", id, reason, { code: plan.code });
   }
 
+  async applyPackage(accountId: string, planId: string, requestId: string, rawReason: string) {
+    const reason = adminReasonSchema.parse(rawReason);
+    if (this.state.snapshot.audit.items.some((event) => event.metadataSafe.requestId === requestId)) return;
+    const plan = this.plan(planId);
+    if (!plan.isActive) throw new AdminError("invalid", "Пакет отключён");
+    const detail = this.detail(accountId);
+    const expiresAt =
+      plan.durationDays === null && plan.productKind === "subscription"
+        ? null
+        : plan.productKind === "addon" && !detail.subscription.expiresAt
+          ? null
+          : new Date(
+              Math.max(Date.now(), Date.parse(detail.subscription.expiresAt ?? "") || 0) +
+                (plan.durationDays ?? 0) * 86400000,
+            ).toISOString();
+    await this.updateSubscription(accountId, {
+      planId: plan.productKind === "subscription" ? plan.id : detail.subscription.planId,
+      status: "active",
+      startsAt: detail.subscription.startsAt,
+      expiresAt,
+      gracePeriodEndsAt: null,
+      customLimits: detail.subscription.customLimits,
+      reason,
+    });
+    this.audit(accountId, "admin.package.grant", "subscription_plans", plan.id, reason, { requestId });
+  }
+
   async updateSetting(key: AdminSetting["key"], value: AdminSetting["value"], rawReason: string) {
     const reason = adminReasonSchema.parse(rawReason);
     const setting = this.state.snapshot.settings.find((candidate) => candidate.key === key);
@@ -348,6 +375,9 @@ function createState(): DemoState {
       code: "trial",
       name: "Trial",
       description: "Проверка AR Photo",
+      durationDays: 30,
+      priceKopecks: 0,
+      productKind: "subscription",
       storageLimitBytes: 1_073_741_824,
       projectLimit: 3,
       groupLimit: 12,
@@ -363,6 +393,9 @@ function createState(): DemoState {
       code: "studio",
       name: "Studio",
       description: "Коммерческий тариф студии",
+      durationDays: 30,
+      priceKopecks: 0,
+      productKind: "subscription",
       storageLimitBytes: 107_374_182_400,
       projectLimit: 100,
       groupLimit: 1000,

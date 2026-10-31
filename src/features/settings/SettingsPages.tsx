@@ -178,6 +178,14 @@ export function SubscriptionRoute() {
             <StatePill ok={entitlements.canWrite}>{subscriptionLabels[entitlements.subscription.status]}</StatePill>
           </div>
           <dl className="mt-6 grid gap-4 border-t border-line pt-5 text-sm">
+            <TextFact
+              label="Осталось добавлений фото"
+              value={
+                entitlements.limits.arItems === null
+                  ? "Без ограничений"
+                  : String(Math.max(0, entitlements.limits.arItems - entitlements.usage.arItems))
+              }
+            />
             <DateFact label="Начало" value={entitlements.subscription.startsAt} />
             <DateFact label="Окончание" value={entitlements.subscription.expiresAt} />
             <DateFact label="Льготный период до" value={entitlements.subscription.gracePeriodEndsAt} />
@@ -196,7 +204,10 @@ export function SubscriptionRoute() {
             </span>
             <div>
               <h2 className="text-xl font-semibold">Использование</h2>
-              <p className="mt-1 text-sm text-muted">Показатели рассчитываются на сервере по активным данным.</p>
+              <p className="mt-1 text-sm text-muted">
+                Добавления фото расходуются при создании AR-работы и не возвращаются после удаления. Хранилище и
+                остальные показатели считаются по текущим данным.
+              </p>
             </div>
           </div>
           <div className="mt-6 grid gap-5">
@@ -220,7 +231,7 @@ export function SubscriptionRoute() {
               limit={entitlements.limits.groups}
             />
             <UsageMeter
-              label="AR-работы"
+              label="Использовано добавлений AR-фото"
               icon={<WandSparkles size={17} />}
               used={entitlements.usage.arItems}
               limit={entitlements.limits.arItems}

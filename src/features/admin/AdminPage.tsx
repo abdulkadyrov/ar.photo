@@ -33,6 +33,9 @@ import {
   type AdminSetting,
 } from "./adminSchemas";
 import { getAdminRepository } from "./adminRepository";
+import { PlanEditor } from "./PlanEditor";
+import { packageSummary } from "./planPresentation";
+import { PackageGrant } from "./PackageGrant";
 
 const adminRepository = getAdminRepository();
 const tabs = [
@@ -76,6 +79,7 @@ export function AdminRoute() {
   const [contentResults, setContentResults] = useState<AdminContentResult[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<AdminPlan | null>(null);
   const [toast, setToast] = useState<{ title: string; message: string; tone: "success" | "error" } | null>(null);
 
   const accessQuery = useQuery({ queryKey: ["admin", "access"], queryFn: () => adminRepository.getAccess() });
@@ -277,12 +281,28 @@ export function AdminRoute() {
           key={detail?.account.id ?? "no-account"}
           detail={detail}
           plans={snapshot.plans}
+          onGranted={async () => {
+            await queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
+            setDetail(await adminRepository.getAccountDetail(detail!.account.id, "Проверка назначенного пакета"));
+          }}
           onEdit={(planId, status, days) =>
             openConfirm({ kind: "subscription", detail: detail!, planId, status, days })
           }
         />
       ) : null}
-      {tab === "plans" ? <PlansSection plans={snapshot.plans} onCreate={() => setPlanOpen(true)} /> : null}
+      {tab === "plans" ? (
+        <PlansSection
+          plans={snapshot.plans}
+          onCreate={() => {
+            setEditingPlan(null);
+            setPlanOpen(true);
+          }}
+          onEdit={(plan) => {
+            setEditingPlan(plan);
+            setPlanOpen(true);
+          }}
+        />
+      ) : null}
       {tab === "storage" ? <StorageSection accounts={snapshot.accounts.items} /> : null}
       {tab === "items" ? (
         <ItemsSection
@@ -349,15 +369,21 @@ export function AdminRoute() {
           await queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
         }}
       />
-      <CreatePlanModal
-        open={planOpen}
-        onClose={() => setPlanOpen(false)}
-        onSuccess={async () => {
-          setPlanOpen(false);
-          setToast({ title: "Тариф сохранён", message: "Изменение записано в admin audit.", tone: "success" });
-          await queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
-        }}
-      />
+      {planOpen ? (
+        <PlanEditor
+          plan={editingPlan}
+          onClose={() => setPlanOpen(false)}
+          onSuccess={async () => {
+            setPlanOpen(false);
+            setToast({
+              title: "Тариф сохранён",
+              message: "Условия обновлены. Уже выданные фото и срок сохранены.",
+              tone: "success",
+            });
+            await queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
+          }}
+        />
+      ) : null}
       {toast ? (
         <Toast title={toast.title} message={toast.message} tone={toast.tone} onDismiss={() => setToast(null)} />
       ) : null}
@@ -583,7 +609,9 @@ function SubscriptionsSection({
   detail,
   plans,
   onEdit,
+  onGranted,
 }: {
+  onGranted: () => Promise<void>;
   detail: AdminAccountDetail | null;
   plans: AdminPlan[];
   onEdit: (planId: string, status: SubscriptionStatus, days: number) => void;
@@ -596,12 +624,16 @@ function SubscriptionsSection({
   return (
     <Panel className="mt-6">
       <SectionTitle icon={<CreditCard size={19} />} title={`Подписка · ${detail.account.name}`} />
+      <PackageGrant detail={detail} plans={plans} onSuccess={onGranted} />
+      <h3 className="mt-8 text-lg font-semibold">Ручное управление состоянием подписки</h3>
       <div className="mt-5 grid gap-4 md:grid-cols-3">
         <Select
           label="Тариф"
           value={planId}
           onChange={(event) => setPlanId(event.target.value)}
-          options={plans.map((plan) => ({ value: plan.id, label: plan.name }))}
+          options={plans
+            .filter((plan) => plan.productKind === "subscription")
+            .map((plan) => ({ value: plan.id, label: plan.name }))}
         />
         <Select
           label="Статус"
@@ -612,7 +644,14 @@ function SubscriptionsSection({
             label: value,
           }))}
         />
-        <LabeledInput label="Продлить на дней" type="number" min="1" max="730" value={days} onChange={setDays} />
+        <LabeledInput
+          label="Окончание через дней от сегодня"
+          type="number"
+          min="1"
+          max="730"
+          value={days}
+          onChange={setDays}
+        />
       </div>
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted">
@@ -632,7 +671,15 @@ function SubscriptionsSection({
   );
 }
 
-function PlansSection({ plans, onCreate }: { plans: AdminPlan[]; onCreate: () => void }) {
+function PlansSection({
+  plans,
+  onCreate,
+  onEdit,
+}: {
+  plans: AdminPlan[];
+  onCreate: () => void;
+  onEdit: (plan: AdminPlan) => void;
+}) {
   return (
     <Panel className="mt-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -651,7 +698,16 @@ function PlansSection({ plans, onCreate }: { plans: AdminPlan[]; onCreate: () =>
             <p className="mt-2 text-sm text-muted">
               {plan.code} · {plan.projectLimit ?? "∞"} проектов · {plan.teamLimit ?? "∞"} сотрудников
             </p>
-            <p className="mt-2 text-sm text-muted">Хранилище: {formatBytes(plan.storageLimitBytes ?? 0)}</p>
+            <p className="mt-2 text-sm font-semibold">
+              {plan.productKind === "addon" ? "Дополнительный пакет" : "Тариф"}
+            </p>
+            <p className="mt-2 text-sm text-muted">{packageSummary(plan)}</p>
+            <p className="mt-2 text-sm text-muted">
+              Хранилище: {plan.storageLimitBytes === null ? "Без ограничений" : formatBytes(plan.storageLimitBytes)}
+            </p>
+            <Button className="mt-4" variant="quiet" onClick={() => onEdit(plan)}>
+              Редактировать
+            </Button>
           </article>
         ))}
       </div>
@@ -1023,60 +1079,14 @@ function CreateAccountModal({
             label="Тариф"
             value={planId}
             onChange={(event) => setPlanId(event.target.value)}
-            options={plans.map((plan) => ({ value: plan.id, label: plan.name }))}
+            options={plans
+              .filter((plan) => plan.productKind === "subscription")
+              .map((plan) => ({ value: plan.id, label: plan.name }))}
           />
         </div>
         <div className="sm:col-span-2">
           <LabeledInput label="Причина создания" value={reason} onChange={setReason} />
         </div>
-      </div>
-      {mutation.error ? (
-        <p className="mt-3 text-sm text-rose-700" role="alert">
-          {readableAdminError(mutation.error)}
-        </p>
-      ) : null}
-    </Modal>
-  );
-}
-
-function CreatePlanModal({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess: () => void }) {
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("");
-  const [reason, setReason] = useState("");
-  const mutation = useMutation({
-    mutationFn: () =>
-      adminRepository.upsertPlan({
-        code,
-        name,
-        description: "Тариф AR Photo",
-        storageLimitBytes: 107_374_182_400,
-        projectLimit: 100,
-        groupLimit: 1000,
-        arItemLimit: 10_000,
-        videoDurationLimitSeconds: 600,
-        maxVideoSizeBytes: 524_288_000,
-        teamLimit: 20,
-        isActive: true,
-        reason,
-      }),
-    onSuccess,
-  });
-  return (
-    <Modal
-      open={open}
-      title="Новый тариф"
-      description="Лимиты применяются сервером; изменение записывается в audit."
-      onClose={onClose}
-      actions={
-        <Button disabled={mutation.isPending || reason.trim().length < 10} onClick={() => mutation.mutate()}>
-          {mutation.isPending ? "Сохраняем…" : "Создать тариф"}
-        </Button>
-      }
-    >
-      <div className="grid gap-4">
-        <LabeledInput label="Код тарифа" placeholder="agency" value={code} onChange={setCode} />
-        <LabeledInput label="Название" placeholder="Agency" value={name} onChange={setName} />
-        <LabeledInput label="Причина" value={reason} onChange={setReason} />
       </div>
       {mutation.error ? (
         <p className="mt-3 text-sm text-rose-700" role="alert">

@@ -52,3 +52,35 @@ Keep the cloud project available until migration acceptance.
 Files initially stored on the server consume its 40 GB disk. External S3
 must be configured and verified separately; provider replication does not
 replace backups. Maintain an off-server backup and test restoring it.
+
+## Editable tariff packages and photo credits
+
+`20261031171824_editable_photo_credit_packages.sql` adds catalog prices in
+kopecks, duration in days (30/365 are explicit day-based periods), subscription
+products and additive photo/time packages. Admin → Tariffs edits the catalog;
+Admin → Accounts → open account with a reason → Subscriptions grants a package.
+Both mutations require superadmin plus MFA and record an audit entry. Prices
+are informational until a payment provider is integrated; granting does not
+charge a card. Deactivating a product prevents future grants, without revoking
+previously issued access.
+
+Each new AR work consumes one creation credit atomically. Editing an existing
+work or restoring that same work does not create a new charge. Hard and soft
+deletion do not refund credits. Failed/rolled-back creation consumes nothing;
+a failed upload after a work was created still leaves that creation spent.
+Uploads must still satisfy storage, size and account-status limits.
+
+Credit wallets are private and lock per account; immutable spend receipts
+survive work deletion. Package grants use a request UUID for idempotency and
+store the issued product snapshot. Remaining credits carry forward when a new
+package is granted; no automatic monthly reset or billing is implemented.
+Time adds to the later of today and current expiry. Photo-only add-ons do not
+reactivate expired subscriptions. A base product can issue unlimited creations
+or no expiry; time-only add-ons use zero photos. Catalog edits never change
+already issued credit allowance or expiry; other plan resource limits remain
+live as before.
+
+Migration initializes spent credits from all surviving AR rows, including
+soft-deleted rows. Hard deletions before migration cannot be reconstructed.
+Rehearse against an isolated restored database, run the full pgTAP suite, take
+a fresh restricted backup, then apply the migration in a single transaction.

@@ -742,3 +742,56 @@ test("keeps PWA caching static-only and restores the last visited shell offline"
   await expect(page.getByRole("heading", { name: "Главная", exact: true })).toBeVisible();
   await context.setOffline(false);
 });
+
+test("edits photo credit packages and grants an addon from the admin panel", async ({ page }) => {
+  await page.goto("./admin");
+  await signInToDemo(page);
+  const nav = page.getByRole("navigation", { name: "Разделы admin-панели" });
+  await nav.getByRole("button", { name: "Тарифы", exact: true }).click();
+  await page.getByRole("button", { name: "Новый тариф", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Новый тариф или пакет" });
+  await editor.getByRole("combobox", { name: "Тип", exact: true }).selectOption("addon");
+  await editor.getByLabel("Код тарифа", { exact: true }).fill("extra_photos");
+  await editor.getByLabel("Название", { exact: true }).fill("Ещё 50 фото");
+  await editor.getByLabel("Стоимость, ₽", { exact: true }).fill("490");
+  await editor.getByLabel("Срок, дней (30 — месяц, 365 — год)", { exact: true }).fill("0");
+  await editor.getByLabel("Добавления AR-фото", { exact: true }).fill("50");
+  await editor
+    .getByLabel("Причина изменения (от 10 символов)", { exact: true })
+    .fill("Настройка дополнительного пакета фото");
+  await editor.getByRole("button", { name: "Сохранить тариф" }).click();
+  await expect(editor).toHaveCount(0);
+  const card = page
+    .getByRole("article")
+    .filter({ has: page.getByRole("heading", { name: "Ещё 50 фото", exact: true }) });
+  await expect(card).toContainText("50 добавлений фото · 0 дней · 490 ₽");
+  await card.getByRole("button", { name: "Редактировать" }).click();
+  const edit = page.getByRole("dialog", { name: "Редактировать тариф" });
+  await expect(edit.getByLabel("Добавления AR-фото", { exact: true })).toHaveValue("50");
+  await edit.getByLabel("Добавления AR-фото", { exact: true }).fill("75");
+  await edit
+    .getByLabel("Причина изменения (от 10 символов)", { exact: true })
+    .fill("Увеличение дополнительного пакета фото");
+  await edit.getByRole("button", { name: "Сохранить тариф" }).click();
+  await expect(card).toContainText("75 добавлений фото");
+  await nav.getByRole("button", { name: "Аккаунты", exact: true }).click();
+  await page
+    .getByRole("article")
+    .filter({ hasText: "Alpha Studio" })
+    .getByRole("button", { name: "Открыть с причиной" })
+    .click();
+  const support = page.getByRole("dialog", { name: "Support access: Alpha Studio" });
+  await support.getByLabel("Причина обращения").fill("Назначение оплаченного дополнительного пакета");
+  await support.getByRole("button", { name: "Открыть аккаунт" }).click();
+  await expect(support).toHaveCount(0);
+  await nav.getByRole("button", { name: "Подписки", exact: true }).click();
+  await page
+    .getByRole("combobox", { name: "Тариф или пакет", exact: true })
+    .selectOption({ label: "Ещё 50 фото · 75 добавлений фото · 0 дней · 490 ₽" });
+  await page
+    .getByLabel("Причина назначения (от 10 символов)", { exact: true })
+    .fill("Пакет подтверждён владельцем аккаунта");
+  await page.getByRole("button", { name: "Подтвердить и начислить пакет" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Пакет начислен" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
