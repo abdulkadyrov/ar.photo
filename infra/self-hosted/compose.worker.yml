@@ -1,0 +1,26 @@
+services:
+  processing:
+    image: ${AR_PHOTO_WORKER_IMAGE:-ar-photo-worker:beget-20261031}
+    container_name: ar-photo-processing
+    restart: unless-stopped
+    init: true
+    mem_limit: 1024m
+    cpus: 1.0
+    pids_limit: 256
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    env_file:
+      - .env.worker
+    environment:
+      PROCESSING_WORKER_ID: beget-ar-photo-01
+      PROCESSING_CONCURRENCY: "1"
+      PROCESSING_POLL_INTERVAL_MS: "2000"
+    volumes:
+      - ./worker-tmp:/tmp
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

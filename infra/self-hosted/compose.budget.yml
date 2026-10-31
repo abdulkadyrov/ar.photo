@@ -1,0 +1,61 @@
+services:
+  api-gw:
+    ports: !override
+      - "127.0.0.1:8000:8000"
+    mem_limit: 128m
+    logging: &logs
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+  db:
+    mem_limit: 1024m
+    shm_size: 128m
+    command:
+      - postgres
+      - -c
+      - config_file=/etc/postgresql/postgresql.conf
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - work_mem=4MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - max_connections=100
+    logging: *logs
+  studio:
+    mem_limit: 384m
+    logging: *logs
+  auth:
+    mem_limit: 256m
+    logging: *logs
+  rest:
+    mem_limit: 128m
+    environment:
+      PGRST_DB_POOL: "10"
+    logging: *logs
+  storage:
+    mem_limit: 384m
+    logging: *logs
+  imgproxy:
+    mem_limit: 128m
+    logging: *logs
+  meta:
+    mem_limit: 192m
+    logging: *logs
+  functions:
+    mem_limit: 512m
+    environment:
+      # Signed media URLs must use the public HTTPS origin, not api-gw:8000.
+      SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
+    env_file:
+      - .env.functions
+    logging: *logs
+  realtime:
+    profiles: [optional]
+  supavisor:
+    profiles: [optional]
+    ports: !override
+      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:6543:6543"

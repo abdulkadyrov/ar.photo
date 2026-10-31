@@ -3,8 +3,8 @@
   "specifiers": {
     "jsr:@supabase/functions-js@2.111.0": "2.111.0",
     "npm:@supabase/server@1.4.1": "1.4.1_@supabase+supabase-js@2.111.0",
-    "npm:openai@^4.52.5": "4.104.0_zod@4.4.3",
-    "npm:zod@4.4.3": "4.4.3"
+    "npm:openai@^4.52.5": "4.104.0_zod@4.6.7",
+    "npm:zod@4.6.7": "4.6.7"
   },
   "jsr": {
     "@supabase/functions-js@2.111.0": {
@@ -249,7 +249,7 @@
         "whatwg-url"
       ]
     },
-    "openai@4.104.0_zod@4.4.3": {
+    "openai@4.104.0_zod@4.6.7": {
       "integrity": "sha512-p99EFNsA/yX6UhVO93f5kJsDRLAg+CTA2RBqdHK4RtK8u5IJw32Hyb2dTGKbnnFmnuoBv5r7Z2CURI9sGZpSuA==",
       "dependencies": [
         "@types/node@18.19.130",
@@ -291,15 +291,15 @@
         "webidl-conversions"
       ]
     },
-    "zod@4.4.3": {
-      "integrity": "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="
+    "zod@4.6.7": {
+      "integrity": "sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg=="
     }
   },
   "workspace": {
     "dependencies": [
       "jsr:@supabase/functions-js@2.111.0",
       "npm:@supabase/server@1.4.1",
-      "npm:zod@4.4.3"
+      "npm:zod@4.6.7"
     ]
   }
 }

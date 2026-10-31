@@ -1,0 +1,11 @@
+[Unit]
+Description=Back up AR Photo database, media and configuration
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/ar-photo/backup.sh
+Nice=10
+IOSchedulingClass=idle
+UMask=0077
