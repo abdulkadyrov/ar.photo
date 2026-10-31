@@ -84,3 +84,17 @@ Migration initializes spent credits from all surviving AR rows, including
 soft-deleted rows. Hard deletions before migration cannot be reconstructed.
 Rehearse against an isolated restored database, run the full pgTAP suite, take
 a fresh restricted backup, then apply the migration in a single transaction.
+
+## Temporary MFA opt-out
+
+The registry flag `admin_mfa_required` defaults to true. An explicit server
+opt-out permits single-factor sessions only for active superadmins; ordinary
+users remain forbidden. The UI and administrative Edge Functions use the same
+server policy and never label a single-factor session as MFA verified. To
+re-enable the policy, enroll/verify a factor in Security first, then switch the
+flag on in Admin settings. Removing a user's Auth factor is separate from the
+console policy and requires enrolling again later.
+
+Account deletion closes the tenant and cancels memberships/subscription while
+preserving data and audit. The same request can be retried safely. The UI asks
+for one confirmation and records its audit reason automatically.

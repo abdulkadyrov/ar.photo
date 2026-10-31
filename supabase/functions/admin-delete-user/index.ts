@@ -6,7 +6,7 @@ type RpcError = { code?: string };
 type UserRpcClient = {
   rpc<T>(name: string, args?: Record<string, unknown>): Promise<{ data: T | null; error: RpcError | null }>;
 };
-type AdminAccess = { isSuperadmin: boolean; mfaVerified: boolean };
+type AdminAccess = { isSuperadmin: boolean; mfaVerified: boolean; mfaRequired?: boolean };
 
 const deleteUserSchema = z
   .object({
@@ -38,7 +38,8 @@ export default {
     const userRpc = context.supabase as unknown as UserRpcClient;
     const access = await userRpc.rpc<AdminAccess>("get_admin_access");
     if (access.error || !access.data?.isSuperadmin) return Response.json({ code: "forbidden" }, { status: 403 });
-    if (!access.data.mfaVerified) return Response.json({ code: "mfa_required" }, { status: 403 });
+    if (access.data.mfaRequired !== false && !access.data.mfaVerified)
+      return Response.json({ code: "mfa_required" }, { status: 403 });
 
     const authorization = await userRpc.rpc<{ authorized: boolean; userId: string }>("admin_authorize_user_deletion", {
       p_target_account_id: payload.data.accountId,

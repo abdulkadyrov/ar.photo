@@ -751,14 +751,11 @@ test("edits photo credit packages and grants an addon from the admin panel", asy
   await page.getByRole("button", { name: "Новый тариф", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "Новый тариф или пакет" });
   await editor.getByRole("combobox", { name: "Тип", exact: true }).selectOption("addon");
-  await editor.getByLabel("Код тарифа", { exact: true }).fill("extra_photos");
+  await expect(editor.getByLabel("Код тарифа", { exact: true })).not.toBeVisible();
   await editor.getByLabel("Название", { exact: true }).fill("Ещё 50 фото");
   await editor.getByLabel("Стоимость, ₽", { exact: true }).fill("490");
   await editor.getByLabel("Срок, дней (30 — месяц, 365 — год)", { exact: true }).fill("0");
   await editor.getByLabel("Добавления AR-фото", { exact: true }).fill("50");
-  await editor
-    .getByLabel("Причина изменения (от 10 символов)", { exact: true })
-    .fill("Настройка дополнительного пакета фото");
   await editor.getByRole("button", { name: "Сохранить тариф" }).click();
   await expect(editor).toHaveCount(0);
   const card = page
@@ -769,9 +766,6 @@ test("edits photo credit packages and grants an addon from the admin panel", asy
   const edit = page.getByRole("dialog", { name: "Редактировать тариф" });
   await expect(edit.getByLabel("Добавления AR-фото", { exact: true })).toHaveValue("50");
   await edit.getByLabel("Добавления AR-фото", { exact: true }).fill("75");
-  await edit
-    .getByLabel("Причина изменения (от 10 символов)", { exact: true })
-    .fill("Увеличение дополнительного пакета фото");
   await edit.getByRole("button", { name: "Сохранить тариф" }).click();
   await expect(card).toContainText("75 добавлений фото");
   await nav.getByRole("button", { name: "Аккаунты", exact: true }).click();
@@ -794,4 +788,17 @@ test("edits photo credit packages and grants an addon from the admin panel", asy
   await page.getByRole("button", { name: "Подтвердить и начислить пакет" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Пакет начислен" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("deletes an account with one confirmation and no typed service fields", async ({ page }) => {
+  await page.goto("./admin");
+  await signInToDemo(page);
+  const nav = page.getByRole("navigation", { name: "Разделы admin-панели" });
+  await nav.getByRole("button", { name: "Аккаунты", exact: true }).click();
+  const account = page.getByRole("article").filter({ hasText: "Beta Studio" });
+  await account.getByRole("button", { name: "Удалить аккаунт", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Удалить аккаунт Beta Studio?" });
+  await expect(dialog.getByRole("textbox")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Удалить аккаунт", exact: true }).click();
+  await expect(account).toHaveCount(0);
 });

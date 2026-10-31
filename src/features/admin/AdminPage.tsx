@@ -83,7 +83,9 @@ export function AdminRoute() {
   const [toast, setToast] = useState<{ title: string; message: string; tone: "success" | "error" } | null>(null);
 
   const accessQuery = useQuery({ queryKey: ["admin", "access"], queryFn: () => adminRepository.getAccess() });
-  const canLoad = Boolean(accessQuery.data?.isSuperadmin && accessQuery.data.mfaVerified);
+  const canLoad = Boolean(
+    accessQuery.data?.isSuperadmin && (accessQuery.data.mfaRequired === false || accessQuery.data.mfaVerified),
+  );
   const snapshotQuery = useQuery({
     queryKey: ["admin", "snapshot", submittedSearch],
     queryFn: () => adminRepository.getSnapshot(submittedSearch),
@@ -169,6 +171,7 @@ export function AdminRoute() {
       }
       setToast({ title: "Операция выполнена", message: "Изменение записано в admin audit.", tone: "success" });
       closeConfirmation();
+      if (completedAction?.kind === "setting") await accessQuery.refetch();
       await queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
       if (wasItem && contentSearch.trim().length >= 2) {
         setContentResults(await adminRepository.searchContent(contentSearch));
@@ -202,7 +205,7 @@ export function AdminRoute() {
       </AppShell>
     );
   }
-  if (!accessQuery.data.mfaVerified) {
+  if (accessQuery.data.mfaRequired !== false && !accessQuery.data.mfaVerified) {
     return <MfaRequired onVerified={() => void accessQuery.refetch()} />;
   }
   if (snapshotQuery.isPending) return <AdminLoading />;
@@ -214,12 +217,16 @@ export function AdminRoute() {
   const openConfirm = (action: ConfirmAction) => {
     setConfirmAction(action);
     setConfirmation("");
-    setReason("");
+    setReason(action.kind === "account-delete" ? `Удаление аккаунта «${action.account.name}» администратором` : "");
   };
 
   return (
     <AppShell
-      eyebrow="MFA подтверждена · действия аудируются"
+      eyebrow={
+        accessQuery.data.mfaRequired === false
+          ? "MFA временно отключена · история действий включена"
+          : "MFA подтверждена · действия аудируются"
+      }
       title="Супер-админ"
       description="Пользователи, подписки, проекты и системные события AR Photo в одном защищённом пространстве."
       actions={
@@ -440,7 +447,7 @@ function OverviewSection({ snapshot }: { snapshot: Awaited<ReturnType<typeof adm
         <Panel>
           <SectionTitle icon={<ShieldCheck size={19} />} title="Защита операций" />
           <p className="mt-3 text-sm leading-6 text-muted">
-            Данные доступны только активному супер-админу после MFA. Пароли и их хэши отсутствуют во всех контрактах.
+            Доступ есть только у активного суперадминистратора. Требование MFA управляется в настройках админки.
           </p>
         </Panel>
         <Panel>
@@ -908,7 +915,9 @@ function SettingsSection({
           <article key={setting.key} className="rounded-2xl border border-line p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="font-mono text-sm font-semibold text-primary">{setting.key}</h3>
+                <h3 className="font-mono text-sm font-semibold text-primary">
+                  {setting.key === "admin_mfa_required" ? "Подтверждение MFA в админке" : setting.key}
+                </h3>
                 <p className="mt-1 text-sm text-muted">{setting.description}</p>
               </div>
               {typeof setting.value === "boolean" ? (
@@ -1013,7 +1022,7 @@ function ConfirmModal({
       title={actionTitle(action)}
       description={
         action?.kind === "account-delete"
-          ? `Аккаунт исчезнет из рабочих списков, его подписка и доступы пользователей будут отключены. Audit сохраняется. Введите «${word}».`
+          ? `Удалить аккаунт «${action.account.name}»? Он исчезнет из списка, подписка и доступы пользователей будут отключены. Данные и история останутся в архиве.`
           : `Опасная операция требует причину и точный ввод «${word}».`
       }
       onClose={onClose}
@@ -1028,17 +1037,21 @@ function ConfirmModal({
               ? "danger"
               : "primary"
           }
-          disabled={pending || reason.trim().length < 10 || confirmation !== word}
+          disabled={
+            pending || (action?.kind !== "account-delete" && (reason.trim().length < 10 || confirmation !== word))
+          }
           onClick={onSubmit}
         >
-          {pending ? "Выполняем…" : "Подтвердить"}
+          {pending ? "Выполняем…" : action?.kind === "account-delete" ? "Удалить аккаунт" : "Подтвердить"}
         </Button>
       }
     >
-      <div className="grid gap-4">
-        <LabeledInput label="Причина" placeholder="Номер обращения и основание" value={reason} onChange={onReason} />
-        <LabeledInput label={`Введите ${word}`} value={confirmation} onChange={onConfirmation} />
-      </div>
+      {action?.kind !== "account-delete" ? (
+        <div className="grid gap-4">
+          <LabeledInput label="Причина" placeholder="Номер обращения и основание" value={reason} onChange={onReason} />
+          <LabeledInput label={`Введите ${word}`} value={confirmation} onChange={onConfirmation} />
+        </div>
+      ) : null}
       {error ? (
         <p className="mt-3 text-sm text-rose-700" role="alert">
           {readableAdminError(error)}

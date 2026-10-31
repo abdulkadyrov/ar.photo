@@ -14,7 +14,7 @@ type RpcError = { code?: string };
 type UserRpcClient = {
   rpc<T>(name: string, args?: Record<string, unknown>): Promise<{ data: T | null; error: RpcError | null }>;
 };
-type AdminAccess = { isSuperadmin: boolean; mfaVerified: boolean };
+type AdminAccess = { isSuperadmin: boolean; mfaVerified: boolean; mfaRequired?: boolean };
 
 export default {
   fetch: withSupabase({ auth: "user" }, async (request, context) => {
@@ -26,7 +26,8 @@ export default {
     const userRpc = context.supabase as unknown as UserRpcClient;
     const access = await userRpc.rpc<AdminAccess>("get_admin_access");
     if (access.error || !access.data?.isSuperadmin) return Response.json({ code: "forbidden" }, { status: 403 });
-    if (!access.data.mfaVerified) return Response.json({ code: "mfa_required" }, { status: 403 });
+    if (access.data.mfaRequired !== false && !access.data.mfaVerified)
+      return Response.json({ code: "mfa_required" }, { status: 403 });
 
     const redirectTo = safeRedirectUrl(Deno.env.get("ADMIN_PASSWORD_RESET_REDIRECT_URL"));
     if (!redirectTo) return Response.json({ code: "password_reset_not_configured" }, { status: 503 });

@@ -372,7 +372,7 @@ select lives_ok(
 );
 select is(
   jsonb_array_length(public.admin_get_system_settings()),
-  5,
+  6,
   'protected settings reader returns the allowlisted registry'
 );
 reset role;

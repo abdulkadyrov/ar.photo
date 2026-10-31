@@ -9,7 +9,9 @@ const accountStatus = z.enum(["active", "suspended", "closed"]);
 const subscriptionStatus = z.enum(["trial", "active", "grace_period", "expired", "suspended", "cancelled"]);
 const arItemStatus = z.enum(["draft", "processing", "ready", "published", "failed", "suspended", "archived"]);
 
-export const adminAccessSchema = z.object({ isSuperadmin: z.boolean(), mfaVerified: z.boolean() }).strict();
+export const adminAccessSchema = z
+  .object({ isSuperadmin: z.boolean(), mfaVerified: z.boolean(), mfaRequired: z.boolean().optional() })
+  .strict();
 
 export const adminOverviewSchema = z
   .object({
@@ -183,6 +185,7 @@ export const adminAuditListSchema = z
 export const adminSettingSchema = z
   .object({
     key: z.enum([
+      "admin_mfa_required",
       "maintenance_mode",
       "registration_enabled",
       "public_ar_enabled",

@@ -24,7 +24,7 @@ export function PlanEditor({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [code, setCode] = useState(plan?.code ?? "");
+  const [code, setCode] = useState(plan?.code ?? `plan_${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`);
   const [name, setName] = useState(plan?.name ?? "");
   const [description, setDescription] = useState(plan?.description ?? "");
   const [productKind, setProductKind] = useState<"subscription" | "addon">(plan?.productKind ?? "subscription");
@@ -77,7 +77,7 @@ export function PlanEditor({
         priceKopecks,
         productKind,
         isActive: active,
-        reason,
+        reason: reason.trim() || `${plan ? "Редактирование" : "Создание"} тарифа «${name.trim()}» администратором`,
       } as AdminPlanInput;
       await repository.upsertPlan(input);
     },
@@ -88,9 +88,9 @@ export function PlanEditor({
       open
       title={plan ? "Редактировать тариф" : "Новый тариф или пакет"}
       onClose={onClose}
-      description="Фото — расходуемые добавления. Удаление работы не возвращает добавление."
+      description="Укажите название, цену, срок и количество новых AR-фото."
       actions={
-        <Button disabled={mutation.isPending || reason.trim().length < 10} onClick={() => mutation.mutate()}>
+        <Button disabled={mutation.isPending || !name.trim()} onClick={() => mutation.mutate()}>
           {mutation.isPending ? "Сохраняем…" : "Сохранить тариф"}
         </Button>
       }
@@ -105,30 +105,46 @@ export function PlanEditor({
             { value: "addon", label: "Дополнение: фото и/или время" },
           ]}
         />
-        <Field label="Код тарифа" value={code} onChange={setCode} />
         <Field label="Название" value={name} onChange={setName} />
-        <Field label="Описание" value={description} onChange={setDescription} />
         <Field label="Стоимость, ₽" value={price} onChange={setPrice} />
         <Field label="Срок, дней (30 — месяц, 365 — год)" value={duration} onChange={setDuration} />
+        <Field
+          label="Добавления AR-фото"
+          value={values.arItemLimit}
+          onChange={(v) => setValues({ ...values, arItemLimit: v })}
+        />
         <p className="text-sm text-muted">
-          Пустой срок — без окончания для тарифа. Дополнение с 0 дней добавляет только фото. Продление считается от
-          текущего окончания, а если срок истёк — от сегодняшнего дня.
+          Удаление фото не возвращает добавление. Пустой лимит фото или срок — без ограничений для тарифа; 0 дней —
+          пакет только фото.
         </p>
-        {numericFields
-          .filter(([key]) => productKind === "subscription" || key === "arItemLimit")
-          .map(([key, label]) => (
-            <Field key={key} label={label} value={values[key]} onChange={(v) => setValues({ ...values, [key]: v })} />
-          ))}
-        <p className="text-sm text-muted">
-          Пустой лимит — без ограничений. В дополнении число фото обязательно: 0 для пакета только времени. Изменения
-          тарифа применяются при следующем назначении; уже выданные добавления и срок сохраняются. Дополнения не меняют
-          лимиты хранилища и команды.
-        </p>
-        <label className="flex min-h-12 items-center gap-3 text-sm">
-          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-          Доступен для назначения
-        </label>
-        <Field label="Причина изменения (от 10 символов)" value={reason} onChange={setReason} />
+        <details>
+          <summary className="min-h-12 cursor-pointer py-3 text-sm font-semibold">Дополнительные настройки</summary>
+          <div className="grid gap-4">
+            <Field label="Код тарифа" value={code} onChange={setCode} />
+            <Field label="Описание" value={description} onChange={setDescription} />
+            {productKind === "subscription"
+              ? numericFields
+                  .filter(([key]) => key !== "arItemLimit")
+                  .map(([key, label]) => (
+                    <Field
+                      key={key}
+                      label={label}
+                      value={values[key]}
+                      onChange={(v) => setValues({ ...values, [key]: v })}
+                    />
+                  ))
+              : null}
+            <p className="text-sm text-muted">
+              Код заполняется автоматически. Пустые технические лимиты — без ограничений. Ранее выданные фото и срок
+              сохраняются; прочие лимиты меняются у всех аккаунтов на этом тарифе.
+            </p>
+            <label className="flex min-h-12 items-center gap-3 text-sm">
+              <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+              Доступен для назначения
+            </label>
+            <Field label="Причина изменения (необязательно)" value={reason} onChange={setReason} />
+          </div>
+        </details>
       </div>
       {mutation.error ? (
         <p role="alert" className="mt-3 text-sm text-rose-700">
