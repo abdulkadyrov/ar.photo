@@ -98,3 +98,26 @@ console policy and requires enrolling again later.
 Account deletion closes the tenant and cancels memberships/subscription while
 preserving data and audit. The same request can be retried safely. The UI asks
 for one confirmation and records its audit reason automatically.
+
+## khanzama.ru domain binding
+
+`Caddyfile.khanzama` is the deployed configuration for `khanzama.ru` on
+141.133.204.84. Beget is authoritative for the domain and `www`; both A records
+point to the VPS, with existing MX/TXT records preserved. The six Beget NS
+servers were assigned in the domain panel. New delegation must appear in the
+`.ru` parent zone before public certificate validation can succeed.
+
+Caddy serves the existing application at `https://khanzama.ru/ar.photo/`,
+redirects the bare root to `/ar.photo/` and `www` to the apex, and obtains and
+renews public certificates automatically. The previous sslip.io origin stays
+available for existing application sessions, API calls and QR links. Both new
+origins are in Supabase Auth's additional redirect allowlist. API and canonical
+QR build URLs stay on their existing origins during DNS propagation; binding
+the new website host does not require rotating credentials or moving data.
+
+Validate with `caddy validate --config /etc/caddy/Caddyfile` before reloading.
+Check authoritative delegation with `dig NS khanzama.ru @a.dns.ripn.net`, then
+check public DNS and HTTPS without disabling certificate validation. A new
+registration/delegation returning NXDOMAIN is an external propagation wait,
+not a reason to replace the working API origin or use self-signed certificates.
+Pre-change copies are under `/opt/ar-photo/backups/domain-before-*` on the VPS.
