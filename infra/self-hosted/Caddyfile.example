@@ -27,7 +27,7 @@
         file_server
     }
     handle / {
-        redir /ar.photo/ 302
+        redir * /ar.photo/ 302
     }
     handle {
         respond "Not found" 404
