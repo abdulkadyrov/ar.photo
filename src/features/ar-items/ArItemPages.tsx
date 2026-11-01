@@ -21,7 +21,7 @@ import {
   Timer,
   Upload,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type MouseEvent } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "../../app/layout/AppShell";
@@ -452,7 +452,8 @@ function SignedMedia({ asset, kind, label }: { asset?: MediaAsset; kind: "image"
   const [viewing, setViewing] = useState(false);
   const inlineVideo = useRef<HTMLVideoElement>(null);
   const [playbackTime, setPlaybackTime] = useState(0);
-  const openViewer = () => {
+  const openViewer = (event: MouseEvent<HTMLButtonElement>) => {
+    event.currentTarget.focus({ preventScroll: true });
     setPlaybackTime(inlineVideo.current?.currentTime ?? 0);
     inlineVideo.current?.pause();
     setViewing(true);
