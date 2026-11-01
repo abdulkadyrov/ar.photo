@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+// These multi-step media flows include WebKit video decoding on shared CI runners.
+// Keep assertion timeouts intact; allow the complete scenario enough time.
+test.setTimeout(90_000);
+
 for (const width of [390, 1280]) {
   test(`prepares matching crops and removes a middle video fragment at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });

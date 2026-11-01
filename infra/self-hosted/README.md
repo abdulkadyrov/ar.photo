@@ -121,3 +121,30 @@ check public DNS and HTTPS without disabling certificate validation. A new
 registration/delegation returning NXDOMAIN is an external propagation wait,
 not a reason to replace the working API origin or use self-signed certificates.
 Pre-change copies are under `/opt/ar-photo/backups/domain-before-*` on the VPS.
+
+## Canonical Auth/API origin and manual recovery
+
+After DNS and HTTPS became available, the canonical API and frontend URL were
+switched to `https://khanzama.ru` and `https://khanzama.ru/ar.photo/`.
+Supabase `SUPABASE_PUBLIC_URL`, `API_EXTERNAL_URL` (with `/auth/v1`), `SITE_URL`,
+function redirect URLs, frontend Beget build and GitHub Pages build must agree.
+Keep the old origins in Auth/CORS/CSP allowlists for existing QR links and
+legacy app tabs. Never rotate signing keys just to move the origin.
+
+The manual recovery page is `/ar.photo/recover-access#token_hash=...`.
+Generate a recovery token through the Auth admin API on the server; never
+ship an admin key in a link or browser bundle. Merely loading/reloading the
+page does not verify or consume the token. The user enters a new password
+and submits; only then does the page verify the recovery token and update
+the password. The fragment is removed after successful verification, and
+network retries can reuse the verified session. Recovery links are secrets:
+do not place them in Git, public screenshots or server access logs.
+
+Until SMTP is configured, production builds set `VITE_AUTH_EMAIL_ENABLED=false`
+and disclose that email recovery is unavailable rather than claiming an email
+was sent. Demo tests keep simulated mail behavior. Enabling real recovery
+emails requires working SMTP and rebuilding with the flag enabled; retain the
+explicit-confirmation token flow in the email template to avoid link-scanner
+consumption. The recovery-browser suite uses an isolated mocked Auth host and
+asserts no token use on opening/reloading, single verification on save, missing
+token rejection and the mail-availability message.

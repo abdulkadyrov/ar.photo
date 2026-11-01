@@ -15,7 +15,7 @@ export default defineConfig({
         url: "http://localhost/",
       },
     },
-    exclude: ["tests/e2e/**", "tests/configuration/**", "node_modules/**", "dist/**"],
+    exclude: ["tests/e2e/**", "tests/configuration/**", "tests/recovery/**", "node_modules/**", "dist/**"],
     setupFiles: ["./src/test/setup.ts"],
     coverage: {
       reporter: ["text", "html"],

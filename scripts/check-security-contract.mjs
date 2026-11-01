@@ -48,7 +48,7 @@ const requiredDemoBoundaryRules = [
     "VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}",
     "Pages publishable key secret",
   ],
-  [pagesWorkflow, "VITE_PUBLIC_APP_URL: https://abdulkadyrov.github.io/ar.photo/", "canonical Pages origin"],
+  [pagesWorkflow, "VITE_PUBLIC_APP_URL: https://khanzama.ru/ar.photo/", "canonical application origin"],
   [pagesWorkflow, "run: npm run build", "production Pages build"],
   [pagesWorkflow, "cp dist/index.html dist/404.html", "Pages SPA fallback"],
   [

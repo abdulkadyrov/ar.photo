@@ -122,6 +122,7 @@ function RoutedContent() {
           <Route path="/login" element={<LoginRoute />} />
           <Route path="/register" element={<RegisterRoute />} />
           <Route path="/reset-password" element={<ResetPasswordRoute />} />
+          <Route path="/recover-access" element={<UpdatePasswordRoute recovery />} />
           <Route path="/update-password" element={<Protected element={<UpdatePasswordRoute />} />} />
           <Route path="/dashboard" element={<Protected element={<DashboardRoute />} />} />
           <Route path="/create" element={<Protected element={<QuickStartRoute />} />} />

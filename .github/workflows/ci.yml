@@ -73,6 +73,8 @@ jobs:
         run: npx playwright install --with-deps chromium firefox webkit
       - name: Fail-closed production configuration smoke
         run: npm run test:e2e:configuration
+      - name: Password recovery and email availability
+        run: npx playwright test --config playwright.recovery.config.ts
       - name: Explicit demo browser smoke test
         run: npm run test:e2e
       - name: Cross-browser and mobile emulation matrix

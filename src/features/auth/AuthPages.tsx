@@ -3,6 +3,7 @@ import { ArrowLeft, KeyRound, LoaderCircle, LockKeyhole, Mail, Sparkles, UserRou
 import { useState, type ReactNode } from "react";
 import { useForm, type FieldError, type UseFormRegisterReturn } from "react-hook-form";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { getSupabaseBrowserClient } from "../../shared/api/supabase";
 import { Button, Panel } from "../../shared/ui";
 import { useAuth } from "./authContext";
 import { getSignUpErrorMessage } from "./authErrors";
@@ -208,6 +209,7 @@ export function RegisterRoute() {
 
 export function ResetPasswordRoute() {
   const auth = useAuth();
+  const emailEnabled = auth.mode === "demo" || import.meta.env.VITE_AUTH_EMAIL_ENABLED !== "false";
   const [sent, setSent] = useState(false);
   const [formError, setFormError] = useState("");
   const {
@@ -227,8 +229,25 @@ export function ResetPasswordRoute() {
   });
 
   return (
-    <AuthLayout title="Восстановление доступа" description="Отправим безопасную ссылку на подтверждённый email.">
-      {sent ? (
+    <AuthLayout
+      title="Восстановление доступа"
+      description={
+        emailEnabled
+          ? "Отправим безопасную ссылку на подтверждённый email."
+          : "Восстановление доступа через персональную ссылку смены пароля."
+      }
+    >
+      {!emailEnabled ? (
+        <div>
+          <FormNotice tone="error">
+            Письма восстановления ещё не настроены. Для восстановления доступа нужна персональная ссылка от
+            администратора AR Photo.
+          </FormNotice>
+          <Link className="btn btn-ghost mt-5 w-full" to="/login">
+            Вернуться ко входу
+          </Link>
+        </div>
+      ) : sent ? (
         <div aria-live="polite">
           <FormNotice tone="success">
             Если такой аккаунт существует, инструкция уже отправлена. Проверьте входящие и папку «Спам».
@@ -265,8 +284,12 @@ export function ResetPasswordRoute() {
   );
 }
 
-export function UpdatePasswordRoute() {
+export function UpdatePasswordRoute({ recovery = false }: { recovery?: boolean }) {
   const auth = useAuth();
+  const [recoveryToken] = useState(() =>
+    recovery ? new URLSearchParams(window.location.hash.slice(1)).get("token_hash") : null,
+  );
+  const [recoveryVerified, setRecoveryVerified] = useState(false);
   const navigate = useNavigate();
   const [formError, setFormError] = useState("");
   const {
@@ -281,15 +304,36 @@ export function UpdatePasswordRoute() {
   const submit = handleSubmit(async ({ password }) => {
     setFormError("");
     try {
+      if (recovery && !recoveryVerified) {
+        const client = getSupabaseBrowserClient();
+        if (!client || !recoveryToken) throw new Error("Recovery link missing");
+        const { error } = await client.auth.verifyOtp({ token_hash: recoveryToken, type: "recovery" });
+        if (error) throw error;
+        setRecoveryVerified(true);
+        window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+      }
       await auth.updatePassword(password);
       navigate("/dashboard", { replace: true });
-    } catch {
-      setFormError("Ссылка устарела или пароль не удалось обновить. Запросите новое письмо.");
+    } catch (error) {
+      const code = error && typeof error === "object" && "code" in error ? error.code : "";
+      setFormError(
+        code === "same_password"
+          ? "Новый пароль должен отличаться от текущего."
+          : code === "insufficient_aal"
+            ? "Для смены пароля подтвердите код MFA в разделе безопасности."
+            : "Не удалось сохранить пароль. Ссылка могла устареть; запросите новую ссылку у администратора.",
+      );
     }
   });
 
   return (
     <AuthLayout title="Новый пароль" description="Придумайте новый пароль для аккаунта AR Photo.">
+      {recovery && !recoveryToken && !recoveryVerified ? (
+        <FormNotice tone="error">
+          Откройте персональную ссылку восстановления. Если вы уже вошли,{" "}
+          <Link to="/update-password">продолжите смену пароля</Link>.
+        </FormNotice>
+      ) : null}
       <form className="space-y-4" onSubmit={submit} noValidate>
         <AuthField
           label="Новый пароль"
@@ -315,7 +359,7 @@ export function UpdatePasswordRoute() {
         {formError ? <FormNotice tone="error">{formError}</FormNotice> : null}
         <Button
           full
-          disabled={isSubmitting}
+          disabled={isSubmitting || (recovery && !recoveryToken && !recoveryVerified)}
           icon={isSubmitting ? <LoaderCircle className="animate-spin" size={18} /> : <KeyRound size={18} />}
         >
           {isSubmitting ? "Сохраняем…" : "Сохранить пароль"}
