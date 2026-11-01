@@ -148,3 +148,49 @@ explicit-confirmation token flow in the email template to avoid link-scanner
 consumption. The recovery-browser suite uses an isolated mocked Auth host and
 asserts no token use on opening/reloading, single verification on save, missing
 token rejection and the mail-availability message.
+
+## Beget S3 backend (2026-11-01)
+
+The deployed Storage image is `supabase/storage-api:v1.81.0`. Its private backend
+is `46b7b53c02e4-khanzamacloud` at `https://s3.ru1.storage.beget.cloud`.
+Use **all three** Compose files for subsequent Storage updates; omitting the
+S3 override switches it back to the old local backend:
+
+```sh
+cd /opt/ar-photo/supabase
+docker compose -f docker-compose.yml -f compose.budget.yml -f compose.s3.yml config --quiet
+docker compose -f docker-compose.yml -f compose.budget.yml -f compose.s3.yml up -d --no-deps storage
+```
+
+Keep `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in `.env.storage-s3` (0600).
+The backup client uses `.s3-beget.json` (0600), containing `endpoint`, `bucket`,
+`accessKeyId`, and `secretAccessKey`. These files must never enter Git or the
+frontend. The S3 bucket remains private; Supabase still enforces its existing
+bucket policies and signs playback URLs. No browser CORS or public bucket
+policy is needed because browsers use the same Supabase Storage API.
+
+`TENANT_ID=stub`, `REGION=stub`, and slash version separators remain unchanged;
+`STORAGE_S3_REGION=ru1` configures only the provider client. The pinned image
+maps local `volumes/storage/stub/stub/<bucket>/<name>/<version>` to provider
+key `stub/<bucket>/<name>/<version>`. Existing object rows and versions are
+preserved. Migration verified all 109 objects (639,708,990 bytes) by downloading
+and comparing SHA-256. The original local files remain available for rollback.
+Do not remove these or switch back after new S3 writes without copying those
+new objects back with their matching database versions and metadata.
+
+Install `s3-backup.py` as `/opt/ar-photo/s3-backup.py` with system Python and
+`boto3` available (deployed version 1.34.46). Updated `backup.sh` saves the DB,
+configuration, functions, and a full private S3 snapshot daily. Snapshot objects
+have original keys, byte counts, SHA-256, Content-Type, Cache-Control, encoding,
+and metadata in `s3/manifest.json`. It fails below a 2 GiB disk reserve; monitor
+backup failures and disk growth. The seven-day retention needs space for seven
+full media copies. Each backup has a lock and COMPLETE marker; incomplete runs
+are never reported successful. Source media on the VPS is no longer the daily
+backup source once S3 is enabled.
+
+Restore into an isolated environment: verify SHA256SUMS, upload each snapshot
+object under its original key and saved headers, verify each object's SHA-256,
+restore the matching DB and configuration, then test signed media and QR links
+before changing production. Never run a restore against the live DB for a test.
+These local snapshots protect against an S3 object loss but not loss of the VPS;
+maintain a separate restricted off-server backup as the collection grows.

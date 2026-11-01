@@ -1,0 +1,12 @@
+# Credentials live only in the root-readable .env.storage-s3 on the VPS.
+# Keep REGION/TENANT_ID unchanged: existing API keys and object paths use stub.
+services:
+  storage:
+    env_file:
+      - .env.storage-s3
+    environment:
+      STORAGE_BACKEND: s3
+      GLOBAL_S3_BUCKET: 46b7b53c02e4-khanzamacloud
+      GLOBAL_S3_ENDPOINT: https://s3.ru1.storage.beget.cloud
+      GLOBAL_S3_FORCE_PATH_STYLE: "true"
+      STORAGE_S3_REGION: ru1
