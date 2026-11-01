@@ -7,6 +7,8 @@ import {
   ChevronRight,
   Clipboard,
   ExternalLink,
+  Expand,
+  X,
   FileVideo2,
   ImageIcon,
   LoaderCircle,
@@ -244,7 +246,13 @@ export function ArItemDetailRoute() {
       </AppShell>
     );
   }
-  if (workspaceQuery.isPending || itemQuery.isPending || assetsQuery.isPending || qrQuery.isPending || jobsQuery.isPending) {
+  if (
+    workspaceQuery.isPending ||
+    itemQuery.isPending ||
+    assetsQuery.isPending ||
+    qrQuery.isPending ||
+    jobsQuery.isPending
+  ) {
     return <ItemDetailLoading />;
   }
 
@@ -441,22 +449,115 @@ function ArItemCard({ item, marker, groupName }: { item: ArItem; marker?: MediaA
 
 function SignedMedia({ asset, kind, label }: { asset?: MediaAsset; kind: "image" | "video"; label: string }) {
   const urlQuery = useAssetUrl(asset);
+  const [viewing, setViewing] = useState(false);
+  const inlineVideo = useRef<HTMLVideoElement>(null);
+  const [playbackTime, setPlaybackTime] = useState(0);
+  const openViewer = () => {
+    setPlaybackTime(inlineVideo.current?.currentTime ?? 0);
+    inlineVideo.current?.pause();
+    setViewing(true);
+  };
   if (!asset) return <div className="ar-item-empty-preview">Файл не добавлен</div>;
   if (urlQuery.isPending) return <Skeleton className="ar-item-media-preview" />;
   if (!urlQuery.data) return <div className="ar-item-empty-preview">Файл недоступен</div>;
-  if (kind === "video") {
-    return (
-      <video
-        className="ar-item-media-preview"
-        src={urlQuery.data}
-        controls
-        playsInline
-        preload="metadata"
-        aria-label={label}
-      />
-    );
-  }
-  return <img className="ar-item-media-preview" src={urlQuery.data} alt={label} />;
+  return (
+    <>
+      {kind === "video" ? (
+        <>
+          <video
+            ref={inlineVideo}
+            className="ar-item-media-preview"
+            src={urlQuery.data}
+            controls
+            playsInline
+            preload="metadata"
+            aria-label={label}
+          />
+          <button className="ar-media-open-video" type="button" onClick={openViewer}>
+            <Expand size={18} aria-hidden="true" /> Открыть видео
+          </button>
+        </>
+      ) : (
+        <button className="ar-media-open-photo" type="button" onClick={openViewer} aria-label="Открыть фото">
+          <img className="ar-item-media-preview" src={urlQuery.data} alt={label} />
+          <span>
+            <Expand size={18} aria-hidden="true" /> Открыть фото
+          </span>
+        </button>
+      )}
+      {viewing ? (
+        <MediaViewer
+          kind={kind}
+          url={urlQuery.data}
+          label={label}
+          startTime={playbackTime}
+          onClose={() => setViewing(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function MediaViewer({
+  kind,
+  url,
+  label,
+  startTime,
+  onClose,
+}: {
+  kind: "image" | "video";
+  url: string;
+  label: string;
+  startTime: number;
+  onClose: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const element = dialog.current!;
+    const focused = document.activeElement;
+    const overflow = document.body.style.overflow;
+    element.showModal();
+    document.body.style.overflow = "hidden";
+    return () => {
+      element.close();
+      document.body.style.overflow = overflow;
+      if (focused instanceof HTMLElement && focused.isConnected) focused.focus({ preventScroll: true });
+    };
+  }, []);
+  return (
+    <dialog
+      ref={dialog}
+      className="ar-media-viewer"
+      aria-label={kind === "image" ? "Просмотр фото" : "Просмотр видео"}
+      onCancel={onClose}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="ar-media-viewer-content">
+        <header>
+          <span>{kind === "image" ? "Фото" : "Видео"}</span>
+          <button type="button" autoFocus aria-label="Закрыть просмотр" onClick={onClose}>
+            <X aria-hidden="true" size={24} />
+          </button>
+        </header>
+        {kind === "image" ? (
+          <img src={url} alt={label} />
+        ) : (
+          <video
+            src={url}
+            aria-label={label}
+            controls
+            playsInline
+            preload="metadata"
+            onLoadedMetadata={(event) => {
+              event.currentTarget.currentTime = startTime;
+            }}
+          />
+        )}
+      </div>
+    </dialog>
+  );
 }
 
 function useAssetUrl(asset?: MediaAsset) {
@@ -1175,7 +1276,15 @@ function ProcessingStep({
   );
 }
 
-function ProcessingTimer({ item, jobs, prominent = false }: { item: ArItem; jobs: ProcessingJob[]; prominent?: boolean }) {
+function ProcessingTimer({
+  item,
+  jobs,
+  prominent = false,
+}: {
+  item: ArItem;
+  jobs: ProcessingJob[];
+  prominent?: boolean;
+}) {
   const active = item.status === "processing";
   const [now, setNow] = useState(0);
 

@@ -486,6 +486,29 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   expect(Math.abs(videoPreviewBox!.width - videoPreviewBox!.height)).toBeLessThanOrEqual(2);
   expect(qrSummaryBox!.y).toBeGreaterThan(photoSectionBox!.y + photoSectionBox!.height);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const detailScroll = await page.evaluate(() => window.scrollY);
+  const openPhoto = page.getByRole("button", { name: "Открыть фото", exact: true });
+  await openPhoto.click();
+  const photoViewer = page.getByRole("dialog", { name: "Просмотр фото" });
+  await expect(photoViewer.getByRole("img", { name: "Фотография-маркер" })).toBeVisible();
+  await expect(photoViewer.getByRole("button", { name: "Закрыть просмотр" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(photoViewer).toHaveCount(0);
+  await expect(openPhoto).toBeFocused();
+  expect(await page.evaluate(() => window.scrollY)).toBe(detailScroll);
+  await page.getByRole("button", { name: "Открыть видео", exact: true }).click();
+  const videoViewer = page.getByRole("dialog", { name: "Просмотр видео" });
+  await expect(videoViewer.getByLabel("Видео AR-работы")).toBeVisible();
+  expect(
+    await mediaSections
+      .nth(1)
+      .locator("video.ar-item-media-preview")
+      .evaluate((video: HTMLVideoElement) => video.paused),
+  ).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await videoViewer.getByRole("button", { name: "Закрыть просмотр" }).click();
+  await expect(videoViewer).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Открыть видео", exact: true })).toBeFocused();
   await page.getByRole("button", { name: "Вернуться к AR-работам" }).click();
   await expect(page.getByRole("heading", { name: "AR workflow project", exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThanOrEqual(savedListScrollY - 1);

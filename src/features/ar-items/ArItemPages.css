@@ -419,3 +419,105 @@
     font-size: 0.61rem;
   }
 }
+
+.ar-media-open-photo {
+  display: block;
+  position: relative;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: zoom-in;
+}
+.ar-media-open-photo img {
+  display: block;
+}
+.ar-media-open-photo span {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: rgb(0 0 0 / 75%);
+  color: white;
+  font-size: 0.8rem;
+}
+.ar-media-open-video {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+}
+.ar-media-open-photo:focus-visible,
+.ar-media-open-video:focus-visible,
+.ar-media-viewer button:focus-visible {
+  outline: 3px solid #a99aff;
+  outline-offset: 3px;
+}
+.ar-media-open-photo:active,
+.ar-media-open-video:active {
+  opacity: 0.8;
+}
+.ar-media-viewer {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  background: rgb(12 13 18 / 96%);
+  color: white;
+}
+.ar-media-viewer::backdrop {
+  background: rgb(0 0 0 / 80%);
+}
+.ar-media-viewer-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 1600px;
+  margin: auto;
+}
+.ar-media-viewer header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 52px;
+  padding: 0 4px 8px;
+}
+.ar-media-viewer button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #ffffff66;
+  border-radius: 12px;
+  background: #ffffff18;
+  color: white;
+  cursor: pointer;
+}
+.ar-media-viewer img,
+.ar-media-viewer video {
+  display: block;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  object-fit: contain;
+}
