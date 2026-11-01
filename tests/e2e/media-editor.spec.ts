@@ -4,6 +4,14 @@ import { expect, test } from "@playwright/test";
 // Keep assertion timeouts intact; allow the complete scenario enough time.
 test.setTimeout(90_000);
 
+// WebKit can discover a waiting worker while the media scenario is running.
+// Dismiss its real prompt rather than letting it obscure the next control.
+test.beforeEach(async ({ page }) => {
+  await page.addLocatorHandler(page.getByRole("button", { name: "Отложить обновление" }), async (button) => {
+    await button.click();
+  });
+});
+
 for (const width of [390, 1280]) {
   test(`prepares matching crops and removes a middle video fragment at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
