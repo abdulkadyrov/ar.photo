@@ -378,7 +378,7 @@ textarea:focus-visible {
 }
 
 .app-sidebar .brand-mark strong {
-  color: var(--primary);
+  color: var(--primary-text);
 }
 
 .sidebar-create {
