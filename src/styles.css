@@ -291,11 +291,11 @@ textarea:focus-visible {
   z-index: 20;
   width: 252px;
   flex-direction: column;
-  border-right: 1px solid rgba(255, 255, 255, 0.07);
-  background: #17191f;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
   padding: 1.35rem 1rem 1rem;
-  backdrop-filter: blur(18px);
-  color: #ffffff;
+  backdrop-filter: none;
+  color: var(--ink);
 }
 
 .app-content {
@@ -373,12 +373,12 @@ textarea:focus-visible {
 }
 
 .app-sidebar .brand-mark {
-  color: #ffffff;
+  color: var(--ink);
   padding-inline: 0.35rem;
 }
 
 .app-sidebar .brand-mark strong {
-  color: #9f8dff;
+  color: var(--primary);
 }
 
 .sidebar-create {
@@ -389,12 +389,12 @@ textarea:focus-visible {
   gap: 0.5rem;
   margin-top: 1.6rem;
   border-radius: 13px;
-  background: linear-gradient(135deg, #7357ff, #6547f6);
+  background: var(--primary);
   color: white;
   font-size: 0.84rem;
   font-weight: 700;
   text-decoration: none;
-  box-shadow: 0 12px 30px rgba(115, 87, 255, 0.28);
+  box-shadow: none;
 }
 
 .sidebar-navigation {
@@ -406,7 +406,7 @@ textarea:focus-visible {
 .sidebar-caption {
   margin: 0 0 0.45rem;
   padding: 0 0.75rem;
-  color: #9aa2b0;
+  color: var(--muted);
   font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -425,7 +425,7 @@ textarea:focus-visible {
   border: 1px solid transparent;
   border-radius: 12px;
   padding: 0.65rem 0.8rem;
-  color: #aeb4bf;
+  color: var(--ink);
   font-size: 0.875rem;
   font-weight: 550;
   text-decoration: none;
@@ -436,21 +436,21 @@ textarea:focus-visible {
 }
 
 .sidebar-link:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.055);
+  color: var(--ink);
+  background: #f0ebff;
 }
 
 .sidebar-link-active {
-  border-color: rgba(159, 141, 255, 0.24);
-  background: rgba(115, 87, 255, 0.17);
-  color: #c2b7ff;
+  border-color: #ded4ff;
+  background: #eee8ff;
+  color: #5633cc;
 }
 
 .sidebar-account {
   display: grid;
   gap: 0.7rem;
   margin-top: auto;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--line);
   padding-top: 0.9rem;
 }
 
@@ -461,15 +461,15 @@ textarea:focus-visible {
   gap: 0.65rem;
   border-radius: 11px;
   padding: 0.55rem 0.7rem;
-  color: #aeb4bf;
+  color: var(--ink);
   font-size: 0.82rem;
   font-weight: 600;
   text-decoration: none;
 }
 
 .sidebar-settings-link:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: white;
+  background: #f0ebff;
+  color: var(--primary);
 }
 
 .sidebar-user-row {
@@ -477,10 +477,10 @@ textarea:focus-visible {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.65rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line);
   border-radius: 14px;
   padding: 0.7rem;
-  background: rgba(255, 255, 255, 0.035);
+  background: var(--card);
 }
 
 .sidebar-avatar {
@@ -489,8 +489,8 @@ textarea:focus-visible {
   height: 36px;
   place-items: center;
   border-radius: 11px;
-  background: rgba(115, 87, 255, 0.2);
-  color: #c6bcff;
+  background: #eee8ff;
+  color: var(--primary);
 }
 
 .sidebar-user-row p,
@@ -502,13 +502,13 @@ textarea:focus-visible {
 }
 
 .sidebar-user-row p {
-  color: #f9fafb;
+  color: var(--ink);
   font-size: 0.75rem;
   font-weight: 650;
 }
 
 .sidebar-user-row div > span {
-  color: #858c98;
+  color: var(--muted);
   font-size: 0.66rem;
 }
 
@@ -520,12 +520,12 @@ textarea:focus-visible {
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: #9299a5;
+  color: var(--ink);
 }
 
 .sidebar-user-row button:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: white;
+  background: #f0ebff;
+  color: var(--primary);
 }
 
 .mobile-nav {

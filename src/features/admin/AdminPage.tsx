@@ -69,8 +69,6 @@ export function AdminRoute() {
   const [tab, setTab] = useState<TabId>("overview");
   const [accountSearch, setAccountSearch] = useState("");
   const [submittedSearch, setSubmittedSearch] = useState("");
-  const [supportAccount, setSupportAccount] = useState<AdminAccount | null>(null);
-  const [supportReason, setSupportReason] = useState("");
   const [detail, setDetail] = useState<AdminAccountDetail | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [confirmation, setConfirmation] = useState("");
@@ -93,46 +91,48 @@ export function AdminRoute() {
   });
 
   const supportMutation = useMutation({
-    mutationFn: () => adminRepository.getAccountDetail(supportAccount!.id, supportReason),
+    mutationFn: (account: AdminAccount) =>
+      adminRepository.getAccountDetail(account.id, `Просмотр аккаунта «${account.name}» администратором`),
     onSuccess: (nextDetail) => {
       setDetail(nextDetail);
-      setSupportAccount(null);
-      setSupportReason("");
       setTab("users");
-      setToast({ title: "Support access открыт", message: "Причина записана в admin audit.", tone: "success" });
+      setToast({ title: "Аккаунт открыт", message: "Просмотр записан в историю действий.", tone: "success" });
       void queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
     },
   });
 
+  const supportError = supportMutation.error;
+
   const actionMutation = useMutation({
     mutationFn: async () => {
       if (!confirmAction) return;
+      const auditReason = `${actionTitle(confirmAction)} администратором${reason.trim() ? `: ${reason.trim()}` : ""}`;
       if (confirmAction.kind === "account") {
-        await adminRepository.setAccountStatus(confirmAction.account.id, confirmAction.nextStatus, reason);
+        await adminRepository.setAccountStatus(confirmAction.account.id, confirmAction.nextStatus, auditReason);
       } else if (confirmAction.kind === "account-delete") {
-        await adminRepository.deleteAccount(confirmAction.account.id, "УДАЛИТЬ АККАУНТ", reason);
+        await adminRepository.deleteAccount(confirmAction.account.id, "УДАЛИТЬ АККАУНТ", auditReason);
       } else if (confirmAction.kind === "item") {
         await adminRepository.setItemSuspended(
           confirmAction.item.accountId,
           confirmAction.item.arItemId,
           confirmAction.suspended,
-          reason,
+          auditReason,
         );
       } else if (confirmAction.kind === "retry") {
-        await adminRepository.retryProcessingJob(confirmAction.accountId, confirmAction.jobId, reason);
+        await adminRepository.retryProcessingJob(confirmAction.accountId, confirmAction.jobId, auditReason);
       } else if (confirmAction.kind === "reset") {
-        await adminRepository.requestPasswordReset(confirmAction.accountId, confirmAction.userId, reason);
+        await adminRepository.requestPasswordReset(confirmAction.accountId, confirmAction.userId, auditReason);
       } else if (confirmAction.kind === "user-status") {
         await adminRepository.setUserActive(
           confirmAction.accountId,
           confirmAction.userId,
           confirmAction.active,
-          reason,
+          auditReason,
         );
       } else if (confirmAction.kind === "user-delete") {
-        await adminRepository.deleteUser(confirmAction.accountId, confirmAction.userId, "УДАЛИТЬ", reason);
+        await adminRepository.deleteUser(confirmAction.accountId, confirmAction.userId, "УДАЛИТЬ", auditReason);
       } else if (confirmAction.kind === "setting") {
-        await adminRepository.updateSetting(confirmAction.setting.key, confirmAction.value, reason);
+        await adminRepository.updateSetting(confirmAction.setting.key, confirmAction.value, auditReason);
       } else {
         const expiresAt = addDaysIso(confirmAction.days);
         await adminRepository.updateSubscription(confirmAction.detail.account.id, {
@@ -142,7 +142,7 @@ export function AdminRoute() {
           expiresAt,
           gracePeriodEndsAt: null,
           customLimits: confirmAction.detail.subscription.customLimits,
-          reason,
+          reason: auditReason,
         });
       }
     },
@@ -217,7 +217,7 @@ export function AdminRoute() {
   const openConfirm = (action: ConfirmAction) => {
     setConfirmAction(action);
     setConfirmation("");
-    setReason(action.kind === "account-delete" ? `Удаление аккаунта «${action.account.name}» администратором` : "");
+    setReason("");
   };
 
   return (
@@ -260,7 +260,7 @@ export function AdminRoute() {
           onSearch={setAccountSearch}
           onSubmit={() => setSubmittedSearch(accountSearch.trim())}
           onCreate={() => setCreateOpen(true)}
-          onSupport={setSupportAccount}
+          onSupport={(account) => supportMutation.mutate(account)}
           onStatus={(account) =>
             openConfirm({
               kind: "account",
@@ -346,19 +346,11 @@ export function AdminRoute() {
         />
       ) : null}
 
-      <SupportModal
-        account={supportAccount}
-        reason={supportReason}
-        pending={supportMutation.isPending}
-        error={supportMutation.error}
-        onReason={setSupportReason}
-        onClose={() => {
-          setSupportAccount(null);
-          setSupportReason("");
-          supportMutation.reset();
-        }}
-        onSubmit={() => supportMutation.mutate()}
-      />
+      {supportError ? (
+        <p role="alert" className="text-rose-700">
+          {readableAdminError(supportError)}
+        </p>
+      ) : null}
       <ConfirmModal
         action={confirmAction}
         confirmation={confirmation}
@@ -530,7 +522,7 @@ function AccountsSection({
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button variant="ghost" onClick={() => onSupport(account)}>
-                Открыть с причиной
+                Открыть аккаунт
               </Button>
               <Button variant={account.status === "active" ? "danger" : "quiet"} onClick={() => onStatus(account)}>
                 {account.status === "active" ? "Приостановить" : "Восстановить"}
@@ -950,50 +942,6 @@ function SettingsSection({
   );
 }
 
-function SupportModal({
-  account,
-  reason,
-  pending,
-  error,
-  onReason,
-  onClose,
-  onSubmit,
-}: {
-  account: AdminAccount | null;
-  reason: string;
-  pending: boolean;
-  error: unknown;
-  onReason: (value: string) => void;
-  onClose: () => void;
-  onSubmit: () => void;
-}) {
-  return (
-    <Modal
-      open={Boolean(account)}
-      title={`Support access: ${account?.name ?? ""}`}
-      description="Причина будет сохранена вместе с actor, account и временем."
-      onClose={onClose}
-      actions={
-        <Button disabled={pending || reason.trim().length < 10} onClick={onSubmit}>
-          {pending ? "Открываем…" : "Открыть аккаунт"}
-        </Button>
-      }
-    >
-      <LabeledInput
-        label="Причина обращения"
-        placeholder="Например, обращение SUPPORT-1042"
-        value={reason}
-        onChange={onReason}
-      />
-      {error ? (
-        <p className="mt-3 text-sm text-rose-700" role="alert">
-          {readableAdminError(error)}
-        </p>
-      ) : null}
-    </Modal>
-  );
-}
-
 function ConfirmModal({
   action,
   confirmation,
@@ -1023,7 +971,7 @@ function ConfirmModal({
       description={
         action?.kind === "account-delete"
           ? `Удалить аккаунт «${action.account.name}»? Он исчезнет из списка, подписка и доступы пользователей будут отключены. Данные и история останутся в архиве.`
-          : `Опасная операция требует причину и точный ввод «${word}».`
+          : `Подтвердите действие: введите «${word}». Оно будет записано в историю.`
       }
       onClose={onClose}
       actions={
@@ -1037,9 +985,7 @@ function ConfirmModal({
               ? "danger"
               : "primary"
           }
-          disabled={
-            pending || (action?.kind !== "account-delete" && (reason.trim().length < 10 || confirmation !== word))
-          }
+          disabled={pending || (action?.kind !== "account-delete" && confirmation !== word)}
           onClick={onSubmit}
         >
           {pending ? "Выполняем…" : action?.kind === "account-delete" ? "Удалить аккаунт" : "Подтвердить"}
@@ -1048,7 +994,12 @@ function ConfirmModal({
     >
       {action?.kind !== "account-delete" ? (
         <div className="grid gap-4">
-          <LabeledInput label="Причина" placeholder="Номер обращения и основание" value={reason} onChange={onReason} />
+          <LabeledInput
+            label="Комментарий (необязательно)"
+            placeholder="Можно оставить пустым"
+            value={reason}
+            onChange={onReason}
+          />
           <LabeledInput label={`Введите ${word}`} value={confirmation} onChange={onConfirmation} />
         </div>
       ) : null}
@@ -1080,7 +1031,14 @@ function CreateAccountModal({
   const [reason, setReason] = useState("");
   const mutation = useMutation({
     mutationFn: () =>
-      adminRepository.createAccount({ email, fullName, accountName, accountSlug: slug, planId, reason }),
+      adminRepository.createAccount({
+        email,
+        fullName,
+        accountName,
+        accountSlug: slug,
+        planId,
+        reason: `Создание аккаунта «${accountName}» администратором${reason.trim() ? `: ${reason.trim()}` : ""}`,
+      }),
     onSuccess,
   });
   return (
@@ -1090,7 +1048,7 @@ function CreateAccountModal({
       description="Владельцу отправляется Auth invitation. Администратор не создаёт и не видит пароль."
       onClose={onClose}
       actions={
-        <Button disabled={mutation.isPending || reason.trim().length < 10} onClick={() => mutation.mutate()}>
+        <Button disabled={mutation.isPending || !email.trim() || !accountName.trim()} onClick={() => mutation.mutate()}>
           {mutation.isPending ? "Создаём…" : "Создать и пригласить"}
         </Button>
       }
@@ -1111,7 +1069,7 @@ function CreateAccountModal({
           />
         </div>
         <div className="sm:col-span-2">
-          <LabeledInput label="Причина создания" value={reason} onChange={setReason} />
+          <LabeledInput label="Комментарий (необязательно)" value={reason} onChange={setReason} />
         </div>
       </div>
       {mutation.error ? (

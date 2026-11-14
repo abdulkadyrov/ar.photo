@@ -659,18 +659,15 @@ test("runs MFA-gated admin support and dangerous operations with reason capture"
 
   await adminNavigation.getByRole("button", { name: "Аккаунты" }).click();
   const alphaAccount = page.getByRole("article").filter({ hasText: "Alpha Studio" });
-  await alphaAccount.getByRole("button", { name: "Открыть с причиной" }).click();
-  const supportDialog = page.getByRole("dialog", { name: "Support access: Alpha Studio" });
-  await expect(supportDialog.getByRole("button", { name: "Открыть аккаунт" })).toBeDisabled();
-  await supportDialog.getByLabel("Причина обращения").fill("Диагностика обращения клиента SUPPORT-1042");
-  await supportDialog.getByRole("button", { name: "Открыть аккаунт" }).click();
+  await alphaAccount.getByRole("button", { name: "Открыть аккаунт" }).click();
+  await expect(page.getByRole("dialog", { name: "Support access: Alpha Studio" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Пользователи · Alpha Studio" })).toBeVisible();
   await expect(page.getByText("Иван Иванов", { exact: true })).toBeVisible();
   await expect(page.locator("body")).not.toContainText("encrypted_password");
 
   await page.getByRole("button", { name: "Сбросить пароль" }).first().click();
   const resetDialog = page.getByRole("dialog", { name: /Отправить сброс/ });
-  await resetDialog.getByLabel("Причина").fill("Подтверждённый запрос клиента SUPPORT-1042");
+  await resetDialog.getByLabel("Комментарий (необязательно)").fill("Подтверждённый запрос клиента SUPPORT-1042");
   await resetDialog.getByLabel("Введите СБРОС").fill("СБРОС");
   await resetDialog.getByRole("button", { name: "Подтвердить" }).click();
   await expect(page.getByText("Операция выполнена", { exact: true })).toBeVisible();
@@ -678,21 +675,23 @@ test("runs MFA-gated admin support and dangerous operations with reason capture"
   const editor = page.getByRole("article").filter({ hasText: "Алина Магомедова" });
   await editor.getByRole("button", { name: "Заблокировать" }).click();
   const blockDialog = page.getByRole("dialog", { name: "Заблокировать Алина Магомедова?" });
-  await blockDialog.getByLabel("Причина").fill("Временная блокировка по обращению SECURITY-205");
+  await blockDialog.getByLabel("Комментарий (необязательно)").fill("Временная блокировка по обращению SECURITY-205");
   await blockDialog.getByLabel("Введите ЗАБЛОКИРОВАТЬ").fill("ЗАБЛОКИРОВАТЬ");
   await blockDialog.getByRole("button", { name: "Подтвердить" }).click();
   await expect(editor.getByText("Заблокирован", { exact: true })).toBeVisible();
 
   await editor.getByRole("button", { name: "Разблокировать" }).click();
   const unblockDialog = page.getByRole("dialog", { name: "Разблокировать Алина Магомедова?" });
-  await unblockDialog.getByLabel("Причина").fill("Проверка завершена по обращению SECURITY-205");
+  await unblockDialog.getByLabel("Комментарий (необязательно)").fill("Проверка завершена по обращению SECURITY-205");
   await unblockDialog.getByLabel("Введите РАЗБЛОКИРОВАТЬ").fill("РАЗБЛОКИРОВАТЬ");
   await unblockDialog.getByRole("button", { name: "Подтвердить" }).click();
   await expect(editor.getByText("Активен", { exact: true })).toBeVisible();
 
   await editor.getByRole("button", { name: "Удалить" }).click();
   const deleteDialog = page.getByRole("dialog", { name: "Безвозвратно удалить Алина Магомедова?" });
-  await deleteDialog.getByLabel("Причина").fill("Удаление по подтверждённому запросу владельца OWNER-812");
+  await deleteDialog
+    .getByLabel("Комментарий (необязательно)")
+    .fill("Удаление по подтверждённому запросу владельца OWNER-812");
   await deleteDialog.getByLabel("Введите УДАЛИТЬ").fill("УДАЛИТЬ");
   await deleteDialog.getByRole("button", { name: "Подтвердить" }).click();
   await expect(page.getByText("Алина Магомедова", { exact: true })).toHaveCount(0);
@@ -703,7 +702,7 @@ test("runs MFA-gated admin support and dangerous operations with reason capture"
   const publishedItem = page.getByRole("article").filter({ hasText: "Алексей Иванов" });
   await publishedItem.getByRole("button", { name: "Приостановить" }).click();
   const itemDialog = page.getByRole("dialog", { name: "Приостановить Алексей Иванов?" });
-  await itemDialog.getByLabel("Причина").fill("Обращение правообладателя CONTENT-44");
+  await itemDialog.getByLabel("Комментарий (необязательно)").fill("Обращение правообладателя CONTENT-44");
   await itemDialog.getByLabel("Введите ПРИОСТАНОВИТЬ").fill("ПРИОСТАНОВИТЬ");
   await itemDialog.getByRole("button", { name: "Подтвердить" }).click();
   await expect(publishedItem.getByText("suspended", { exact: true })).toBeVisible();
@@ -711,7 +710,7 @@ test("runs MFA-gated admin support and dangerous operations with reason capture"
   await adminNavigation.getByRole("button", { name: "Ошибки" }).click();
   await page.getByRole("button", { name: "Повторить задачу" }).first().click();
   const retryDialog = page.getByRole("dialog", { name: /Повторить processing/ });
-  await retryDialog.getByLabel("Причина").fill("Повтор после диагностики безопасной ошибки");
+  await retryDialog.getByLabel("Комментарий (необязательно)").fill("Повтор после диагностики безопасной ошибки");
   await retryDialog.getByLabel("Введите ПОВТОРИТЬ").fill("ПОВТОРИТЬ");
   await retryDialog.getByRole("button", { name: "Подтвердить" }).click();
   await expect(page.getByRole("button", { name: "Повторить задачу" })).toHaveCount(1);
@@ -795,19 +794,13 @@ test("edits photo credit packages and grants an addon from the admin panel", asy
   await page
     .getByRole("article")
     .filter({ hasText: "Alpha Studio" })
-    .getByRole("button", { name: "Открыть с причиной" })
+    .getByRole("button", { name: "Открыть аккаунт" })
     .click();
-  const support = page.getByRole("dialog", { name: "Support access: Alpha Studio" });
-  await support.getByLabel("Причина обращения").fill("Назначение оплаченного дополнительного пакета");
-  await support.getByRole("button", { name: "Открыть аккаунт" }).click();
-  await expect(support).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Пользователи · Alpha Studio" })).toBeVisible();
   await nav.getByRole("button", { name: "Подписки", exact: true }).click();
   await page
     .getByRole("combobox", { name: "Тариф или пакет", exact: true })
     .selectOption({ label: "Ещё 50 фото · 75 добавлений фото · 0 дней · 490 ₽" });
-  await page
-    .getByLabel("Причина назначения (от 10 символов)", { exact: true })
-    .fill("Пакет подтверждён владельцем аккаунта");
   await page.getByRole("button", { name: "Подтвердить и начислить пакет" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Пакет начислен" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

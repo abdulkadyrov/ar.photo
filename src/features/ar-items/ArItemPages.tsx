@@ -328,6 +328,14 @@ export function ArItemDetailRoute() {
         )
       }
     >
+      <div className="mb-4 flex flex-wrap justify-end gap-2" aria-label="Действия AR-работы">
+        <Link className="btn btn-primary" to={`/items/${item.id}/edit`}>
+          Изменить работу
+        </Link>
+        <Link className="btn btn-quiet" to={`/items/${item.id}/qr`}>
+          QR и публикация
+        </Link>
+      </div>
       <main className="ar-item-detail">
         <section className="ar-item-media-section" aria-labelledby="ar-item-photo-title">
           <h2 id="ar-item-photo-title">Фото</h2>

@@ -21,7 +21,13 @@ export function PackageGrant({
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const product = plans.find((p) => p.id === planId);
   const mutation = useMutation({
-    mutationFn: () => repository.applyPackage(detail.account.id, planId, requestId, reason),
+    mutationFn: () =>
+      repository.applyPackage(
+        detail.account.id,
+        planId,
+        requestId,
+        `Назначение пакета «${product?.name ?? planId}» администратором${reason.trim() ? `: ${reason.trim()}` : ""}`,
+      ),
     onSuccess: async () => {
       setRequestId(crypto.randomUUID());
       setPlanId("");
@@ -69,10 +75,10 @@ export function PackageGrant({
         </div>
       ) : null}
       <label className="grid gap-2 text-sm font-semibold">
-        Причина назначения (от 10 символов)
+        Комментарий к назначению (необязательно)
         <Input value={reason} onValueChange={setReason} disabled={mutation.isPending} />
       </label>
-      <Button disabled={!product || reason.trim().length < 10 || mutation.isPending} onClick={() => mutation.mutate()}>
+      <Button disabled={!product || mutation.isPending} onClick={() => mutation.mutate()}>
         {mutation.isPending ? "Применяем…" : "Подтвердить и начислить пакет"}
       </Button>
       {mutation.error ? (
