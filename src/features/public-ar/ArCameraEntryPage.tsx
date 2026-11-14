@@ -1,6 +1,7 @@
-import { Camera, ScanLine, ShieldCheck } from "lucide-react";
+import { Camera, ImageIcon, Info, Play, ScanLine, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getPublicRuntimeConfig } from "../../shared/config/env";
 import { Button } from "../../shared/ui";
 import { classifyViewerError } from "./viewerCapabilities";
 import { startQrCamera, stopMediaStream, waitForPublicProjectQr } from "./qrProjectScanner";
@@ -12,6 +13,8 @@ export function ArCameraEntryRoute() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<CameraEntryMode>("intro");
   const [message, setMessage] = useState("");
+  const [permissionVisible, setPermissionVisible] = useState(true);
+  const demo = getPublicRuntimeConfig().authMode === "demo";
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
@@ -75,39 +78,82 @@ export function ArCameraEntryRoute() {
 
   return (
     <main className="ar-viewer" data-mode="camera-entry">
-      <section className="ar-public-intro">
+      <section className="ar-public-intro ar-camera-intro">
         <header>
           <strong>KHANZAMA</strong>
           <span>AR-камера</span>
+          <small>Живые фотографии в дополненной реальности</small>
         </header>
-        <div className="ar-public-content">
-          <div className="grid aspect-[4/3] place-items-center rounded-xl border border-line bg-card text-primary">
-            <Camera size={84} aria-hidden="true" />
-          </div>
-          <div>
+        <div className="ar-camera-intro-grid">
+          <div className="ar-camera-explanation">
             <span className="ar-public-tag">AR-просмотр</span>
             <h1>{mode === "error" ? "Камера не запустилась" : "Оживите печатную фотографию"}</h1>
             <p>
               {mode === "error"
                 ? message
-                : "Откройте проект по QR-коду. Затем наведите камеру на саму фотографию — на ней появится связанное видео."}
+                : "Откройте проект по QR-коду. Затем наведите камеру на напечатанную фотографию — на её изображении появится связанное видео."}
             </p>
-            <div className="ar-public-buttons">
-              <Button type="button" onClick={() => void startScanning()} icon={<Camera size={18} />} full>
-                {mode === "error" ? "Повторить" : "Разрешить камеру"}
-              </Button>
+            <div className="ar-camera-feature">
+              <ImageIcon size={30} />
+              <div>
+                <h2>Только фотография</h2>
+                <p>Определение по самому изображению, без специальных меток.</p>
+              </div>
             </div>
-            <p className="ar-public-note">
-              <ShieldCheck size={22} /> Камера обрабатывается только на вашем устройстве.
+            <div className="ar-camera-feature">
+              <Play size={30} />
+              <div>
+                <h2>Видео на фотографии</h2>
+                <p>Связанное видео появится прямо на изображении после его распознавания.</p>
+              </div>
+            </div>
+            <p className="ar-camera-disclaimer">
+              <Info size={22} />
+              QR-код открывает проект. Для распознавания используется сама фотография.
             </p>
           </div>
-        </div>
-        <div className="ar-public-help">
-          <h2>Только фотография и ваше видео</h2>
-          <p>
-            QR-код открывает проект. Для распознавания используется само изображение напечатанной фотографии, без
-            специальных меток.
-          </p>
+          <div className="ar-camera-permission-stage">
+            {demo ? (
+              <div className="ar-camera-example">
+                <img src={`${import.meta.env.BASE_URL}test-assets/test.jpg`} alt="Пример фотографии для AR" />
+                <span>Пример AR-фото · камера ещё не включена</span>
+              </div>
+            ) : (
+              <div className="ar-camera-illustration">
+                <ImageIcon size={100} />
+                <span>Фото оживёт после распознавания</span>
+              </div>
+            )}
+            <div className="ar-camera-stage-label">
+              <ScanLine size={20} />
+              Наведите камеру на фотографию
+            </div>
+            {permissionVisible ? (
+              <div className="ar-camera-permission-card" aria-labelledby="ar-camera-permission-title">
+                <Camera size={40} />
+                <h2 id="ar-camera-permission-title">Разрешить камеру?</h2>
+                <p>
+                  Камера найдёт AR-проект по QR-коду, а затем распознает фотографию, чтобы показать связанное видео.
+                </p>
+                <Button type="button" full onClick={() => void startScanning()}>
+                  {mode === "error" ? "Повторить" : "Разрешить камеру"}
+                </Button>
+                <Button type="button" variant="quiet" full onClick={() => setPermissionVisible(false)}>
+                  Не сейчас
+                </Button>
+              </div>
+            ) : (
+              <div className="ar-camera-start">
+                <Button type="button" onClick={() => void startScanning()} icon={<Camera size={18} />}>
+                  Открыть камеру
+                </Button>
+              </div>
+            )}
+            <div className="ar-camera-private">
+              <ShieldCheck size={17} />
+              Кадры обрабатываются на устройстве
+            </div>
+          </div>
         </div>
       </section>
     </main>

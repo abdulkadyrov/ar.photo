@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowRight,
+  ImagePlay,
   BadgeCheck,
   Check,
   ChevronRight,
   CircleGauge,
   Clock3,
-  FolderKanban,
+  EllipsisVertical,
   HardDrive,
   KeyRound,
   Layers3,
@@ -19,7 +21,9 @@ import {
   WandSparkles,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import type { ProjectListItem } from "../../entities/catalog/model";
+import { captureWorkspaceOrigin } from "../ar-items/itemNavigation";
 import { AppShell } from "../../app/layout/AppShell";
 import { Button, ErrorState, Input, Modal, Panel, Select, Skeleton, Toast } from "../../shared/ui";
 import { getCatalogRepository } from "../catalog/catalogRepository";
@@ -93,7 +97,6 @@ export function SettingsRoute() {
       description="Основные параметры вашей студии"
       compactMobile
     >
-      <SettingsNavigation />
       <SubscriptionNotice entitlements={data.entitlements} />
       <AccountSettingsForm settings={settingsQuery.data} entitlements={data.entitlements} />
     </AppShell>
@@ -147,7 +150,7 @@ function AccountSettingsForm({
         if (!editingLocked && dirty && parsed.success) saveMutation.mutate();
       }}
     >
-      <Panel>
+      <Panel className="account-info-panel">
         <h2>Основная информация</h2>
         <label>
           <span>
@@ -278,6 +281,18 @@ export function SubscriptionRoute() {
     enabled: Boolean(accountId),
   });
 
+  const recentProjectsQuery = useQuery({
+    queryKey: ["dashboard", "projects", accountId],
+    queryFn: () =>
+      catalogRepository.listProjects(accountId!, {
+        search: "",
+        filter: "all",
+        sort: "updated_desc",
+        page: 1,
+        pageSize: 3,
+      }),
+    enabled: Boolean(accountId),
+  });
   if (data.error) return <SettingsErrorState title="Мой пакет" error={data.error} />;
   if (data.loading || billingQuery.isPending) return <SettingsLoading title="Мой пакет" />;
   if (billingQuery.error || !data.entitlements) {
@@ -292,89 +307,128 @@ export function SubscriptionRoute() {
       description="Текущий пакет, остатки и дополнительные возможности для вашего аккаунта."
       compactMobile
     >
-      <SettingsNavigation />
       <SubscriptionNotice entitlements={entitlements} />
 
-      <section className="package-summary mt-5">
-        <Panel>
-          <div className="flex items-start justify-between gap-4">
+      <Panel className="package-overview">
+        <div className="package-current">
+          <p>Текущий пакет</p>
+          <h2>{entitlements.plan.name}</h2>
+          <span>
+            {entitlements.subscription.expiresAt
+              ? `Действует до ${formatDate(entitlements.subscription.expiresAt)}`
+              : "Без даты окончания"}
+          </span>
+          <StatePill ok={entitlements.canWrite}>{subscriptionLabels[entitlements.subscription.status]}</StatePill>
+        </div>
+        <div className="package-balances">
+          <UsageMeter
+            label="Осталось добавлений фото"
+            remaining
+            icon={<WandSparkles size={22} />}
+            used={
+              entitlements.limits.arItems === null
+                ? entitlements.usage.arItems
+                : Math.max(0, entitlements.limits.arItems - entitlements.usage.arItems)
+            }
+            limit={entitlements.limits.arItems}
+          />
+          <UsageMeter
+            label="Хранилище"
+            icon={<HardDrive size={22} />}
+            used={entitlements.usage.storageBytes}
+            limit={entitlements.limits.storageBytes}
+            formatter={formatBytes}
+          />
+        </div>
+      </Panel>
+      <div className="package-credit-notice">
+        <CircleGauge size={20} />
+        <span>Если вы удалите фото или проект, потраченные добавления не возвращаются.</span>
+      </div>
+      <section className="package-addons">
+        <h2>Дополнительные возможности</h2>
+        <div>
+          <Panel>
+            <Layers3 size={25} />
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Текущий пакет</p>
-              <h2 className="mt-3 text-3xl font-semibold">{entitlements.plan.name}</h2>
-              <p className="mt-2 text-sm leading-6 text-muted">
-                {entitlements.plan.description ?? "Индивидуальные условия AR Photo"}
-              </p>
+              <h3>Добавить фото</h3>
+              <p>Увеличить пакет добавлений для вашего аккаунта.</p>
+              <Link className="btn btn-primary" to="/support">
+                Условия и запрос
+              </Link>
             </div>
-            <StatePill ok={entitlements.canWrite}>{subscriptionLabels[entitlements.subscription.status]}</StatePill>
+          </Panel>
+          <Panel>
+            <Clock3 size={25} />
+            <div>
+              <h3>Продлить доступ</h3>
+              <p>Продлить срок действия текущего пакета.</p>
+              <Link className="btn btn-primary" to="/support">
+                Условия и запрос
+              </Link>
+            </div>
+          </Panel>
+        </div>
+      </section>
+      <section className="package-recent-projects" aria-labelledby="package-recent-title">
+        <div className="section-heading-row">
+          <h2 id="package-recent-title">Недавние проекты</h2>
+          <Link className="text-link" to="/projects">
+            Перейти в проекты <ArrowRight size={16} />
+          </Link>
+        </div>
+        {recentProjectsQuery.isPending ? (
+          <Skeleton className="mt-3 h-24" />
+        ) : recentProjectsQuery.error ? (
+          <ErrorState
+            text="Не удалось загрузить недавние проекты."
+            action={
+              <Button type="button" onClick={() => void recentProjectsQuery.refetch()}>
+                Повторить
+              </Button>
+            }
+          />
+        ) : recentProjectsQuery.data?.items.length ? (
+          <div className="package-recent-grid">
+            {recentProjectsQuery.data.items.map((project) => (
+              <PackageRecentProject key={project.id} project={project} />
+            ))}
           </div>
-          <dl className="mt-6 grid gap-4 border-t border-line pt-5 text-sm">
-            <TextFact
-              label="Осталось добавлений фото"
-              value={
-                entitlements.limits.arItems === null
-                  ? "Без ограничений"
-                  : String(Math.max(0, entitlements.limits.arItems - entitlements.usage.arItems))
-              }
-            />
+        ) : (
+          <Panel className="mt-3">
+            <p className="text-sm text-muted">Ваши проекты появятся здесь после создания.</p>
+            <Link className="text-link" to="/projects">
+              Открыть проекты <ArrowRight size={15} />
+            </Link>
+          </Panel>
+        )}
+      </section>
+      <details className="package-details">
+        <summary>Все лимиты и условия пакета</summary>
+        <Panel>
+          <dl className="grid gap-3 text-sm">
             <DateFact label="Начало" value={entitlements.subscription.startsAt} />
-            <DateFact label="Окончание" value={entitlements.subscription.expiresAt} />
             <DateFact label="Льготный период до" value={entitlements.subscription.gracePeriodEndsAt} />
             <TextFact label="Максимальный файл" value={formatLimit(entitlements.limits.maxVideoBytes, formatBytes)} />
             <TextFact
               label="Длительность видео"
               value={formatLimit(entitlements.limits.videoDurationSeconds, (value) => `${value} сек.`)}
             />
+            <TextFact
+              label="Проекты"
+              value={`${entitlements.usage.projects} / ${formatLimit(entitlements.limits.projects, formatCount)}`}
+            />
+            <TextFact
+              label="Группы"
+              value={`${entitlements.usage.groups} / ${formatLimit(entitlements.limits.groups, formatCount)}`}
+            />
+            <TextFact
+              label="Сотрудники"
+              value={`${entitlements.usage.teamMembers} / ${formatLimit(entitlements.limits.teamMembers, formatCount)}`}
+            />
           </dl>
         </Panel>
-
-        <Panel>
-          <div className="flex items-center gap-3">
-            <span className="metric-icon">
-              <CircleGauge size={20} />
-            </span>
-            <div>
-              <h2 className="text-xl font-semibold">Использование</h2>
-              <p className="mt-1 text-sm text-muted">
-                Добавления фото расходуются при создании AR-работы и не возвращаются после удаления. Хранилище и
-                остальные показатели считаются по текущим данным.
-              </p>
-            </div>
-          </div>
-          <div className="mt-6 grid gap-5">
-            <UsageMeter
-              label="Хранилище"
-              icon={<HardDrive size={17} />}
-              used={entitlements.usage.storageBytes}
-              limit={entitlements.limits.storageBytes}
-              formatter={formatBytes}
-            />
-            <UsageMeter
-              label="Проекты"
-              icon={<FolderKanban size={17} />}
-              used={entitlements.usage.projects}
-              limit={entitlements.limits.projects}
-            />
-            <UsageMeter
-              label="Группы"
-              icon={<Layers3 size={17} />}
-              used={entitlements.usage.groups}
-              limit={entitlements.limits.groups}
-            />
-            <UsageMeter
-              label="Использовано добавлений AR-фото"
-              icon={<WandSparkles size={17} />}
-              used={entitlements.usage.arItems}
-              limit={entitlements.limits.arItems}
-            />
-            <UsageMeter
-              label="Сотрудники"
-              icon={<Users size={17} />}
-              used={entitlements.usage.teamMembers}
-              limit={entitlements.limits.teamMembers}
-            />
-          </div>
-        </Panel>
-      </section>
+      </details>
 
       {billingQuery.data?.status === "available" ? (
         <Panel className="mt-4 flex flex-wrap items-center justify-between gap-4">
@@ -393,6 +447,37 @@ export function SubscriptionRoute() {
         </div>
       )}
     </AppShell>
+  );
+}
+
+function PackageRecentProject({ project }: { project: ProjectListItem }) {
+  const location = useLocation();
+  const path = project.previewPath ?? project.cover_path;
+  const coverQuery = useQuery({
+    queryKey: ["catalog", "cover", project.previewBucket ?? "project-covers-private", path],
+    queryFn: () => catalogRepository.getCoverUrl(path, project.previewBucket),
+    enabled: Boolean(path),
+    staleTime: 8 * 60_000,
+  });
+  return (
+    <Link
+      className="package-recent-project"
+      state={captureWorkspaceOrigin(location, project.account_id)}
+      to={`/projects/${project.id}`}
+    >
+      <span>{coverQuery.data ? <img alt="" loading="lazy" src={coverQuery.data} /> : <ImagePlay size={24} />}</span>
+      <div>
+        <h3>{project.name}</h3>
+        <p>{project.arItemCount} AR-фото</p>
+        <small>
+          Обновлён{" "}
+          {new Intl.DateTimeFormat("ru", { day: "2-digit", month: "2-digit", year: "numeric" }).format(
+            new Date(project.updated_at),
+          )}
+        </small>
+      </div>
+      <ArrowRight size={16} />
+    </Link>
   );
 }
 
@@ -519,7 +604,6 @@ export function TeamRoute() {
         ) : undefined
       }
     >
-      <SettingsNavigation />
       {notice ? (
         <div className="fixed right-5 top-5 z-50">
           <Toast {...notice} onDismiss={() => setNotice(null)} />
@@ -549,6 +633,12 @@ export function TeamRoute() {
         <>
           <TeamUsage entitlements={entitlements} />
           <section aria-label="Сотрудники" className="team-members mt-5">
+            <div className="team-table-heading" aria-hidden="true">
+              <span>Участник</span>
+              <span>Роль</span>
+              <span>Статус</span>
+              <span />
+            </div>
             {rosterQuery.data.members.map((member) => (
               <MemberCard
                 key={member.id}
@@ -562,46 +652,29 @@ export function TeamRoute() {
                 onToggle={() => setMemberAction({ member, nextActive: !member.isActive })}
               />
             ))}
-          </section>
-
-          <Panel className="mt-6">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-semibold">Ожидают принятия</h2>
-                <p className="mt-1 text-sm text-muted">
-                  Приглашения действуют ограниченное время и учитываются в лимите.
-                </p>
-              </div>
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">
-                {rosterQuery.data.invitations.length}
-              </span>
-            </div>
-            {rosterQuery.data.invitations.length ? (
-              <div className="mt-5 grid gap-3">
-                {rosterQuery.data.invitations.map((invitation) => (
-                  <div
-                    className="flex flex-col gap-3 rounded-2xl border border-line bg-white/[0.025] p-4 sm:flex-row sm:items-center sm:justify-between"
-                    key={invitation.id}
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold">{invitation.email}</p>
-                      <p className="mt-1 text-xs text-muted">
-                        {roleLabels[invitation.role]} · до {formatDate(invitation.expiresAt)}
-                      </p>
-                    </div>
-                    <Button
-                      variant="quiet"
-                      onClick={() => setRevokingInvitation({ id: invitation.id, email: invitation.email })}
-                    >
-                      Отозвать
-                    </Button>
+            {rosterQuery.data.invitations.map((invitation) => (
+              <article className="team-member team-invitation" key={invitation.id}>
+                <div className="team-member-row">
+                  <span className="team-avatar">{initials(invitation.email)}</span>
+                  <div className="min-w-0 flex-1">
+                    <h2>{invitation.email}</h2>
+                    <p>До {formatDate(invitation.expiresAt)}</p>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-5 text-sm text-muted">Активных приглашений нет.</p>
-            )}
-          </Panel>
+                  <span className="team-member-role">{roleLabels[invitation.role]}</span>
+                  <span className="team-member-state">
+                    <span className="team-invited-state">Приглашён</span>
+                  </span>
+                  <Button
+                    type="button"
+                    variant="quiet"
+                    onClick={() => setRevokingInvitation({ id: invitation.id, email: invitation.email })}
+                  >
+                    Отозвать
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </section>
         </>
       )}
 
@@ -683,29 +756,6 @@ function useSettingsData() {
   };
 }
 
-function SettingsNavigation() {
-  const links = [
-    { to: "/settings", label: "Аккаунт", end: true },
-    { to: "/settings/subscription", label: "Мой пакет" },
-    { to: "/settings/team", label: "Команда" },
-    { to: "/settings/security", label: "Безопасность" },
-  ];
-  return (
-    <nav aria-label="Разделы настроек" className="settings-navigation">
-      {links.map((link) => (
-        <NavLink
-          className={({ isActive }) => `btn whitespace-nowrap ${isActive ? "btn-primary" : "btn-quiet"}`}
-          end={link.end}
-          key={link.to}
-          to={link.to}
-        >
-          {link.label}
-        </NavLink>
-      ))}
-    </nav>
-  );
-}
-
 function SubscriptionNotice({ entitlements }: { entitlements: AccountEntitlements }) {
   const status = entitlements.subscription.status;
   if (status === "active" || status === "trial") return null;
@@ -740,15 +790,17 @@ function UsageMeter({
   used,
   limit,
   formatter = formatCount,
+  remaining = false,
 }: {
   label: string;
   icon: ReactNode;
   used: number;
   limit: number | null;
   formatter?: (value: number) => string;
+  remaining?: boolean;
 }) {
   const percent = limit && limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
-  const warning = percent >= 85;
+  const warning = !remaining && percent >= 85;
   return (
     <div>
       <div className="flex items-center justify-between gap-4 text-sm">
@@ -757,11 +809,17 @@ function UsageMeter({
           {label}
         </span>
         <span className={warning ? "text-amber-700" : "text-muted"}>
-          {formatter(used)} / {limit === null ? "без лимита по пакету" : formatter(limit)}
+          {remaining && limit === null ? (
+            "Без лимита"
+          ) : (
+            <>
+              {formatter(used)} / {limit === null ? "без лимита по пакету" : formatter(limit)}
+            </>
+          )}
         </span>
       </div>
       <div
-        aria-label={`${label}: использовано ${percent}%`}
+        aria-label={`${label}: ${percent}% от лимита`}
         aria-valuemax={100}
         aria-valuemin={0}
         aria-valuenow={percent}
@@ -778,21 +836,17 @@ function UsageMeter({
 }
 
 function TeamUsage({ entitlements }: { entitlements: AccountEntitlements }) {
-  const used = entitlements.usage.teamMembers + entitlements.usage.pendingInvitations;
   return (
-    <Panel className="mt-6">
-      <div className="flex items-center gap-3">
-        <span className="metric-icon">
-          <Users size={20} />
-        </span>
-        <div>
-          <h2 className="text-xl font-semibold">Места в команде</h2>
-          <p className="mt-1 text-sm text-muted">Активные сотрудники и ожидающие приглашения.</p>
-        </div>
-      </div>
-      <div className="mt-5">
-        <UsageMeter label="Занято" icon={<UserCheck size={17} />} used={used} limit={entitlements.limits.teamMembers} />
-      </div>
+    <Panel className="team-summary">
+      <Users size={22} />
+      <strong>{entitlements.usage.teamMembers} участника</strong>
+      <span>Активных: {entitlements.usage.teamMembers}</span>
+      <span>Приглашённых: {entitlements.usage.pendingInvitations}</span>
+      <small>
+        {entitlements.limits.teamMembers === null
+          ? "Без лимита по пакету"
+          : `Лимит мест: ${entitlements.limits.teamMembers}`}
+      </small>
     </Panel>
   );
 }
@@ -818,28 +872,42 @@ function MemberCard({
           <h2 className="truncate text-lg font-semibold">{member.fullName ?? "Без имени"}</h2>
           <p className="truncate text-sm text-muted">{member.email ?? "Email скрыт"}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <span className="team-member-role">{roleLabels[member.role]}</span>
+        <span className="team-member-state">
           <StatePill ok={member.isActive}>{member.isActive ? "Активен" : "Отключён"}</StatePill>
-          <span className="rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
-            {roleLabels[member.role]}
-          </span>
-        </div>
+        </span>
         {!protectedMember ? (
-          <div className="flex gap-2">
-            <Button variant="quiet" icon={<Pencil size={16} />} onClick={onEdit}>
-              Права
-            </Button>
-            <Button
-              variant={member.isActive ? "danger" : "ghost"}
-              icon={member.isActive ? <UserMinus size={16} /> : <UserCheck size={16} />}
-              onClick={onToggle}
-            >
-              {member.isActive ? "Отключить" : "Включить"}
-            </Button>
-          </div>
+          <details className="team-member-menu">
+            <summary aria-label={`Действия участника ${member.fullName ?? member.email}`}>
+              <EllipsisVertical size={20} />
+            </summary>
+            <div>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.currentTarget.closest("details")?.removeAttribute("open");
+                  onEdit();
+                }}
+              >
+                <Pencil size={16} />
+                Изменить роль
+              </button>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.currentTarget.closest("details")?.removeAttribute("open");
+                  onToggle();
+                }}
+              >
+                {member.isActive ? <UserMinus size={16} /> : <UserCheck size={16} />}
+                {member.isActive ? "Отключить доступ" : "Восстановить доступ"}
+              </button>
+            </div>
+          </details>
         ) : (
-          <span className="inline-flex items-center gap-2 text-xs text-muted">
-            <ShieldCheck size={16} /> Защищённая роль
+          <span className="team-protected-label" title="Изменение вашей роли и роли владельца недоступно">
+            <ShieldCheck size={16} />
+            <span className="sr-only">Защищённая роль</span>
           </span>
         )}
       </div>
@@ -933,7 +1001,7 @@ function InviteMemberModal({
         </Button>
       }
     >
-      <div className="grid gap-4">
+      <fieldset disabled={loading} className="grid gap-4">
         <label className="text-sm font-semibold">
           Email
           <Input
@@ -960,8 +1028,11 @@ function InviteMemberModal({
             { value: "viewer", label: "Наблюдатель" },
           ]}
         />
-        <PermissionEditor role={role} permissions={permissions} onChange={setPermissions} />
-      </div>
+        <details className="team-advanced-permissions">
+          <summary>Дополнительные разрешения</summary>
+          <PermissionEditor role={role} permissions={permissions} onChange={setPermissions} />
+        </details>
+      </fieldset>
     </Modal>
   );
 }
@@ -1000,7 +1071,7 @@ function EditMemberModal({
         </Button>
       }
     >
-      <div className="grid gap-4">
+      <fieldset disabled={loading} className="grid gap-4">
         <Select
           label="Роль"
           value={role}
@@ -1011,8 +1082,11 @@ function EditMemberModal({
             { value: "viewer", label: "Наблюдатель" },
           ]}
         />
-        <PermissionEditor role={role} permissions={permissions} onChange={setPermissions} />
-      </div>
+        <details className="team-advanced-permissions">
+          <summary>Дополнительные разрешения</summary>
+          <PermissionEditor role={role} permissions={permissions} onChange={setPermissions} />
+        </details>
+      </fieldset>
     </Modal>
   );
 }

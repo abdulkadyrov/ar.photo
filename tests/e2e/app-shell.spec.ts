@@ -188,12 +188,12 @@ test("protects the workspace and clears the demo session on logout", async ({ pa
 
 test("registers with email and password through the explicit signup route", async ({ page }) => {
   await page.goto("./register");
-
+  await page.getByLabel("Ваше имя", { exact: true }).fill("Новая студия");
   await page.getByPlaceholder("name@example.com").fill("new-owner@example.com");
   await page.getByPlaceholder("8+ символов, A–Z, a–z и цифра").fill("Strong-password1");
   await page.getByPlaceholder("Повторите пароль").fill("Strong-password1");
   await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+  await page.getByRole("button", { name: "Создать кабинет" }).click();
 
   await expect(page).toHaveURL(/\/ar\.photo\/dashboard$/);
   await expect(page.getByRole("heading", { name: "Главная", exact: true })).toBeVisible();
@@ -329,8 +329,8 @@ test("validates and uploads a marker through the resumable media queue", async (
   await page.goto("./media");
 
   await expect(page.getByRole("heading", { name: "Медиа и загрузки", exact: true })).toBeVisible();
-  await expect(page.getByText("Демо-режим: очередь работает локально.", { exact: false })).toBeVisible();
-  await page.getByText("Загрузить фото и видео", { exact: true }).click();
+  await page.getByRole("button", { name: "Загрузить файлы", exact: true }).click();
+  await expect(page.getByText("Демо: файлы сохраняются только в этом браузере.", { exact: false })).toBeVisible();
   const markerFixtures = await page.evaluate(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 640;
@@ -363,6 +363,7 @@ test("validates and uploads a marker through the resumable media queue", async (
 
   await page.reload();
   await expect(page.getByText("Локальная очередь восстановлена", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Загрузить файлы", exact: true }).click();
   await expect(page.getByRole("button", { name: "Загрузить готовые · 3" })).toBeVisible();
   await page.getByRole("button", { name: "Загрузить готовые · 3" }).click();
   await expect(page.getByText("загружено", { exact: false })).toHaveCount(3);
@@ -456,7 +457,7 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   await expect(compactWork.getByText("Портрет Алексея", { exact: true })).toBeVisible();
   await expect(compactWork.getByText("Ревизия", { exact: false })).toHaveCount(0);
   await page.setViewportSize({ width: 319, height: 628 });
-  await expect(compactWork.getByText("AR workflow group", { exact: true })).toBeVisible();
+  await expect(compactWork.locator("..").getByText("AR workflow group", { exact: true })).toBeVisible();
   const cards = page.locator(".ar-item-card");
   const [firstCardBox, workGridColumns] = await Promise.all([
     cards.first().boundingBox(),
@@ -474,9 +475,10 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   const savedListScrollY = await page.evaluate(() => window.scrollY);
   expect(savedListScrollY).toBeGreaterThan(0);
   await compactWork.click();
-  await expect(page.getByRole("heading", { name: /^Фото ·/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /^Видео ·/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "QR-код", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Фото (основа AR)", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Видео (AR-контент)", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "QR-код", exact: true })).toBeVisible();
+  await expect(page.locator(".ar-item-qr-code svg")).toBeVisible();
   await expect(page.getByRole("timer")).toContainText("Готово за");
   await expect(page.getByLabel("Видео AR-работы")).toBeVisible();
   await expect(page.getByLabel("Открыть публичную ссылку")).toBeVisible();
@@ -486,7 +488,7 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
     mediaSections.nth(1).boundingBox(),
     mediaSections.nth(0).locator(".ar-item-media-preview").boundingBox(),
     mediaSections.nth(1).locator(".ar-item-media-preview").boundingBox(),
-    page.locator(".ar-item-qr-summary").boundingBox(),
+    page.locator(".ar-item-publication").boundingBox(),
   ]);
   expect(photoSectionBox).not.toBeNull();
   expect(videoSectionBox).not.toBeNull();
@@ -549,7 +551,7 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
 
   await page.setViewportSize({ width: 1280, height: 720 });
   const printing = page.locator("details.qr-extra-card");
-  if ((await printing.getAttribute("open")) === null) await printing.locator("summary").first().click();
+  await expect(printing).toHaveAttribute("open", "");
 
   await page.getByRole("button", { name: "AR Photo", exact: true }).click();
   await expect(page.getByText("Стиль QR сохранён", { exact: true })).toBeVisible();
@@ -584,10 +586,9 @@ test("shows subscription usage and manages team permissions within the tariff", 
   await expect(page.getByRole("heading", { name: "Мой пакет", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Студия" })).toBeVisible();
   await expect(page.getByRole("progressbar", { name: /Хранилище/ })).toBeVisible();
-  await expect(page.getByText("Добавления фото расходуются", { exact: false })).toBeVisible();
+  await expect(page.getByText("потраченные добавления не возвращаются", { exact: false })).toBeVisible();
 
-  const settingsNavigation = page.getByRole("navigation", { name: "Разделы настроек" });
-  await settingsNavigation.getByRole("link", { name: "Команда" }).click();
+  await page.getByRole("link", { name: "Команда", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Моя команда", exact: true })).toBeVisible();
   await expect(page.getByText("Алина Магомедова", { exact: true })).toBeVisible();
 
@@ -595,22 +596,25 @@ test("shows subscription usage and manages team permissions within the tariff", 
   const inviteDialog = page.getByRole("dialog", { name: "Пригласить участника" });
   await inviteDialog.getByPlaceholder("employee@example.com").fill("designer@example.com");
   await inviteDialog.getByLabel("Роль").selectOption("viewer");
+  await inviteDialog.locator("summary").filter({ hasText: "Дополнительные разрешения" }).click();
   await inviteDialog.getByText("Статистика", { exact: true }).click();
   await inviteDialog.getByRole("button", { name: "Отправить приглашение" }).click();
   await expect(page.getByText("Приглашение создано", { exact: true })).toBeVisible();
   await expect(page.getByText("designer@example.com", { exact: true })).toBeVisible();
 
-  const memberCard = page.getByText("Алина Магомедова", { exact: true }).locator("../..");
-  await memberCard.getByRole("button", { name: "Права" }).click();
+  const memberCard = page.locator(".team-member").filter({ hasText: "Алина Магомедова" });
+  await memberCard.locator("summary").click();
+  await memberCard.getByRole("button", { name: "Изменить роль" }).click();
   const rightsDialog = page.getByRole("dialog", { name: "Права: Алина Магомедова" });
   await rightsDialog.getByLabel("Роль").selectOption("viewer");
   await rightsDialog.getByRole("button", { name: "Сохранить права" }).click();
   await expect(page.getByText("Права сотрудника сохранены", { exact: true })).toBeVisible();
 
+  await page.locator(".team-member").filter({ hasText: "Алина Магомедова" }).locator("summary").click();
   await page
-    .getByText("Алина Магомедова", { exact: true })
-    .locator("../..")
-    .getByRole("button", { name: "Отключить" })
+    .locator(".team-member")
+    .filter({ hasText: "Алина Магомедова" })
+    .getByRole("button", { name: "Отключить доступ", exact: true })
     .click();
   await page.getByRole("dialog", { name: "Отключить сотрудника?" }).getByRole("button", { name: "Отключить" }).click();
   await expect(page.getByText("Доступ сотрудника отключён", { exact: true })).toBeVisible();
@@ -647,13 +651,15 @@ test("filters privacy-safe analytics across every scope and date mode", async ({
   await expect(page.getByRole("heading", { name: "Статистика моих работ", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Ключевые показатели" })).toBeVisible();
   await expect(page.getByTestId("analytics-chart")).toBeVisible();
+  await page.locator("summary").filter({ hasText: "Подробнее о просмотрах и устройствах" }).click();
   await expect(page.getByText("Приватность по умолчанию", { exact: true })).toBeVisible();
   await expect(page.getByText(/не сохраняет IP-адреса/)).toBeVisible();
 
   const scope = page.getByLabel("Раздел аналитики");
   for (const label of ["Проект · Выпускной 2027", "Группа · 11А класс", "AR-работа · Алексей Иванов"]) {
     await scope.selectOption({ label });
-    await expect(page.getByText(label.split(" · ")[1], { exact: true }).first()).toBeVisible();
+    await expect(scope.locator("option:checked")).toHaveText(label);
+    await expect(page.getByTestId("analytics-chart")).toBeVisible();
   }
 
   await page.getByLabel("Период аналитики").selectOption("custom");
@@ -802,11 +808,11 @@ test("edits photo credit packages and grants an addon from the admin panel", asy
   await nav.getByRole("link", { name: "Тарифы", exact: true }).click();
   await page.getByRole("button", { name: "Новый тариф", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "Новый тариф или пакет" });
-  await editor.getByRole("combobox", { name: "Тип", exact: true }).selectOption("addon");
+  await editor.getByRole("radio", { name: "Дополнение", exact: true }).check();
   await expect(editor.getByLabel("Код тарифа", { exact: true })).not.toBeVisible();
   await editor.getByLabel("Название", { exact: true }).fill("Ещё 50 фото");
   await editor.getByLabel("Стоимость, ₽", { exact: true }).fill("490");
-  await editor.getByLabel("Срок, дней (30 — месяц, 365 — год)", { exact: true }).fill("0");
+  await editor.getByLabel("Срок, дней", { exact: true }).fill("0");
   await editor.getByLabel("Добавления AR-фото", { exact: true }).fill("50");
   await editor.getByRole("button", { name: "Сохранить тариф" }).click();
   await expect(editor).toHaveCount(0);

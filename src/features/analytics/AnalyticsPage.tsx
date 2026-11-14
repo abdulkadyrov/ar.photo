@@ -160,6 +160,25 @@ export function AnalyticsRoute() {
             <DateInput label="По дату" value={customTo} onChange={setCustomTo} />
           </div>
         ) : null}
+        <Button
+          type="button"
+          className="analytics-filter-apply"
+          disabled={summaryQuery.isFetching || !range}
+          onClick={() => void summaryQuery.refetch()}
+        >
+          Применить
+        </Button>
+        <Button
+          type="button"
+          className="analytics-filter-reset"
+          variant="ghost"
+          onClick={() => {
+            setPreset("30");
+            setSelectedScopeKey("");
+          }}
+        >
+          Сбросить
+        </Button>
         {!range ? (
           <p className="mt-4 text-sm text-rose-700" role="alert">
             Начальная дата должна быть раньше конечной, максимальный период — 366 дней.
@@ -182,56 +201,60 @@ export function AnalyticsRoute() {
           />
         </div>
       ) : summaryQuery.data ? (
-        <>
-          <AnalyticsDashboard data={summaryQuery.data} />
-          {range ? (
-            <AnalyticsWorkList
-              items={itemsQuery.data ?? []}
-              loading={itemsQuery.isPending}
-              error={itemsQuery.error}
-              accountId={workspace.accountId}
-              range={range}
-              scope={scope}
-              scopes={scopes}
-              onRetry={() => void itemsQuery.refetch()}
-            />
-          ) : null}
-        </>
+        <AnalyticsDashboard
+          data={summaryQuery.data}
+          works={
+            range ? (
+              <AnalyticsWorkList
+                items={itemsQuery.data ?? []}
+                loading={itemsQuery.isPending}
+                error={itemsQuery.error}
+                accountId={workspace.accountId}
+                range={range}
+                scope={scope}
+                scopes={scopes}
+                onRetry={() => void itemsQuery.refetch()}
+              />
+            ) : null
+          }
+        />
       ) : null}
     </AppShell>
   );
 }
 
-function AnalyticsDashboard({ data }: { data: AnalyticsSummary }) {
+function AnalyticsDashboard({ data, works }: { data: AnalyticsSummary; works: ReactNode }) {
   const summary = data.summary;
   return (
     <>
       <section className="analytics-metrics mt-5" aria-label="Ключевые показатели">
-        <MetricCard
-          icon={<Eye size={20} />}
-          label="Открытия страниц"
-          value={formatNumber(summary.pageOpens)}
-          hint={`${formatNumber(summary.uniqueSessions)} сессий`}
-        />
-        <MetricCard
-          icon={<ScanLine size={20} />}
-          label="Запуски AR"
-          value={formatNumber(summary.cameraStarts)}
-          hint={`${formatNumber(summary.markerDetections)} распознаваний`}
-        />
-        <MetricCard
-          icon={<Play size={20} />}
-          label="Просмотры видео"
-          value={formatNumber(summary.playbackStarts)}
-          hint={`${formatRate(summary.playbackRate)} после маркера`}
-        />
+        <article className="analytics-stat">
+          <Eye size={22} />
+          <div>
+            <span>Открытия страниц</span>
+            <strong>{formatNumber(summary.pageOpens)}</strong>
+          </div>
+        </article>
+        <article className="analytics-stat">
+          <ScanLine size={22} />
+          <div>
+            <span>Запуски AR</span>
+            <strong>{formatNumber(summary.cameraStarts)}</strong>
+          </div>
+        </article>
+        <article className="analytics-stat">
+          <Play size={22} />
+          <div>
+            <span>Просмотры видео</span>
+            <strong>{formatNumber(summary.playbackStarts)}</strong>
+          </div>
+        </article>
       </section>
 
       <section className="analytics-chart-grid mt-5">
         <Panel>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Динамика</p>
               <h2 className="mt-1 text-lg font-semibold">Динамика активности</h2>
             </div>
             <span className="rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
@@ -240,6 +263,11 @@ function AnalyticsDashboard({ data }: { data: AnalyticsSummary }) {
           </div>
           <AnalyticsChart series={data.series} />
         </Panel>
+      </section>
+
+      {works}
+      <details className="analytics-details mt-5">
+        <summary>Подробнее о просмотрах и устройствах</summary>
         <Panel>
           <div className="flex items-center gap-3">
             <span className="metric-icon">
@@ -252,10 +280,7 @@ function AnalyticsDashboard({ data }: { data: AnalyticsSummary }) {
           </div>
           <Funnel summary={summary} />
         </Panel>
-      </section>
 
-      <details className="analytics-details mt-5">
-        <summary>Подробнее о просмотрах и устройствах</summary>
         <section className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             icon={<CircleCheck size={20} />}
@@ -287,21 +312,21 @@ function AnalyticsDashboard({ data }: { data: AnalyticsSummary }) {
             errors
           />
         </section>
-      </details>
-      <Panel className="analytics-privacy mt-5 border-primary/25">
-        <div className="flex items-start gap-3">
-          <span className="metric-icon">
-            <ShieldCheck size={20} />
-          </span>
-          <div>
-            <h2 className="font-semibold">Приватность по умолчанию</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-              Отчёт строится только по агрегатам. AR Photo не сохраняет IP-адреса, полный User-Agent, кадры камеры,
-              персональные данные зрителя или подписанные ссылки на медиа. Токен сессии хранится как солёный SHA‑256.
-            </p>
+        <Panel className="analytics-privacy mt-5 border-primary/25">
+          <div className="flex items-start gap-3">
+            <span className="metric-icon">
+              <ShieldCheck size={20} />
+            </span>
+            <div>
+              <h2 className="font-semibold">Приватность по умолчанию</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
+                Отчёт строится только по агрегатам. AR Photo не сохраняет IP-адреса, полный User-Agent, кадры камеры,
+                персональные данные зрителя или подписанные ссылки на медиа. Токен сессии хранится как солёный SHA‑256.
+              </p>
+            </div>
           </div>
-        </div>
-      </Panel>
+        </Panel>
+      </details>
     </>
   );
 }
@@ -427,7 +452,14 @@ function AnalyticsWorkRow({
         )}
         <div>
           <strong>{item.title}</strong>
-          <span>{projectName}</span>
+          <span className="analytics-project-name">{projectName}</span>
+          <span className="analytics-mobile-views">
+            {stat
+              ? `${formatNumber(stat.playbackStarts)} просмотров`
+              : summary.error
+                ? "Статистика недоступна"
+                : "Загружаем статистику…"}
+          </span>
         </div>
       </div>
       <span aria-label="Открытия страниц">
@@ -445,7 +477,7 @@ function AnalyticsWorkRow({
 function AnalyticsChart({ series }: { series: AnalyticsSummary["series"] }) {
   const width = 760;
   const height = 250;
-  const inset = 30;
+  const inset = 40;
   const maximum = Math.max(
     1,
     ...series.flatMap((day) => [day.sessions, day.detections, day.playbacks, day.completions]),
@@ -478,21 +510,22 @@ function AnalyticsChart({ series }: { series: AnalyticsSummary["series"] }) {
         <svg
           className="h-auto w-full"
           viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
           role="img"
           aria-label={`График активности за ${series.length} дней`}
         >
           <title>Динамика AR-просмотров</title>
-          {[0.25, 0.5, 0.75].map((position) => (
-            <line
-              key={position}
-              x1={inset}
-              x2={width - inset}
-              y1={height * position}
-              y2={height * position}
-              stroke="rgba(148,163,184,0.14)"
-              strokeDasharray="5 7"
-            />
-          ))}
+          {[0, 0.25, 0.5, 0.75, 1].map((position) => {
+            const y = height - inset - position * (height - inset * 2);
+            return (
+              <g key={position}>
+                <line x1={inset} x2={width - inset} y1={y} y2={y} stroke="#e7e4e9" />
+                <text x={inset - 8} y={y + 4} textAnchor="end" fill="#666471" fontSize="11">
+                  {Math.round(maximum * position)}
+                </text>
+              </g>
+            );
+          })}
           {Object.keys(colors).map((key) => (
             <polyline
               key={key}

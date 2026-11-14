@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import "./PublicArViewerPage.css";
+import { PrivacyRoute } from "./PrivacyPage";
 import {
   AlertTriangle,
   Camera,
@@ -12,8 +13,15 @@ import {
   ShieldCheck,
   Volume2,
   VolumeX,
+  ImageIcon,
+  Smartphone,
+  Info,
+  CameraOff,
+  Chrome,
+  Compass,
+  Clipboard,
 } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "../../shared/ui";
 import { saveArRecording, type ArRecording } from "./arRecording";
 import {
@@ -45,6 +53,8 @@ type ViewerMode =
 
 export function PublicArViewerRoute() {
   const { publicSlug = "" } = useParams<{ publicSlug: string }>();
+  const [publicParams] = useSearchParams();
+  const ordinaryVideo = publicParams.get("view") === "video";
   const [manifest, setManifest] = useState<PublicArManifest | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [cachedProject, setCachedProject] = useState<CachedPublicArProject | null>(null);
@@ -90,7 +100,7 @@ export function PublicArViewerRoute() {
           setMuted(initialArMuted(next));
           setCachedProject(cached);
           telemetry.track("page_open");
-          setMode("intro");
+          setMode(ordinaryVideo && next.fallbackEnabled ? "fallback" : "intro");
         })
         .catch((error) => {
           if (controller.signal.aborted) return;
@@ -100,7 +110,7 @@ export function PublicArViewerRoute() {
         });
     });
     return () => controller.abort();
-  }, [publicSlug, refreshManifest, telemetry]);
+  }, [ordinaryVideo, publicSlug, refreshManifest, telemetry]);
 
   useEffect(() => {
     if (!manifest) return;
@@ -470,6 +480,7 @@ function ViewerIntro({
   onStart(): void;
   onFallback?: () => void;
 }) {
+  const location = useLocation();
   return (
     <section className="ar-public-intro">
       <header>
@@ -497,7 +508,11 @@ function ViewerIntro({
             ) : null}
           </div>
           <p className="ar-public-note">
-            <ShieldCheck size={22} /> Установка приложения не нужна. Камера обрабатывается на вашем устройстве.
+            <Smartphone size={25} />
+            <span>
+              <strong>Установка приложения не нужна</strong>
+              <small>Работает в браузере на телефоне и компьютере.</small>
+            </span>
           </p>
         </div>
       </div>
@@ -505,23 +520,50 @@ function ViewerIntro({
         <h2>Как это работает</h2>
         <ol>
           <li>
-            <strong>1 · Разрешите камеру</strong>
-            <span>Браузер запросит доступ — нажмите «Разрешить».</span>
+            <b>1</b>
+            <i>
+              <Camera size={24} />
+            </i>
+            <div>
+              <strong>Разрешите камеру</strong>
+              <span>Браузер запросит доступ — нажмите «Разрешить».</span>
+            </div>
           </li>
           <li>
-            <strong>2 · Наведите на фото</strong>
-            <span>
-              {cached
-                ? "Проект сохранён. Наведите камеру на напечатанное фото."
-                : "Сначала отсканируйте QR ещё раз, затем наведите камеру на фотографию."}
-            </span>
+            <b>2</b>
+            <i>
+              <ImageIcon size={24} />
+            </i>
+            <div>
+              <strong>Наведите на фото</strong>
+              <span>
+                {cached
+                  ? "Направьте камеру на напечатанную фотографию."
+                  : "Сначала подтвердите проект по QR, затем наведите камеру на фотографию."}
+              </span>
+            </div>
           </li>
           <li>
-            <strong>3 · Смотрите</strong>
-            <span>Фотография оживёт, и видео появится прямо на ней.</span>
+            <b>3</b>
+            <i>
+              <Play size={24} />
+            </i>
+            <div>
+              <strong>Смотрите</strong>
+              <span>Фотография оживёт, и видео появится прямо на ней.</span>
+            </div>
           </li>
         </ol>
-        <p>QR-код открывает проект. Во время просмотра распознаётся само изображение фотографии.</p>
+        <p>
+          <Info size={22} />
+          <span>
+            <strong>Важно:</strong> распознаётся само изображение на фотографии, без специальных меток. QR-код открывает
+            проект.
+          </span>
+        </p>
+        <Link className="ar-public-privacy-link" to="/privacy" state={{ viewerPath: location.pathname }}>
+          Камера и конфиденциальность
+        </Link>
       </div>
     </section>
   );
@@ -539,46 +581,115 @@ function CornerGuide({ className, testId }: { className: string; testId?: string
 }
 
 export function PublicArPrivacyRoute() {
-  return (
-    <PublicInfo
-      title="Камера и конфиденциальность"
-      description="Как KHANZAMA использует камеру при просмотре живых фото."
-    >
-      <InfoCard icon={<Camera size={25} />} title="Что использует камера">
-        Камера распознаёт изображение напечатанной фотографии и показывает связанное с ним видео. Разрешение
-        запрашивается только после нажатия кнопки открытия камеры.
-      </InfoCard>
-      <InfoCard icon={<ShieldCheck size={25} />} title="Обработка на устройстве">
-        Кадры камеры обрабатываются на вашем устройстве. Они не загружаются на сервер и не сохраняются без нажатия
-        кнопки записи AR-видео.
-      </InfoCard>
-      <InfoCard icon={<ScanLine size={25} />} title="Роль QR-кода">
-        QR-код открывает нужный проект. Во время AR-просмотра распознаётся сама фотография, без специальных меток на
-        изображении.
-      </InfoCard>
-      <Link className="btn btn-primary" to="/camera">
-        <Camera size={18} /> Открыть AR-камеру
-      </Link>
-    </PublicInfo>
-  );
+  return <PrivacyRoute />;
 }
 
 export function PublicArUnsupportedRoute() {
+  const [params] = useSearchParams();
+  const slug = params.get("publicSlug") ?? "";
+  const validSlug = /^(demo|[a-f0-9]{36})$/.test(slug);
+  const [manifest, setManifest] = useState<PublicArManifest | null>(null);
+  const [copyNotice, setCopyNotice] = useState("");
+  useEffect(() => {
+    if (!validSlug) return;
+    const controller = new AbortController();
+    void loadPublicManifest(slug, controller.signal)
+      .then(setManifest)
+      .catch(() => {});
+    return () => controller.abort();
+  }, [slug, validSlug]);
+  const workUrl = validSlug
+    ? new URL(`${import.meta.env.BASE_URL}ar/${encodeURIComponent(slug)}`, window.location.origin).toString()
+    : "";
   return (
-    <PublicInfo
-      title="Откройте в другом браузере"
-      description="В этом браузере невозможно запустить AR-камеру. Откройте ссылку на работу в актуальном Safari или Chrome."
-    >
-      <InfoCard icon={<Camera size={25} />} title="Доступ к камере">
-        Разрешите браузеру использовать камеру. Для распознавания понадобится напечатанная фотография.
-      </InfoCard>
-      <InfoCard icon={<Play size={25} />} title="Обычный просмотр видео">
-        На странице работы выберите «Смотреть видео», если автор разрешил этот вариант просмотра.
-      </InfoCard>
-      <InfoCard icon={<ShieldCheck size={25} />} title="Без регистрации">
-        Для просмотра опубликованной работы не нужны аккаунт, пароль или приложение.
-      </InfoCard>
-    </PublicInfo>
+    <main className="ar-unsupported-page">
+      <header>
+        <strong>KHANZAMA</strong>
+        <span>AR-живые фотографии</span>
+        <small>Просмотр по ссылке или QR</small>
+      </header>
+      <section className="ar-unsupported-card">
+        <div className="ar-unsupported-illustration" aria-hidden="true">
+          <svg viewBox="0 0 160 110">
+            <rect x="14" y="12" width="126" height="85" rx="14" fill="#f1edfc" stroke="#a294cb" strokeWidth="4" />
+            <path d="M15 34h124" stroke="#a294cb" strokeWidth="3" />
+            <circle cx="30" cy="24" r="3" fill="#7657c2" />
+            <circle cx="44" cy="24" r="3" fill="#7657c2" />
+            <circle cx="58" cy="24" r="3" fill="#7657c2" />
+          </svg>
+          <CameraOff size={58} />
+        </div>
+        <h1>Откройте в другом браузере</h1>
+        <p className="ar-unsupported-description">
+          В этом браузере невозможно запустить AR-камеру. Он не поддерживает нужные возможности для дополненной
+          реальности.
+        </p>
+        {validSlug ? (
+          <div className="ar-unsupported-actions">
+            {manifest?.fallbackEnabled ? (
+              <Link className="btn btn-primary" to={`/ar/${slug}?view=video`}>
+                <Play size={18} />
+                Смотреть видео
+              </Link>
+            ) : null}
+            <Button
+              variant="quiet"
+              onClick={() =>
+                void navigator.clipboard
+                  .writeText(workUrl)
+                  .then(() => setCopyNotice("Ссылка скопирована"))
+                  .catch(() => setCopyNotice("Не удалось скопировать ссылку"))
+              }
+            >
+              <Clipboard size={18} />
+              Скопировать ссылку
+            </Button>
+          </div>
+        ) : null}
+        {copyNotice ? (
+          <p role="status" className="ar-unsupported-copy">
+            {copyNotice}
+          </p>
+        ) : null}
+        <section className="ar-browser-guidance">
+          <h2>
+            <span>Как открыть</span>Попробуйте открыть эту же ссылку в Safari или Chrome:
+          </h2>
+          <div>
+            <p>
+              <Compass size={32} />
+              <span>
+                <strong>Safari</strong>
+                <small>на iPhone или Mac</small>
+              </span>
+            </p>
+            <p>
+              <Chrome size={32} />
+              <span>
+                <strong>Chrome</strong>
+                <small>на Android, Windows или Mac</small>
+              </span>
+            </p>
+          </div>
+        </section>
+        <div className="ar-unsupported-features">
+          <InfoCard icon={<Camera size={25} />} title="Доступ к камере">
+            Для просмотра AR понадобится разрешить доступ к камере в выбранном браузере.
+          </InfoCard>
+          <InfoCard icon={<ImageIcon size={25} />} title="По настоящему фото">
+            Видео запускается на самом напечатанном фото: распознаётся изображение фотографии.
+          </InfoCard>
+          <InfoCard icon={<ScanLine size={25} />} title="Роль QR">
+            QR только открывает проект. Специальные метки на фотографии не нужны.
+          </InfoCard>
+        </div>
+        <p className="ar-unsupported-footer">
+          <Info size={20} />
+          Возможности AR зависят от устройства и браузера. Обычный просмотр видео доступен, если его разрешил автор
+          работы.
+        </p>
+      </section>
+    </main>
   );
 }
 

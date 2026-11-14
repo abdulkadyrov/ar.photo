@@ -67,6 +67,36 @@ describe("workspace back navigation", () => {
     expect(screen.getByRole("status")).toHaveTextContent("/items?q=море&status=published");
     await waitFor(() => expect(screen.getByText("Далее")).toHaveFocus());
   });
+  it("captures the subscription source and restores it from a recent project", async () => {
+    const source = {
+      pathname: "/settings/subscription",
+      search: "?period=year",
+      hash: "#recent-projects",
+      key: "subscription-source",
+    };
+    expect(captureWorkspaceOrigin(source, "account-a")).toEqual({
+      workspaceOrigin: {
+        accountId: "account-a",
+        key: source.key,
+        path: "/settings/subscription?period=year#recent-projects",
+      },
+    });
+    render(
+      <MemoryRouter initialEntries={[source.pathname + source.search + source.hash]}>
+        <Routes>
+          <Route path="/settings/subscription" element={<Page name="Мой пакет" next="/projects/project-one" />} />
+          <Route path="/projects/project-one" element={<Page name="Проект" />} />
+          <Route path="/items" element={<Page name="Неверный возврат" />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByText("Далее"));
+    expect(screen.getByRole("heading")).toHaveTextContent("Проект");
+    fireEvent.click(screen.getByText("Назад"));
+    expect(screen.getByRole("heading")).toHaveTextContent("Мой пакет");
+    expect(screen.getByRole("status")).toHaveTextContent("/settings/subscription?period=year#recent-projects");
+    await waitFor(() => expect(screen.getByText("Далее")).toHaveFocus());
+  });
   it("uses a safe fallback for direct entry instead of leaving the app", () => {
     render(
       <MemoryRouter initialEntries={["/items/photo-one/qr"]}>
@@ -85,6 +115,10 @@ describe("workspace back navigation", () => {
       "//evil.test/items",
       "/admin",
       "/login",
+      "/settings",
+      "/settings/team",
+      "/settings/subscription/manage",
+      "/settings/subscription/../team",
       "/items/../admin",
       "/items?next=1\\evil",
     ]) {

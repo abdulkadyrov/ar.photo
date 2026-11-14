@@ -14,8 +14,11 @@ function ownWorkspacePath(path: string) {
     return false;
   try {
     const parsed = new URL(path, "https://workspace.invalid");
-    return /^\/(dashboard|analytics|projects|groups|items|qr-codes|create|media)(?:\/[a-zA-Z0-9-]+)*\/?$/.test(
-      parsed.pathname,
+    return (
+      parsed.pathname === "/settings/subscription" ||
+      /^\/(dashboard|analytics|projects|groups|items|qr-codes|create|media)(?:\/[a-zA-Z0-9-]+)*\/?$/.test(
+        parsed.pathname,
+      )
     );
   } catch {
     return false;

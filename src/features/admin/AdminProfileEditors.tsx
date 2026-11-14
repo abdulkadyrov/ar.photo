@@ -42,9 +42,9 @@ export function AccountProfileEditor({
         <ArrowLeft size={16} />
         {detail.account.name}
       </button>
-      <header className="admin-section-heading">
+      <header className="admin-section-heading admin-page-heading">
         <div>
-          <h2>Редактирование аккаунта</h2>
+          <h1>Редактирование аккаунта</h1>
           <p>Основные параметры организации. Владелец и права управляются отдельно.</p>
         </div>
       </header>

@@ -98,7 +98,9 @@ describe("exact administration back navigation", () => {
     fireEvent.click(desktop().getByRole("button", { name: "Открыть" }));
     await screen.findByRole("dialog", { name: "Карточка пользователя" });
     expect(location()).toContain("user=10000000-0000-4000-8000-000000000011");
-    fireEvent.click(screen.getByRole("button", { name: mode === "browser" ? "Browser back" : "Отмена" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: mode === "browser" ? "Browser back" : "Назад к пользователям" }),
+    );
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(location()).toBe(source);
     expect(screen.getByLabelText("Поиск пользователей")).toHaveValue("Алина");
@@ -185,5 +187,44 @@ describe("account editor cancellation", () => {
     expect(onCancel).toHaveBeenCalledOnce();
     expect(update).not.toHaveBeenCalled();
     expect(onSaved).not.toHaveBeenCalled();
+  });
+});
+
+describe("administration access indicator", () => {
+  it("shows confirmed MFA only after the access response verifies it", async () => {
+    vi.spyOn(getAdminRepository(), "getAccess").mockResolvedValue({
+      isSuperadmin: true,
+      mfaRequired: true,
+      mfaVerified: true,
+    });
+    mount("/admin?section=overview");
+    const access = await screen.findByRole("status", { name: "Защита административного доступа" });
+    expect(within(access).getByText("MFA подтверждена")).toBeVisible();
+    expect(screen.queryByText("MFA временно отключена")).toBeNull();
+  });
+  it("reports a disabled requirement without claiming the session passed MFA", async () => {
+    vi.spyOn(getAdminRepository(), "getAccess").mockResolvedValue({
+      isSuperadmin: true,
+      mfaRequired: false,
+      mfaVerified: false,
+    });
+    mount("/admin?section=overview");
+    const access = await screen.findByRole("status", { name: "Защита административного доступа" });
+    expect(within(access).getByText("MFA временно отключена")).toBeVisible();
+    expect(screen.queryByText("MFA подтверждена")).toBeNull();
+  });
+  it("keeps administrative data gated when MFA is required but not verified", async () => {
+    const repository = getAdminRepository();
+    vi.spyOn(repository, "getAccess").mockResolvedValue({
+      isSuperadmin: true,
+      mfaRequired: true,
+      mfaVerified: false,
+    });
+    const snapshot = vi.spyOn(repository, "getSnapshot");
+    mount("/admin?section=overview");
+    await screen.findByRole("heading", { name: "Подтвердите второй фактор" });
+    expect(screen.queryByText("MFA подтверждена")).toBeNull();
+    expect(screen.queryByRole("status", { name: "Защита административного доступа" })).toBeNull();
+    expect(snapshot).not.toHaveBeenCalled();
   });
 });

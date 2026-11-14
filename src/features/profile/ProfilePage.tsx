@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Headphones, KeyRound, Layers3, LogOut, Settings, Users } from "lucide-react";
+import { ChevronRight, Headphones, KeyRound, Layers3, LogOut, Users } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../../app/layout/AppShell";
@@ -76,6 +76,11 @@ export function ProfileRoute() {
           <span className="profile-avatar" aria-hidden="true">
             {initials(displayName)}
           </span>
+          <div className="profile-mobile-identity">
+            <strong>{displayName}</strong>
+            <span>{profile.email_display ?? email}</span>
+            <span className="profile-role">{roleLabels[workspace.memberRole]}</span>
+          </div>
           <div className="profile-fields">
             <label>
               <span>Имя и фамилия</span>
@@ -100,7 +105,7 @@ export function ProfileRoute() {
               <span>Название аккаунта</span>
               <input className="field-control" aria-label="Название аккаунта" readOnly value={workspace.accountName} />
             </label>
-            <div>
+            <div className="profile-role-field">
               <span className="profile-field-label">Моя роль</span>
               <span className="profile-role">{roleLabels[workspace.memberRole]}</span>
             </div>
@@ -137,12 +142,6 @@ export function ProfileRoute() {
             label="Безопасность"
             description="Пароль и двухфакторная защита"
             to="/settings/security"
-          />
-          <ProfileLink
-            icon={<Settings size={22} />}
-            label="Настройки аккаунта"
-            description="Параметры моей студии"
-            to="/settings"
           />
           <ProfileLink
             icon={<Headphones size={22} />}

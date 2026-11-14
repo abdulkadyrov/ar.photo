@@ -75,6 +75,9 @@ export function AppShell({
   actions,
   compactMobile = false,
   showDescriptionOnMobile = false,
+  hideHeader = false,
+  titleBadge,
+  breadcrumbs,
   children,
   workspaceKind,
 }: {
@@ -85,6 +88,9 @@ export function AppShell({
   actions?: ReactNode;
   compactMobile?: boolean;
   showDescriptionOnMobile?: boolean;
+  hideHeader?: boolean;
+  titleBadge?: ReactNode;
+  breadcrumbs?: ReactNode;
   children: ReactNode;
 }) {
   const auth = useAuth();
@@ -116,7 +122,11 @@ export function AppShell({
   const accountName = workspace.data?.accountName ?? "Мой кабинет";
   const brand = (
     <span className="workspace-wordmark">
-      KHANZAMA<small>{scope}</small>
+      KHANZAMA
+      <small>
+        {scope}
+        {auth.mode === "demo" ? " · демо" : ""}
+      </small>
     </span>
   );
   const adminLinks = (close = false) =>
@@ -142,6 +152,12 @@ export function AppShell({
         <Link className="brand-mark" to={admin ? "/admin" : "/dashboard"}>
           {brand}
         </Link>
+        {!admin ? (
+          <Link className="workspace-sidebar-account" to="/settings">
+            <Building2 size={20} />
+            <span>{accountName}</span>
+          </Link>
+        ) : null}
         <nav aria-label={admin ? "Разделы администрации" : "Основная навигация"} className="sidebar-navigation">
           {admin
             ? adminLinks()
@@ -193,11 +209,17 @@ export function AppShell({
       <div
         className={`app-content pb-24 lg:pb-10 ${compactMobile ? "app-content-compact-mobile" : ""} ${showDescriptionOnMobile ? "app-content-mobile-description" : ""}`}
       >
-        <div className="workspace-context">
+        <div
+          className={`workspace-context ${location.pathname === "/dashboard" || location.pathname === "/settings" ? "workspace-context-desktop" : ""}`}
+        >
           <Link to={admin ? "/admin" : "/dashboard"} className="workspace-mobile-brand lg:hidden">
             {brand}
           </Link>
-          {!admin ? <span className="workspace-account-name">{accountName}</span> : null}
+          {!admin ? (
+            <span className="workspace-account-name">
+              {location.pathname === "/settings" ? "Настройки › Настройки аккаунта" : accountName}
+            </span>
+          ) : null}
           {canSwitchToAdmin ? (
             <Link className="workspace-admin-switch" to="/admin">
               <ShieldCheck size={16} />
@@ -205,15 +227,21 @@ export function AppShell({
             </Link>
           ) : null}
           {!admin ? (
-            <button className="btn btn-ghost lg:hidden" onClick={() => menu.current?.showModal()}>
+            <button
+              className="btn btn-ghost workspace-sections-button lg:hidden"
+              aria-label="Разделы"
+              onClick={() => menu.current?.showModal()}
+            >
               <Menu size={17} />
-              Разделы
             </button>
           ) : null}
           {admin ? (
-            <button className="btn btn-ghost lg:hidden" onClick={() => menu.current?.showModal()}>
+            <button
+              className="btn btn-ghost workspace-sections-button lg:hidden"
+              aria-label="Разделы"
+              onClick={() => menu.current?.showModal()}
+            >
               <Menu size={17} />
-              Разделы
             </button>
           ) : (
             <Link className="workspace-profile" to="/profile" aria-label="Мой профиль">
@@ -221,14 +249,20 @@ export function AppShell({
             </Link>
           )}
         </div>
-        <header className="app-topbar">
-          <div>
-            {eyebrow ? <p className="app-eyebrow">{eyebrow}</p> : null}
-            <h1>{title}</h1>
-            {description ? <p className="app-description">{description}</p> : null}
-          </div>
-          <div className="app-topbar-actions">{actions}</div>
-        </header>
+        {!hideHeader ? (
+          <header className="app-topbar">
+            <div>
+              {breadcrumbs ? <div className="workspace-breadcrumbs">{breadcrumbs}</div> : null}
+              {eyebrow ? <p className="app-eyebrow">{eyebrow}</p> : null}
+              <div className="workspace-title-row">
+                <h1>{title}</h1>
+                {titleBadge ? <span className="workspace-title-badge">{titleBadge}</span> : null}
+              </div>
+              {description ? <p className="app-description">{description}</p> : null}
+            </div>
+            <div className="app-topbar-actions">{actions}</div>
+          </header>
+        ) : null}
         <main>{children}</main>
       </div>
       {admin ? (
@@ -243,12 +277,12 @@ export function AppShell({
                   aria-current={section === id ? "page" : undefined}
                   className={`mobile-nav-link ${section === id ? "mobile-nav-link-active" : ""}`}
                 >
-                  <Icon size={19} />
+                  <Icon size={22} />
                   <span>{label}</span>
                 </Link>
               ))}
             <button className="mobile-nav-link" onClick={() => menu.current?.showModal()}>
-              <MoreHorizontal size={19} />
+              <MoreHorizontal size={22} />
               <span>Ещё</span>
             </button>
           </nav>
@@ -267,7 +301,7 @@ export function AppShell({
                 }
               >
                 <span className={create ? "mobile-create-icon" : ""}>
-                  <Icon size={create ? 22 : 19} />
+                  <Icon size={create ? 24 : 22} />
                 </span>
                 <span>{label}</span>
               </NavLink>

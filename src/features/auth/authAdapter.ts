@@ -15,6 +15,7 @@ export type AuthSession = {
 };
 
 export type SignUpInput = {
+  fullName?: string;
   email: string;
   password: string;
 };
@@ -70,6 +71,7 @@ export class SupabaseAuthAdapter implements AuthAdapter {
         emailRedirectTo,
         data: {
           registration_source: "self_service",
+          ...(input.fullName?.trim() ? { full_name: input.fullName.trim() } : {}),
         },
       },
     });

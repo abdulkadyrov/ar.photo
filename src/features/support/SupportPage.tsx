@@ -182,16 +182,7 @@ export function SupportRoute() {
                 Подготовить письмо
               </Button>
             </form>
-          ) : (
-            <Button
-              className="mt-4"
-              variant="quiet"
-              icon={<Clipboard size={17} />}
-              onClick={() => void copyDiagnostics()}
-            >
-              Скопировать диагностику
-            </Button>
-          )}
+          ) : null}
           {supportEmail && mailto ? (
             <a className="btn btn-ghost mt-3 w-full" href={mailto}>
               <Mail size={17} /> Открыть почтовое приложение

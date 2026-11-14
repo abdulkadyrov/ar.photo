@@ -14,6 +14,7 @@ export const loginSchema = z.object({
 
 export const registerSchema = z
   .object({
+    fullName: z.string().trim().max(120, "Не более 120 символов").optional(),
     email: z.string().trim().email("Введите корректный email"),
     password: strongPasswordSchema,
     confirmPassword: z.string(),

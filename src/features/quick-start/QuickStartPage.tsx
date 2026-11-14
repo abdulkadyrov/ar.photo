@@ -84,6 +84,15 @@ function QuickCreatePage({ userId }: { userId: string }) {
   const restoredAttempt = useMemo(() => getPendingQuickStart(userId), [userId]);
   const [title, setTitle] = useState(restoredAttempt?.title ?? "");
   const [edits, setEdits] = useState<PairEdits>({});
+  const [markerActionTarget, setMarkerActionTarget] = useState<HTMLSpanElement | null>(null);
+  const [videoActionTarget, setVideoActionTarget] = useState<HTMLSpanElement | null>(null);
+  const [comparisonTarget, setComparisonTarget] = useState<HTMLElement | null>(null);
+  const [playback, setPlayback] = useState({
+    autoplay: true,
+    loopVideo: true,
+    audioEnabled: true,
+    fallbackEnabled: true,
+  });
   const [markerFile, setMarkerFile] = useState<File>();
   const [videoFile, setVideoFile] = useState<File>();
   const [additionalPairs, setAdditionalPairs] = useState<QuickMediaPair[]>([]);
@@ -258,11 +267,11 @@ function QuickCreatePage({ userId }: { userId: string }) {
         await arItemRepository.prepare(workspace.accountId, item.id, {
           markerAssetId: marker.id,
           videoAssetId: video.id,
-          autoplay: true,
-          loopVideo: true,
+          autoplay: playback.autoplay,
+          loopVideo: playback.loopVideo,
           markerLostBehavior: "pause_hide",
-          audioDefault: "user_enabled",
-          fallbackEnabled: true,
+          audioDefault: playback.audioEnabled ? "user_enabled" : "muted",
+          fallbackEnabled: playback.fallbackEnabled,
         });
         createdItemIds.push(item.id);
         try {
@@ -405,8 +414,11 @@ function QuickCreatePage({ userId }: { userId: string }) {
     >
       <section className="quick-create-card" aria-label="Создание AR-фото">
         <label className="quick-title-field">
-          <span>Название</span>
+          <span>
+            Название <b className="text-rose-700">*</b>
+          </span>
           <Input
+            aria-label="Название"
             value={title}
             onValueChange={setTitle}
             placeholder="Например, Наш семейный момент"
@@ -427,6 +439,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
               <MediaPicker
                 key={`marker-${pickerVersion}`}
                 kind="marker"
+                onActionMount={setMarkerActionTarget}
                 file={markerFile}
                 previewUrl={markerPreview}
                 disabled={processing || Boolean(itemId)}
@@ -441,6 +454,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
               <MediaPicker
                 key={`video-${pickerVersion}`}
                 kind="video"
+                onActionMount={setVideoActionTarget}
                 file={videoFile}
                 previewUrl={videoPreview}
                 disabled={processing || Boolean(itemId)}
@@ -451,6 +465,9 @@ function QuickCreatePage({ userId }: { userId: string }) {
               />
             </div>
             <MediaPairEditor
+              compact
+              actionTargets={{ marker: markerActionTarget, video: videoActionTarget }}
+              comparisonTarget={comparisonTarget}
               markerFile={markerFile}
               videoFile={videoFile}
               value={edits}
@@ -464,6 +481,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
               key={pair.id}
               index={index + 2}
               pair={pair}
+              comparisonTarget={comparisonTarget}
               disabled={processing || Boolean(itemId)}
               onChange={(nextPair) =>
                 setAdditionalPairs((current) =>
@@ -490,6 +508,32 @@ function QuickCreatePage({ userId }: { userId: string }) {
           </button>
         ) : null}
 
+        <details className="quick-playback-settings">
+          <summary>
+            Дополнительные настройки <span>Автозапуск, звук и повтор</span>
+          </summary>
+          <div>
+            {(
+              [
+                { key: "autoplay", label: "Автозапуск видео" },
+                { key: "loopVideo", label: "Повторять видео" },
+                { key: "audioEnabled", label: "Звук после нажатия" },
+                { key: "fallbackEnabled", label: "Разрешить обычный просмотр видео" },
+              ] as const
+            ).map(({ key, label }) => (
+              <label key={key}>
+                <input
+                  type="checkbox"
+                  checked={playback[key]}
+                  disabled={processing}
+                  onChange={(event) => setPlayback((current) => ({ ...current, [key]: event.target.checked }))}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+          <section className="quick-comparison-target" ref={setComparisonTarget} />
+        </details>
         {startedAt ? <QuickStopwatch elapsedSeconds={elapsedSeconds} running={!finishedAt} /> : null}
         {visibleStage !== "form" && visibleStage !== "error" ? <ProgressStatus step={progressStep} /> : null}
         {visibleStage === "error" ? (
@@ -503,7 +547,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
           </div>
         ) : null}
 
-        <p className="mt-4 rounded-xl bg-primary/10 px-3 py-2.5 text-xs leading-5 text-primary-text">
+        <p className="quick-credit-note">
           Создание каждого AR-фото расходует одно добавление.{" "}
           {additionalPairs.length
             ? `В этом QR будет ${additionalPairs.length + 1} AR-фото.`
@@ -537,16 +581,20 @@ function QuickCreatePage({ userId }: { userId: string }) {
 export function AdditionalArPhotoPair({
   index,
   pair,
+  comparisonTarget,
   disabled,
   onChange,
   onRemove,
 }: {
   index: number;
   pair: QuickMediaPair;
+  comparisonTarget?: HTMLElement | null;
   disabled: boolean;
   onChange(pair: QuickMediaPair): void;
   onRemove(): void;
 }) {
+  const [markerActionTarget, setMarkerActionTarget] = useState<HTMLSpanElement | null>(null);
+  const [videoActionTarget, setVideoActionTarget] = useState<HTMLSpanElement | null>(null);
   const markerPreview = useObjectUrl(pair.markerFile);
   const videoPreview = useObjectUrl(pair.videoFile);
   const headingId = useId();
@@ -564,6 +612,7 @@ export function AdditionalArPhotoPair({
       <div className="quick-media-pair">
         <MediaPicker
           kind="marker"
+          onActionMount={setMarkerActionTarget}
           file={pair.markerFile}
           previewUrl={markerPreview}
           disabled={disabled}
@@ -574,6 +623,7 @@ export function AdditionalArPhotoPair({
         </span>
         <MediaPicker
           kind="video"
+          onActionMount={setVideoActionTarget}
           file={pair.videoFile}
           previewUrl={videoPreview}
           disabled={disabled}
@@ -581,6 +631,9 @@ export function AdditionalArPhotoPair({
         />
       </div>
       <MediaPairEditor
+        compact
+        actionTargets={{ marker: markerActionTarget, video: videoActionTarget }}
+        comparisonTarget={comparisonTarget}
         markerFile={pair.markerFile}
         videoFile={pair.videoFile}
         value={pair.edits ?? {}}
@@ -593,12 +646,14 @@ export function AdditionalArPhotoPair({
 
 export function MediaPicker({
   kind,
+  onActionMount,
   file,
   previewUrl,
   disabled,
   onPick,
 }: {
   kind: "marker" | "video";
+  onActionMount?: (element: HTMLSpanElement | null) => void;
   file?: File;
   previewUrl?: string;
   disabled: boolean;
@@ -668,6 +723,7 @@ export function MediaPicker({
         </span>
 
         <span className="quick-media-preview">
+          <span className="quick-media-editor-actions" ref={onActionMount} />
           {previewUrl ? (
             <button
               aria-label={`Просмотреть ${marker ? "фотографию" : "видео"} ${file?.name ?? ""}`}
@@ -683,6 +739,11 @@ export function MediaPicker({
                   muted
                   playsInline
                   preload="metadata"
+                  onLoadedMetadata={(event) => {
+                    const preview = event.currentTarget;
+                    if (Number.isFinite(preview.duration) && preview.duration > 0)
+                      preview.currentTime = Math.min(0.01, preview.duration / 2);
+                  }}
                   aria-label={`Предпросмотр видео ${file?.name ?? ""}`}
                 />
               )}

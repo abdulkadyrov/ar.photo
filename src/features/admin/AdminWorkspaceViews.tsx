@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useId, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   Activity,
   ArrowLeft,
@@ -6,13 +6,19 @@ import {
   Building2,
   CircleAlert,
   CreditCard,
+  CalendarDays,
+  Image,
+  Pencil,
   KeyRound,
   Search,
+  RefreshCw,
+  ChevronRight,
+  X,
   Trash2,
   UserPlus,
   Users,
 } from "lucide-react";
-import { Button, Input, Modal, Select } from "../../shared/ui";
+import { Button, Input, Select } from "../../shared/ui";
 import type { AdminSnapshot } from "./adminRepository";
 import type { AdminAccount, AdminAccountDetail, AdminContentResult, AdminPlan, AdminSetting } from "./adminSchemas";
 import { PackageGrant } from "./PackageGrant";
@@ -36,6 +42,26 @@ const statusNames: Record<string, string> = {
   failed: "Ошибка",
   archived: "Архив",
 };
+const auditActionNames: Record<string, string> = {
+  "admin.support_access": "Открыт аккаунт",
+  "admin.account.create": "Создан аккаунт",
+  "admin.account.profile.update": "Изменены данные аккаунта",
+  "admin.user.profile.update": "Изменено имя пользователя",
+  "admin.subscription.update": "Изменена подписка",
+  "admin.account.status": "Изменён статус аккаунта",
+  "admin.account.close": "Закрыт аккаунт",
+  "admin.user.activate": "Восстановлен доступ",
+  "admin.user.suspend": "Заблокирован пользователь",
+  "admin.user.delete.authorized": "Подтверждено удаление",
+  "admin.ar_item.suspend": "Приостановлена AR-работа",
+  "admin.ar_item.restore": "Восстановлена AR-работа",
+  "admin.processing.retry": "Повторена обработка",
+  "admin.plan.upsert": "Сохранён тариф",
+  "admin.package.grant": "Назначен пакет",
+  "admin.settings.update": "Изменены настройки",
+  "admin.password_reset.request": "Запрошен сброс пароля",
+};
+const auditActionName = (value: string) => auditActionNames[value] ?? value;
 const roleNames: Record<string, string> = {
   owner: "Владелец",
   manager: "Менеджер",
@@ -96,6 +122,92 @@ function Heading({ title, description, actions }: { title: string; description?:
     </header>
   );
 }
+function PageHeading({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) {
+  return (
+    <header className="admin-section-heading admin-page-heading">
+      <div>
+        <h1>{title}</h1>
+        {description ? <p>{description}</p> : null}
+      </div>
+      {actions}
+    </header>
+  );
+}
+function RefreshAction({ onRefresh }: { onRefresh?: () => void }) {
+  return onRefresh ? (
+    <Button
+      type="button"
+      variant="quiet"
+      className="admin-refresh-button"
+      icon={<RefreshCw size={16} />}
+      onClick={onRefresh}
+    >
+      Обновить
+    </Button>
+  ) : null;
+}
+
+function Inspector({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const titleId = useId();
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+  return (
+    <aside className="admin-inspector" role="dialog" aria-modal="false" aria-labelledby={titleId}>
+      <header>
+        <h2 id={titleId}>{title}</h2>
+        <button type="button" aria-label="Закрыть просмотр" onClick={onClose}>
+          <X size={18} />
+        </button>
+      </header>
+      <div className="admin-inspector-body">{children}</div>
+      <Button type="button" variant="quiet" onClick={onClose}>
+        Закрыть
+      </Button>
+    </aside>
+  );
+}
+
+function subscribeMobile(listener: () => void) {
+  const media = window.matchMedia?.("(max-width:700px)");
+  media?.addEventListener("change", listener);
+  return () => media?.removeEventListener("change", listener);
+}
+function mobileSnapshot() {
+  return window.matchMedia?.("(max-width:700px)").matches ?? false;
+}
+function ResponsivePanel({
+  title,
+  children,
+  initialMobileOpen = false,
+}: {
+  title: string;
+  children: ReactNode;
+  initialMobileOpen?: boolean;
+}) {
+  const mobile = useSyncExternalStore(subscribeMobile, mobileSnapshot, () => false);
+  const [expanded, setExpanded] = useState(initialMobileOpen);
+  return (
+    <details
+      className="admin-surface admin-responsive-panel"
+      open={!mobile || expanded}
+      onToggle={(event) => {
+        if (mobile) setExpanded(event.currentTarget.open);
+      }}
+    >
+      <summary>
+        <h2>{title}</h2>
+        <ChevronRight size={17} />
+      </summary>
+      <div>{children}</div>
+    </details>
+  );
+}
+
 function Surface({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <section className={`admin-surface ${className}`}>{children}</section>;
 }
@@ -112,7 +224,7 @@ function Notice({ children }: { children: ReactNode }) {
 }
 function Stats({ items }: { items: { label: string; value: ReactNode; hint?: string; icon?: ReactNode }[] }) {
   return (
-    <div className="admin-stats">
+    <div className={`admin-stats admin-stats-${items.length}`}>
       {items.map((item) => (
         <div className="admin-stat" key={item.label}>
           <span className="admin-stat-label">
@@ -169,7 +281,9 @@ function Segments<T extends string>({
 export function OverviewSection({
   snapshot,
   onNavigate,
+  onRefresh,
 }: {
+  onRefresh?: () => void;
   snapshot: AdminSnapshot;
   onNavigate: (id: "accounts" | "errors" | "analytics" | "activity") => void;
 }) {
@@ -177,6 +291,11 @@ export function OverviewSection({
   const recent = [...snapshot.accounts.items].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5);
   return (
     <div className="admin-page">
+      <PageHeading
+        title="Обзор платформы"
+        description="Состояние сервиса, аккаунты и обработка"
+        actions={<RefreshAction onRefresh={onRefresh} />}
+      />
       <Stats
         items={[
           {
@@ -224,7 +343,6 @@ export function OverviewSection({
                   <tr key={a.id}>
                     <td>
                       <strong>{a.name}</strong>
-                      <small>{a.ownerName ?? "Владелец не указан"}</small>
                     </td>
                     <td>{date(a.createdAt)}</td>
                     <td>{a.arItemCount}</td>
@@ -263,27 +381,44 @@ export function OverviewSection({
           </Button>
         </Surface>
       </div>
-      <Surface>
-        <Heading title="Быстрые действия" />
-        <div className="admin-quick-actions">
-          <button onClick={() => onNavigate("accounts")}>
-            <Building2 size={22} />
-            <span>
-              <strong>Аккаунты</strong>
-              <small>Подписки, пользователи и доступ</small>
-            </span>
-            <ArrowUpRight size={17} />
-          </button>
-          <button onClick={() => onNavigate("analytics")}>
-            <Activity size={22} />
-            <span>
-              <strong>Аналитика</strong>
-              <small>Доступные показатели платформы</small>
-            </span>
-            <ArrowUpRight size={17} />
-          </button>
-        </div>
-      </Surface>
+      <div className="admin-two-column admin-overview-bottom">
+        <Surface>
+          <Heading
+            title="Активность пользователей"
+            actions={
+              <Button type="button" variant="quiet" onClick={() => onNavigate("analytics")}>
+                Аналитика <ArrowUpRight size={15} />
+              </Button>
+            }
+          />
+          <Empty>История активности пока не собирается.</Empty>
+          <p className="admin-footnote">
+            График появится после подключения измерения активности. Вход и открытая вкладка не считаются активным
+            временем.
+          </p>
+        </Surface>
+        <Surface>
+          <Heading title="Быстрые действия" />
+          <div className="admin-quick-actions">
+            <button onClick={() => onNavigate("accounts")}>
+              <Building2 size={22} />
+              <span>
+                <strong>Аккаунты</strong>
+                <small>Подписки, пользователи и доступ</small>
+              </span>
+              <ArrowUpRight size={17} />
+            </button>
+            <button onClick={() => onNavigate("analytics")}>
+              <Activity size={22} />
+              <span>
+                <strong>Аналитика</strong>
+                <small>Доступные показатели платформы</small>
+              </span>
+              <ArrowUpRight size={17} />
+            </button>
+          </div>
+        </Surface>
+      </div>
     </div>
   );
 }
@@ -315,18 +450,10 @@ export function AccountsSection({
   const setFilter = (value: string) => navigation.update({ accountStatus: value === "all" ? null : value });
   const visible = accounts.filter((a) => filter === "all" || a.status === filter);
   return (
-    <div className="admin-page">
-      <Heading
-        title="Управление аккаунтами"
-        description="Аккаунты студий и организаций на платформе KHANZAMA."
-        actions={
-          <Button icon={<UserPlus size={17} />} onClick={onCreate}>
-            Создать аккаунт
-          </Button>
-        }
-      />
+    <div className="admin-page admin-accounts-page">
+      <PageHeading title="Управление аккаунтами" description="Аккаунты студий и организаций на платформе KHANZAMA." />
       <form
-        className="admin-toolbar"
+        className="admin-toolbar admin-account-toolbar"
         onSubmit={(e) => {
           e.preventDefault();
           onSubmit();
@@ -338,10 +465,13 @@ export function AccountsSection({
           value={search}
           onChange={onSearch}
         />
-        <Button type="submit" variant="ghost">
+        <Button type="submit" variant="ghost" className="admin-find-button">
           Найти
         </Button>
       </form>
+      <Button type="button" className="admin-create-account" icon={<UserPlus size={17} />} onClick={onCreate}>
+        Создать аккаунт
+      </Button>
       <Segments
         label="Статус аккаунтов"
         value={filter}
@@ -380,7 +510,6 @@ export function AccountsSection({
                     >
                       {a.name}
                     </button>
-                    <small>{a.slug}</small>
                   </td>
                   <td>{a.ownerName ?? "Не указан"}</td>
                   <td>
@@ -393,8 +522,14 @@ export function AccountsSection({
                   </td>
                   <td>
                     <div className="admin-row-actions">
-                      <Button variant="quiet" data-admin-focus={`account-${a.id}`} onClick={() => onSupport(a)}>
-                        Открыть аккаунт
+                      <Button
+                        type="button"
+                        variant="quiet"
+                        aria-label="Открыть аккаунт"
+                        data-admin-focus={`account-${a.id}`}
+                        onClick={() => onSupport(a)}
+                      >
+                        Открыть <ArrowUpRight size={14} />
                       </Button>
                       <details className="admin-action-menu">
                         <summary aria-label={`Другие действия: ${a.name}`}>•••</summary>
@@ -416,7 +551,7 @@ export function AccountsSection({
         </div>
         <div className="admin-mobile-list">
           {visible.map((a) => (
-            <article className="admin-mobile-card" key={a.id}>
+            <article className="admin-mobile-card admin-account-card" key={a.id}>
               <div className="admin-card-top">
                 <button
                   className="admin-text-action"
@@ -425,7 +560,15 @@ export function AccountsSection({
                 >
                   {a.name}
                 </button>
-                <Badge value={a.status} />
+                <Button
+                  type="button"
+                  variant="quiet"
+                  data-admin-focus={`account-${a.id}`}
+                  aria-label="Открыть аккаунт"
+                  onClick={() => onSupport(a)}
+                >
+                  Открыть <ArrowUpRight size={14} />
+                </Button>
               </div>
               <p>Владелец: {a.ownerName ?? "Не указан"}</p>
               <p>
@@ -436,9 +579,7 @@ export function AccountsSection({
               </p>
               <p>Срок: {a.subscriptionStatus ? expiry(a.subscriptionExpiresAt) : "Нет подписки"}</p>
               <div className="admin-row-actions">
-                <Button variant="quiet" data-admin-focus={`account-${a.id}`} onClick={() => onSupport(a)}>
-                  Открыть аккаунт
-                </Button>
+                <Badge value={a.status} />
                 <details className="admin-action-menu">
                   <summary aria-label={`Другие действия: ${a.name}`}>•••</summary>
                   <div>
@@ -456,10 +597,15 @@ export function AccountsSection({
         </div>
         {!visible.length ? <Empty>Аккаунты не найдены. Измените поиск или фильтр.</Empty> : null}
       </Surface>
-      <p className="admin-footnote">
-        Показано {visible.length} из {total} аккаунтов. Остатки расходуемых добавлений сервер пока не передаёт; число
-        работ не заменяет остаток пакета.
-      </p>
+      <div className="admin-list-footer">
+        <p className="admin-footnote">
+          Показано {visible.length} из {total} аккаунтов
+        </p>
+        <details className="admin-data-notes">
+          <summary>О данных пакета</summary>
+          <p>Остатки расходуемых добавлений сервер пока не передаёт. Число работ не заменяет остаток пакета.</p>
+        </details>
+      </div>
     </div>
   );
 }
@@ -503,15 +649,22 @@ export function AccountDetailSection({
         <div className="admin-identity">
           <div className="admin-avatar">{detail.account.name.slice(0, 2).toUpperCase()}</div>
           <div>
-            <h2>
+            <h1>
               {detail.account.name} <Badge value={detail.account.status} />
-            </h2>
+            </h1>
             <p>
               Владелец: {owner?.emailDisplay ?? owner?.fullName ?? "Не указан"} · Участников: {detail.users.length}
             </p>
           </div>
-          <Button variant="quiet" onClick={() => setEditing(true)}>
-            Изменить
+          <Button
+            type="button"
+            variant="quiet"
+            className="admin-edit-account"
+            icon={<Pencil size={16} />}
+            aria-label="Изменить"
+            onClick={() => setEditing(true)}
+          >
+            <span>Изменить</span>
           </Button>
           {account ? (
             <details className="admin-action-menu">
@@ -546,24 +699,26 @@ export function AccountDetailSection({
           </div>
         </dl>
       </Surface>
-      <Segments
-        label="Карточка аккаунта"
-        value={pane}
-        onChange={(v) => {
-          if (v === "users") onUsers();
-          else if (v === "subscription") onSubscription();
-          else setPane(v);
-        }}
-        items={[
-          { value: "overview", label: "Обзор" },
-          { value: "users", label: "Пользователи" },
-          { value: "subscription", label: "Подписка" },
-          { value: "works", label: "Работы" },
-          { value: "history", label: "История" },
-        ]}
-      />
+      <div className="admin-underlined-tabs">
+        <Segments
+          label="Карточка аккаунта"
+          value={pane}
+          onChange={(v) => {
+            if (v === "users") onUsers();
+            else if (v === "subscription") onSubscription();
+            else setPane(v);
+          }}
+          items={[
+            { value: "overview", label: "Обзор" },
+            { value: "users", label: "Пользователи" },
+            { value: "subscription", label: "Подписка" },
+            { value: "works", label: "Работы" },
+            { value: "history", label: "История" },
+          ]}
+        />
+      </div>
       {pane === "history" ? (
-        <AuditSection audit={audit.filter((a) => a.accountId === detail.account.id)} />
+        <AuditSection embedded audit={audit.filter((a) => a.accountId === detail.account.id)} />
       ) : pane === "works" ? (
         <Surface>
           <Heading title="Работы аккаунта" />
@@ -582,78 +737,113 @@ export function AccountDetailSection({
         </Surface>
       ) : (
         <>
-          <div className="admin-quick-actions">
-            <button onClick={onSubscription}>
-              <CreditCard size={22} />
-              <span>
-                <strong>Назначить пакет</strong>
-                <small>Добавления фото и продление срока</small>
-              </span>
-              <ArrowUpRight size={17} />
-            </button>
-            <button onClick={onUsers}>
-              <Users size={22} />
-              <span>
-                <strong>Пользователи</strong>
-                <small>Роли внутри этого аккаунта</small>
-              </span>
-              <ArrowUpRight size={17} />
-            </button>
+          <div className="admin-account-package-actions">
+            <Button type="button" icon={<CreditCard size={18} />} onClick={onSubscription}>
+              Назначить пакет
+            </Button>
+            <Button type="button" variant="quiet" icon={<Image size={18} />} onClick={onSubscription}>
+              Добавить фото
+            </Button>
+            <Button type="button" variant="quiet" icon={<CalendarDays size={18} />} onClick={onSubscription}>
+              Продлить срок
+            </Button>
           </div>
           <div className="admin-two-column">
-            <Surface>
-              <Heading title="Основные данные" />
+            <ResponsivePanel title="Основные данные">
               <dl className="admin-key-values">
                 <div>
                   <dt>Название</dt>
                   <dd>{detail.account.name}</dd>
                 </div>
                 <div>
-                  <dt>Адрес аккаунта</dt>
-                  <dd>{detail.account.slug}</dd>
-                </div>
-                <div>
-                  <dt>Часовой пояс</dt>
-                  <dd>{detail.account.timezone}</dd>
-                </div>
-                <div>
-                  <dt>Создан</dt>
-                  <dd>{date(detail.account.createdAt)}</dd>
-                </div>
-                <div>
-                  <dt>Подписка</dt>
+                  <dt>Статус</dt>
                   <dd>
-                    <Badge value={detail.subscription.status} />
+                    <Badge value={detail.account.status} />
                   </dd>
                 </div>
+                <div>
+                  <dt>Владелец (контакт)</dt>
+                  <dd>{owner?.emailDisplay ?? owner?.fullName ?? "Не указан"}</dd>
+                </div>
+                <div>
+                  <dt>Участники</dt>
+                  <dd>{detail.users.length}</dd>
+                </div>
+                <div>
+                  <dt>Пакет</dt>
+                  <dd>{detail.subscription.planName}</dd>
+                </div>
+                <div>
+                  <dt>Срок действия</dt>
+                  <dd>{expiry(detail.subscription.expiresAt)}</dd>
+                </div>
+                <div>
+                  <dt>Осталось добавлений</dt>
+                  <dd>Нет данных</dd>
+                </div>
+                <div>
+                  <dt>Хранилище</dt>
+                  <dd>{formatBytes(detail.usage.storageBytes)}</dd>
+                </div>
               </dl>
-              <Notice>
-                Название и часовой пояс меняются через «Изменить». Назначение пакета не выдаёт роль администратора
-                платформы.
-              </Notice>
-            </Surface>
-            <Surface>
-              <Heading title="Использование" />
-              <dl className="admin-key-values">
-                <div>
-                  <dt>Проекты</dt>
-                  <dd>{detail.usage.projects}</dd>
-                </div>
-                <div>
-                  <dt>AR-работы</dt>
-                  <dd>{detail.usage.arItems}</dd>
-                </div>
-                <div>
-                  <dt>Опубликовано</dt>
-                  <dd>{detail.usage.publishedItems}</dd>
-                </div>
-                <div>
-                  <dt>Ошибки</dt>
-                  <dd>{detail.usage.failedJobs}</dd>
-                </div>
-              </dl>
-            </Surface>
+            </ResponsivePanel>
+            <ResponsivePanel title="Быстрые действия">
+              <div className="admin-detail-action-list">
+                <button type="button" onClick={onSubscription}>
+                  <CreditCard size={22} />
+                  <span>
+                    <strong>Назначить пакет</strong>
+                    <small>Выбрать тариф или дополнение</small>
+                  </span>
+                  <ChevronRight size={16} />
+                </button>
+                <button type="button" onClick={onSubscription}>
+                  <Image size={22} />
+                  <span>
+                    <strong>Добавить фото</strong>
+                    <small>Начислить дополнительные добавления</small>
+                  </span>
+                  <ChevronRight size={16} />
+                </button>
+                <button type="button" onClick={onSubscription}>
+                  <CalendarDays size={22} />
+                  <span>
+                    <strong>Продлить срок</strong>
+                    <small>Выбрать пакет продления</small>
+                  </span>
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </ResponsivePanel>
           </div>
+          <ResponsivePanel title="Недавняя активность аккаунта">
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Дата и время</th>
+                    <th>Событие</th>
+                    <th>Описание</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {audit
+                    .filter((record) => record.accountId === detail.account.id)
+                    .slice(0, 3)
+                    .map((record) => (
+                      <tr key={record.id}>
+                        <td>{date(record.createdAt)}</td>
+                        <td>{record.action}</td>
+                        <td>{record.reason}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+            {!audit.some((record) => record.accountId === detail.account.id) ? (
+              <p className="admin-footnote">В загруженном журнале пока нет событий этого аккаунта.</p>
+            ) : null}
+          </ResponsivePanel>
         </>
       )}
     </div>
@@ -699,9 +889,39 @@ export function UsersSection({
       (status === "all" || u.isActive === (status === "active")) &&
       (role === "all" || u.role === role),
   );
+  if (selected && detail)
+    return (
+      <UserDetailWorkspace
+        detail={detail}
+        user={selected}
+        onBack={() => setSelected(null)}
+        onEdit={() => setEditingUser(selected)}
+        onReset={() => {
+          onReset(selected.id, selected.fullName ?? "пользователь");
+          setSelected(null);
+        }}
+        onStatus={() => {
+          onStatus(selected.id, selected.fullName ?? "пользователь", !selected.isActive);
+          setSelected(null);
+        }}
+        onDelete={() => {
+          onDelete(selected.id, selected.fullName ?? "пользователь");
+          setSelected(null);
+        }}
+      >
+        {editingUser ? (
+          <UserProfileEditor
+            accountId={detail.account.id}
+            user={editingUser}
+            onCancel={() => setEditingUser(null)}
+            onSaved={onUpdated}
+          />
+        ) : null}
+      </UserDetailWorkspace>
+    );
   return (
     <div className="admin-page">
-      <Heading title="Пользователи платформы" description="Доступ, контакты и роли внутри выбранного аккаунта." />
+      <PageHeading title="Пользователи платформы" description="Доступ, контакты и роли внутри выбранного аккаунта." />
       <div className="admin-toolbar">
         <SearchField
           value={search}
@@ -801,84 +1021,6 @@ export function UsersSection({
           {!users.length ? <Empty>Пользователи не найдены.</Empty> : null}
         </Surface>
       )}
-      <Modal
-        open={Boolean(selected && detail && !editingUser)}
-        title="Карточка пользователя"
-        onClose={() => setSelected(null)}
-      >
-        {selected && detail ? (
-          <div className="admin-user-detail">
-            <div className="admin-identity">
-              <div className="admin-avatar">{(selected.fullName ?? "П").slice(0, 2).toUpperCase()}</div>
-              <div>
-                <h3>{selected.fullName ?? "Без имени"}</h3>
-                <p>{selected.emailDisplay ?? "Email скрыт"}</p>
-              </div>
-            </div>
-            <dl className="admin-key-values">
-              <div>
-                <dt>Аккаунт</dt>
-                <dd>{detail.account.name}</dd>
-              </div>
-              <div>
-                <dt>Роль в аккаунте</dt>
-                <dd>{roleNames[selected.role]}</dd>
-              </div>
-              <div>
-                <dt>Приглашение принято</dt>
-                <dd>{date(selected.acceptedAt)}</dd>
-              </div>
-              <div>
-                <dt>Последний вход</dt>
-                <dd>{date(selected.lastLoginAt)}</dd>
-              </div>
-            </dl>
-            <Notice>Данные MFA и полная история сеансов не передаются этим административным API.</Notice>
-            <div className="admin-detail-actions">
-              <Button
-                variant="quiet"
-                onClick={() => {
-                  setEditingUser(selected);
-                }}
-              >
-                Изменить данные
-              </Button>
-              <Button
-                variant="quiet"
-                icon={<KeyRound size={16} />}
-                onClick={() => {
-                  onReset(selected.id, selected.fullName ?? "пользователь");
-                  setSelected(null);
-                }}
-              >
-                Сбросить пароль
-              </Button>
-              <Button
-                variant="danger"
-                disabled={!selected.acceptedAt}
-                onClick={() => {
-                  onStatus(selected.id, selected.fullName ?? "пользователь", !selected.isActive);
-                  setSelected(null);
-                }}
-              >
-                {selected.isActive ? "Заблокировать" : "Разблокировать"}
-              </Button>
-              <Button
-                variant="danger"
-                icon={<Trash2 size={16} />}
-                disabled={selected.role === "owner"}
-                title={selected.role === "owner" ? "Сначала назначьте другого владельца аккаунта" : undefined}
-                onClick={() => {
-                  onDelete(selected.id, selected.fullName ?? "пользователь");
-                  setSelected(null);
-                }}
-              >
-                Удалить
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </Modal>
       {editingUser && detail ? (
         <UserProfileEditor
           accountId={detail.account.id}
@@ -888,6 +1030,157 @@ export function UsersSection({
         />
       ) : null}
     </div>
+  );
+}
+
+function UserDetailWorkspace({
+  detail,
+  user,
+  onBack,
+  onEdit,
+  onReset,
+  onStatus,
+  onDelete,
+  children,
+}: {
+  detail: AdminAccountDetail;
+  user: AdminAccountDetail["users"][number];
+  onBack: () => void;
+  onEdit: () => void;
+  onReset: () => void;
+  onStatus: () => void;
+  onDelete: () => void;
+  children?: ReactNode;
+}) {
+  const titleId = useId();
+  return (
+    <section className="admin-page admin-user-workspace" role="dialog" aria-modal="false" aria-labelledby={titleId}>
+      <button type="button" className="admin-back" onClick={onBack} aria-label="Назад к пользователям">
+        <ArrowLeft size={16} />
+        Пользователи
+      </button>
+      <header className="admin-section-heading admin-page-heading">
+        <div>
+          <h1 id={titleId}>Карточка пользователя</h1>
+        </div>
+      </header>
+      <Surface>
+        <div className="admin-user-summary">
+          <div className="admin-identity">
+            <div className="admin-avatar">
+              {(user.fullName ?? "П")
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((value) => value[0])
+                .join("")
+                .toUpperCase()}
+            </div>
+            <div>
+              <h2>{user.fullName ?? "Без имени"}</h2>
+              <p>{user.emailDisplay ?? "Email скрыт"}</p>
+              <small className="admin-footnote">
+                ID: <span title={user.id}>{user.id.slice(0, 8)}…</span>
+              </small>
+            </div>
+          </div>
+          <dl className="admin-key-values">
+            <div>
+              <dt>Роль в аккаунте</dt>
+              <dd>
+                <Badge>{roleNames[user.role]}</Badge>
+              </dd>
+            </div>
+            <div>
+              <dt>Приглашение принято</dt>
+              <dd>{date(user.acceptedAt)}</dd>
+            </div>
+            <div>
+              <dt>Последний вход</dt>
+              <dd>{date(user.lastLoginAt)}</dd>
+            </div>
+          </dl>
+          <Badge value={user.isActive ? "active" : "suspended"} />
+        </div>
+      </Surface>
+      <div className="admin-user-detail-columns">
+        <div className="admin-detail-primary">
+          <ResponsivePanel title="Участие в аккаунте" initialMobileOpen>
+            <div className="admin-membership-row">
+              <Building2 size={22} />
+              <div>
+                <strong>{detail.account.name}</strong>
+                <p>
+                  <Badge>{roleNames[user.role]}</Badge> · {detail.subscription.planName}
+                </p>
+                <small className="admin-footnote">{expiry(detail.subscription.expiresAt)}</small>
+              </div>
+            </div>
+            <p className="admin-footnote">Показан выбранный аккаунт.</p>
+          </ResponsivePanel>
+          <ResponsivePanel title="Сеансы и активность">
+            <dl className="admin-key-values">
+              <div>
+                <dt>Последний вход</dt>
+                <dd>{date(user.lastLoginAt)}</dd>
+              </div>
+              <div>
+                <dt>История сеансов</dt>
+                <dd>Нет данных</dd>
+              </div>
+              <div>
+                <dt>Активное время</dt>
+                <dd>Не измеряется</dd>
+              </div>
+            </dl>
+          </ResponsivePanel>
+        </div>
+        <div className="admin-detail-toolbar admin-user-primary-actions">
+          <Button type="button" variant="quiet" icon={<KeyRound size={16} />} onClick={onReset}>
+            Сбросить пароль
+          </Button>
+          <Button type="button" onClick={onEdit}>
+            Изменить данные
+          </Button>
+        </div>
+        <div className="admin-detail-secondary">
+          <Surface>
+            <Heading title="Управление пользователем" />
+            <div className="admin-detail-actions">
+              <Button type="button" variant="danger" disabled={!user.acceptedAt} onClick={onStatus}>
+                {user.isActive ? "Заблокировать" : "Разблокировать"}
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                icon={<Trash2 size={16} />}
+                disabled={user.role === "owner"}
+                title={user.role === "owner" ? "Сначала назначьте другого владельца аккаунта" : undefined}
+                onClick={onDelete}
+              >
+                Удалить
+              </Button>
+            </div>
+          </Surface>
+          <Surface>
+            <Heading title="Безопасность" />
+            <dl className="admin-key-values">
+              <div>
+                <dt>Статус</dt>
+                <dd>
+                  <Badge value={user.isActive ? "active" : "suspended"} />
+                </dd>
+              </div>
+              <div>
+                <dt>MFA</dt>
+                <dd>Нет данных</dd>
+              </div>
+            </dl>
+            <Notice>Пароль и секреты MFA администратору недоступны.</Notice>
+          </Surface>
+        </div>
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -920,7 +1213,7 @@ export function SubscriptionsSection({
   );
   return (
     <div className="admin-page">
-      <Heading title="Подписки" description="Назначение пакетов и управление подписками всех аккаунтов." />
+      <PageHeading title="Подписки" description="Назначение пакетов и управление подписками всех аккаунтов." />
       <div className="admin-toolbar">
         <SearchField
           value={search}
@@ -976,7 +1269,7 @@ export function SubscriptionsSection({
           </div>
           <div className="admin-mobile-list">
             {visible.map((account) => (
-              <article key={account.id} className="admin-mobile-card">
+              <article key={account.id} className="admin-mobile-card admin-subscription-card">
                 <div className="admin-card-top">
                   <strong>{account.name}</strong>
                   {account.subscriptionStatus ? <Badge value={account.subscriptionStatus} /> : null}
@@ -985,8 +1278,14 @@ export function SubscriptionsSection({
                   <Badge>{account.planName ?? "Без тарифа"}</Badge> ·{" "}
                   {account.subscriptionStatus ? expiry(account.subscriptionExpiresAt) : "Нет подписки"}
                 </p>
-                <Button variant="quiet" className="mt-3 w-full" onClick={() => onSelectAccount(account)}>
-                  Выбрать аккаунт
+                <Button
+                  type="button"
+                  variant="quiet"
+                  className="admin-subscription-select"
+                  aria-label="Выбрать аккаунт"
+                  onClick={() => onSelectAccount(account)}
+                >
+                  <ChevronRight size={18} />
                 </Button>
               </article>
             ))}
@@ -994,19 +1293,17 @@ export function SubscriptionsSection({
           {!visible.length ? <Empty>Подписки не найдены.</Empty> : null}
         </Surface>
         <Surface>
-          <Heading title={detail ? `Подписка · ${detail.account.name}` : "Назначение пакета"} />
+          <Heading title="Назначение пакета" />
           {detail ? (
             <>
-              <dl className="admin-key-values">
+              <div className="admin-selected-account">
+                <Building2 size={24} />
                 <div>
-                  <dt>Текущий пакет</dt>
-                  <dd>{detail.subscription.planName}</dd>
+                  <strong>{detail.account.name}</strong>
+                  <p>Текущий пакет: {detail.subscription.planName}</p>
+                  <small>{expiry(detail.subscription.expiresAt)}</small>
                 </div>
-                <div>
-                  <dt>Действует до</dt>
-                  <dd>{expiry(detail.subscription.expiresAt)}</dd>
-                </div>
-              </dl>
+              </div>
               <PackageGrant detail={detail} plans={plans} onSuccess={onGranted} />
               <details className="admin-disclosure">
                 <summary>Ручное управление состоянием подписки</summary>
@@ -1058,64 +1355,95 @@ export function PlansSection({
 }: {
   plans: AdminPlan[];
   onCreate: () => void;
-  onEdit: (p: AdminPlan) => void;
+  onEdit: (plan: AdminPlan) => void;
 }) {
-  const [kind, setKind] = useState<"subscription" | "addon">("subscription");
-  const visible = plans.filter((p) => p.productKind === kind);
+  const navigation = useAdminNavigation();
+  const kind = navigation.params.get("planKind") === "addon" ? "addon" : "subscription";
+  const groups: ("subscription" | "addon")[] = kind === "addon" ? ["addon", "subscription"] : ["subscription", "addon"];
   return (
     <div className="admin-page">
-      <Heading
+      <PageHeading
         title="Тарифы и дополнения"
-        description="Каталог продуктов платформы: добавления фото и срок действия."
-        actions={<Button onClick={onCreate}>Новый тариф</Button>}
+        description="Каталог тарифов платформы и дополнительных опций"
+        actions={
+          <Button type="button" onClick={onCreate}>
+            Новый тариф
+          </Button>
+        }
       />
-      <Segments
-        label="Тип тарифа"
-        value={kind}
-        onChange={setKind}
-        items={[
-          { value: "subscription", label: "Базовые тарифы" },
-          { value: "addon", label: "Дополнения" },
-        ]}
-      />
-      <div className="admin-plan-grid">
-        {visible.map((p) => (
-          <Surface key={p.id} className="admin-plan-card">
-            <div className="admin-card-top">
-              <Badge>{kind === "addon" ? "Дополнение" : "Базовый тариф"}</Badge>
-              <Badge value={p.isActive ? "active" : "closed"}>{p.isActive ? "Включён" : "Отключён"}</Badge>
-            </div>
-            <h3>{p.name}</h3>
-            <p>{p.description}</p>
-            <dl className="admin-key-values">
-              <div>
-                <dt>Добавления фото</dt>
-                <dd>{p.arItemLimit === null ? "Без лимита" : p.arItemLimit.toLocaleString("ru-RU")}</dd>
-              </div>
-              <div>
-                <dt>Срок</dt>
-                <dd>{p.durationDays === null ? "Без срока" : `${p.durationDays} дней`}</dd>
-              </div>
-            </dl>
-            <strong className="admin-price">
-              {new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 2 }).format(
-                p.priceKopecks / 100,
-              )}
-            </strong>
-            <Button variant="quiet" onClick={() => onEdit(p)}>
-              Редактировать
-            </Button>
-          </Surface>
-        ))}
+      <div className="admin-underlined-tabs">
+        <Segments
+          label="Тип тарифа"
+          value={kind}
+          onChange={(value) => navigation.update({ planKind: value })}
+          items={[
+            { value: "subscription", label: "Базовые тарифы" },
+            { value: "addon", label: "Дополнения" },
+          ]}
+        />
       </div>
-      {!visible.length ? (
-        <Surface>
-          <Empty>{kind === "addon" ? "Дополнительных пакетов пока нет." : "Тарифов пока нет."}</Empty>
-        </Surface>
-      ) : null}
-      <Notice>
-        Удаление работы не возвращает добавление. Изменение цены в каталоге не списывает деньги с аккаунтов.
-      </Notice>
+      {groups.map((group) => (
+        <section className="admin-plan-group" key={group}>
+          <Heading
+            title={group === "subscription" ? "Базовые тарифы" : "Дополнения"}
+            description={
+              group === "subscription"
+                ? "Основные планы с лимитом добавлений и сроком действия."
+                : "Дополнительные фото и время к действующему пакету."
+            }
+          />
+          <div className="admin-plan-grid">
+            {plans
+              .filter((plan) => plan.productKind === group)
+              .map((plan) => (
+                <Surface key={plan.id} className="admin-plan-card">
+                  <div className="admin-card-top">
+                    <Badge>{group === "addon" ? "Дополнение" : "Базовый тариф"}</Badge>
+                    <Badge value={plan.isActive ? "active" : "closed"}>{plan.isActive ? "Включён" : "Отключён"}</Badge>
+                  </div>
+                  <h3>{plan.name}</h3>
+                  {plan.description ? <p className="admin-plan-description">{plan.description}</p> : null}
+                  <div className="admin-plan-features">
+                    <p>
+                      <Image size={17} />
+                      <span>
+                        {plan.arItemLimit === null
+                          ? "Без лимита фото"
+                          : `${plan.arItemLimit.toLocaleString("ru-RU")} добавлений фото`}
+                      </span>
+                    </p>
+                    <p>
+                      <CalendarDays size={17} />
+                      <span>
+                        {plan.durationDays === null ? "Без срока" : `Срок действия: ${plan.durationDays} дней`}
+                      </span>
+                    </p>
+                  </div>
+                  <strong className="admin-price">
+                    {new Intl.NumberFormat("ru-RU", {
+                      style: "currency",
+                      currency: "RUB",
+                      maximumFractionDigits: 2,
+                    }).format(plan.priceKopecks / 100)}
+                  </strong>
+                  <Button type="button" onClick={() => onEdit(plan)}>
+                    Редактировать
+                  </Button>
+                </Surface>
+              ))}
+          </div>
+          {!plans.some((plan) => plan.productKind === group) ? (
+            <Surface>
+              <p className="admin-footnote">
+                {group === "addon" ? "Дополнительных пакетов пока нет." : "Базовых тарифов пока нет."}
+              </p>
+            </Surface>
+          ) : null}
+        </section>
+      ))}
+      <p className="admin-footnote">
+        Удаление работы не возвращает добавление. Цена в каталоге не списывает деньги с аккаунтов автоматически.
+      </p>
     </div>
   );
 }
@@ -1124,16 +1452,19 @@ export function StorageSection({
   accounts,
   plans,
   totalBytes,
+  onRefresh,
 }: {
   accounts: AdminAccount[];
   plans: AdminPlan[];
   totalBytes: number;
+  onRefresh?: () => void;
 }) {
   const [search, setSearch] = useState("");
   const visible = accounts.filter((a) => a.name.toLowerCase().includes(search.toLowerCase()));
   return (
     <div className="admin-page">
-      <Heading
+      <PageHeading
+        actions={<RefreshAction onRefresh={onRefresh} />}
         title="Хранилище и ресурсы"
         description="Использование медиа аккаунтами и состояние источников мониторинга."
       />
@@ -1150,7 +1481,7 @@ export function StorageSection({
               <dd>Нет данных</dd>
             </div>
           </dl>
-          <Notice>Мониторинг физических ресурсов сервера не подключён к административному API.</Notice>
+          <Notice>Мониторинг физических ресурсов сервера пока не подключён.</Notice>
         </Surface>
         <Surface>
           <Heading title="Медиа и S3" />
@@ -1168,7 +1499,7 @@ export function StorageSection({
             <SearchField value={search} onChange={setSearch} label="Поиск в хранилище" placeholder="Найти аккаунт" />
           }
         />
-        <div className="admin-table-wrap">
+        <div className="admin-desktop-list admin-table-wrap">
           <table className="admin-table">
             <thead>
               <tr>
@@ -1207,6 +1538,21 @@ export function StorageSection({
             </tbody>
           </table>
         </div>
+        <div className="admin-mobile-list">
+          {visible.map((account) => {
+            const plan = plans.find((item) => item.code === account.planCode);
+            return (
+              <div className="admin-storage-row" key={account.id}>
+                <Building2 size={16} />
+                <strong>{account.name}</strong>
+                <span>
+                  {formatBytes(account.storageUsedBytes)} /{" "}
+                  {plan ? (plan.storageLimitBytes === null ? "∞" : formatBytes(plan.storageLimitBytes)) : "—"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
         {!visible.length ? <Empty>Аккаунты не найдены.</Empty> : null}
       </Surface>
       <Surface>
@@ -1244,10 +1590,10 @@ export function ItemsSection({
     (i) => (account === "all" || account === i.accountId) && (status === "all" || status === i.arItemStatus),
   );
   return (
-    <div className="admin-page">
-      <Heading title="Контент платформы" description="Проекты, группы и AR-работы всех аккаунтов." />
+    <div className={`admin-page ${selected ? "admin-with-inspector" : ""}`}>
+      <PageHeading title="Контент платформы" description="Проекты, группы и AR-работы всех аккаунтов." />
       <form
-        className="admin-toolbar"
+        className="admin-toolbar admin-content-toolbar"
         onSubmit={(e) => {
           e.preventDefault();
           onSubmit();
@@ -1293,7 +1639,7 @@ export function ItemsSection({
         </p>
       ) : null}
       <Surface className="admin-list-surface">
-        <div className="admin-table-wrap">
+        <div className="admin-desktop-list admin-table-wrap">
           <table className="admin-table">
             <thead>
               <tr>
@@ -1326,6 +1672,23 @@ export function ItemsSection({
             </tbody>
           </table>
         </div>
+        <div className="admin-mobile-list">
+          {visible.map((item) => (
+            <article key={item.arItemId} className="admin-content-row">
+              <span className="admin-content-placeholder" aria-label="Превью недоступно">
+                <Image size={20} />
+              </span>
+              <div>
+                <strong>{item.arItemTitle}</strong>
+                <small>{item.accountName}</small>
+                <Badge value={item.arItemStatus} />
+              </div>
+              <Button type="button" variant="quiet" onClick={() => setSelected(item)}>
+                Открыть
+              </Button>
+            </article>
+          ))}
+        </div>
         {!visible.length ? (
           <Empty>
             {results.length
@@ -1334,45 +1697,47 @@ export function ItemsSection({
           </Empty>
         ) : null}
       </Surface>
-      <Modal open={Boolean(selected)} title={selected?.arItemTitle ?? "AR-работа"} onClose={() => setSelected(null)}>
-        {selected ? (
-          <>
-            <dl className="admin-key-values">
-              <div>
-                <dt>Аккаунт</dt>
-                <dd>{selected.accountName}</dd>
-              </div>
-              <div>
-                <dt>Проект</dt>
-                <dd>{selected.projectName}</dd>
-              </div>
-              <div>
-                <dt>Группа</dt>
-                <dd>{selected.groupName}</dd>
-              </div>
-              <div>
-                <dt>Статус</dt>
-                <dd>
-                  <Badge value={selected.arItemStatus} />
-                </dd>
-              </div>
-            </dl>
-            <Notice>
-              Фото, видео и публичный QR не передаются поисковым API. Для приватных файлов нужен отдельный проверенный
-              доступ; ссылки не создаются из идентификатора.
-            </Notice>
-            <Button
-              variant={selected.arItemStatus === "suspended" ? "quiet" : "danger"}
-              onClick={() => {
-                onSuspend(selected);
-                setSelected(null);
-              }}
-            >
-              {selected.arItemStatus === "suspended" ? "Восстановить" : "Приостановить"}
-            </Button>
-          </>
-        ) : null}
-      </Modal>
+      {selected ? (
+        <Inspector title={selected.arItemTitle} onClose={() => setSelected(null)}>
+          {selected ? (
+            <>
+              <dl className="admin-key-values">
+                <div>
+                  <dt>Аккаунт</dt>
+                  <dd>{selected.accountName}</dd>
+                </div>
+                <div>
+                  <dt>Проект</dt>
+                  <dd>{selected.projectName}</dd>
+                </div>
+                <div>
+                  <dt>Группа</dt>
+                  <dd>{selected.groupName}</dd>
+                </div>
+                <div>
+                  <dt>Статус</dt>
+                  <dd>
+                    <Badge value={selected.arItemStatus} />
+                  </dd>
+                </div>
+              </dl>
+              <Notice>
+                Просмотр фото, видео и QR в админке пока недоступен. Приватные файлы доступны только участникам с
+                нужными правами.
+              </Notice>
+              <Button
+                variant={selected.arItemStatus === "suspended" ? "quiet" : "danger"}
+                onClick={() => {
+                  onSuspend(selected);
+                  setSelected(null);
+                }}
+              >
+                {selected.arItemStatus === "suspended" ? "Восстановить" : "Приостановить"}
+              </Button>
+            </>
+          ) : null}
+        </Inspector>
+      ) : null}
     </div>
   );
 }
@@ -1380,7 +1745,9 @@ export function ItemsSection({
 export function ErrorsSection({
   errors,
   onRetry,
+  onRefresh,
 }: {
+  onRefresh?: () => void;
   errors: AdminSnapshot["errors"]["items"];
   onRetry: (e: AdminSnapshot["errors"]["items"][number]) => void;
 }) {
@@ -1390,7 +1757,11 @@ export function ErrorsSection({
   );
   return (
     <div className="admin-page">
-      <Heading title="Обработка и ошибки" description="Неуспешные задачи и безопасный повтор обработки." />
+      <PageHeading
+        actions={<RefreshAction onRefresh={onRefresh} />}
+        title="Обработка и ошибки"
+        description="Неуспешные задачи и безопасный повтор обработки."
+      />
       <Stats
         items={[
           { label: "С ошибками в выборке", value: errors.length, icon: <CircleAlert size={19} /> },
@@ -1442,7 +1813,17 @@ export function ErrorsSection({
   );
 }
 
-export function AuditSection({ audit }: { audit: AdminSnapshot["audit"]["items"] }) {
+export function AuditSection({
+  audit,
+  onRefresh,
+  accounts = [],
+  embedded = false,
+}: {
+  embedded?: boolean;
+  audit: AdminSnapshot["audit"]["items"];
+  onRefresh?: () => void;
+  accounts?: AdminAccount[];
+}) {
   const [search, setSearch] = useState("");
   const [actor, setActor] = useState("all");
   const [period, setPeriod] = useState("all");
@@ -1455,8 +1836,16 @@ export function AuditSection({ audit }: { audit: AdminSnapshot["audit"]["items"]
       (period === "all" || Date.parse(a.createdAt) >= now - Number(period) * 86400000),
   );
   return (
-    <div className="admin-page">
-      <Heading title="История действий" description="Неизменяемый журнал административных действий." />
+    <div className={`admin-page ${selected ? "admin-with-inspector" : ""}`}>
+      {embedded ? (
+        <Heading title="История действий" />
+      ) : (
+        <PageHeading
+          actions={<RefreshAction onRefresh={onRefresh} />}
+          title="История действий"
+          description="Неизменяемый журнал административных действий."
+        />
+      )}
       <div className="admin-toolbar">
         <SearchField
           value={search}
@@ -1494,7 +1883,7 @@ export function AuditSection({ audit }: { audit: AdminSnapshot["audit"]["items"]
                 <th>Дата и время</th>
                 <th>Исполнитель</th>
                 <th>Действие</th>
-                <th>Описание</th>
+                <th>Аккаунт</th>
                 <th />
               </tr>
             </thead>
@@ -1504,9 +1893,13 @@ export function AuditSection({ audit }: { audit: AdminSnapshot["audit"]["items"]
                   <td>{date(a.createdAt)}</td>
                   <td>{a.actorName ?? "Администратор"}</td>
                   <td>
-                    <span className="admin-action-code">{a.action}</span>
+                    <strong className="admin-audit-action-label">{auditActionName(a.action)}</strong>
+                    <small className="admin-action-code">{a.action}</small>
                   </td>
-                  <td>{a.reason}</td>
+                  <td>
+                    {accounts.find((account) => account.id === a.accountId)?.name ??
+                      (a.accountId ? "Аккаунт" : "Платформа")}
+                  </td>
                   <td>
                     <Button variant="quiet" onClick={() => setSelected(a)}>
                       Детали
@@ -1521,7 +1914,8 @@ export function AuditSection({ audit }: { audit: AdminSnapshot["audit"]["items"]
           {visible.map((a) => (
             <button className="admin-audit-card" key={a.id} onClick={() => setSelected(a)}>
               <small>{date(a.createdAt)}</small>
-              <strong>{a.action}</strong>
+              <strong>{auditActionName(a.action)}</strong>
+              <small className="admin-action-code">{a.action}</small>
               <span>{a.actorName ?? "Администратор"}</span>
               <p>{a.reason}</p>
             </button>
@@ -1532,48 +1926,51 @@ export function AuditSection({ audit }: { audit: AdminSnapshot["audit"]["items"]
       <p className="admin-footnote">
         Найдено {visible.length} записей в последней загруженной выборке. Журнал нельзя изменить или удалить.
       </p>
-      <Modal open={Boolean(selected)} title="Детали действия" onClose={() => setSelected(null)}>
-        {selected ? (
-          <>
-            <Badge>{selected.action}</Badge>
-            <dl className="admin-key-values">
-              <div>
-                <dt>Время</dt>
-                <dd>{date(selected.createdAt)}</dd>
-              </div>
-              <div>
-                <dt>Исполнитель</dt>
-                <dd>{selected.actorName ?? selected.actorUserId}</dd>
-              </div>
-              <div>
-                <dt>Объект</dt>
-                <dd>{selected.entityType}</dd>
-              </div>
-              <div>
-                <dt>Идентификатор</dt>
-                <dd>{selected.entityId ?? "—"}</dd>
-              </div>
-            </dl>
-            <h3 className="admin-subtitle">Автоматическое описание</h3>
-            <p>{selected.reason}</p>
-            {Object.keys(selected.metadataSafe).length ? (
-              <>
-                <h3 className="admin-subtitle">Записанные изменения</h3>
-                <dl className="admin-key-values">
-                  {Object.entries(selected.metadataSafe).map(([key, value]) => (
-                    <div key={key}>
-                      <dt>{key}</dt>
-                      <dd>{typeof value === "object" ? JSON.stringify(value) : String(value)}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </>
-            ) : (
-              <Notice>Детали «было / стало» для этого действия не записаны.</Notice>
-            )}
-          </>
-        ) : null}
-      </Modal>
+      {selected ? (
+        <Inspector title="Детали действия" onClose={() => setSelected(null)}>
+          {selected ? (
+            <>
+              <Badge>{auditActionName(selected.action)}</Badge>
+              <p className="admin-action-code">{selected.action}</p>
+              <dl className="admin-key-values">
+                <div>
+                  <dt>Время</dt>
+                  <dd>{date(selected.createdAt)}</dd>
+                </div>
+                <div>
+                  <dt>Исполнитель</dt>
+                  <dd>{selected.actorName ?? selected.actorUserId}</dd>
+                </div>
+                <div>
+                  <dt>Объект</dt>
+                  <dd>{selected.entityType}</dd>
+                </div>
+                <div>
+                  <dt>Идентификатор</dt>
+                  <dd>{selected.entityId ?? "—"}</dd>
+                </div>
+              </dl>
+              <h3 className="admin-subtitle">Автоматическое описание</h3>
+              <p>{selected.reason}</p>
+              {Object.keys(selected.metadataSafe).length ? (
+                <>
+                  <h3 className="admin-subtitle">Записанные изменения</h3>
+                  <dl className="admin-key-values">
+                    {Object.entries(selected.metadataSafe).map(([key, value]) => (
+                      <div key={key}>
+                        <dt>{key}</dt>
+                        <dd>{typeof value === "object" ? JSON.stringify(value) : String(value)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </>
+              ) : (
+                <Notice>Детали «было / стало» для этого действия не записаны.</Notice>
+              )}
+            </>
+          ) : null}
+        </Inspector>
+      ) : null}
     </div>
   );
 }
@@ -1590,7 +1987,7 @@ export function SettingsSection({
   );
   return (
     <div className="admin-page">
-      <Heading title="Настройки платформы" description="Регистрация, публикация, сервис и безопасность." />
+      <PageHeading title="Настройки платформы" description="Регистрация, публикация, сервис и безопасность." />
       {[
         { name: "Регистрация", keys: ["registration_enabled"] },
         { name: "Публикация", keys: ["public_ar_enabled"] },
@@ -1651,7 +2048,15 @@ export function SettingsSection({
   );
 }
 
-export function AnalyticsSection({ snapshot, onActivity }: { snapshot: AdminSnapshot; onActivity: () => void }) {
+export function AnalyticsSection({
+  snapshot,
+  onActivity,
+  onRefresh,
+}: {
+  snapshot: AdminSnapshot;
+  onActivity: () => void;
+  onRefresh?: () => void;
+}) {
   const [period, setPeriod] = useState("30");
   const [now] = useState(() => Date.now());
   const threshold = now - Number(period) * 86400000;
@@ -1662,9 +2067,13 @@ export function AnalyticsSection({ snapshot, onActivity }: { snapshot: AdminSnap
     daily.set(day, (daily.get(day) ?? 0) + 1);
   });
   return (
-    <div className="admin-page">
-      <Heading title="Аналитика платформы" description="Доступные показатели по данным аккаунтов и общей сводки." />
-      <div className="admin-toolbar">
+    <div className="admin-page admin-analytics-page">
+      <PageHeading
+        actions={<RefreshAction onRefresh={onRefresh} />}
+        title="Аналитика платформы"
+        description="Доступные показатели по данным аккаунтов и общей сводки."
+      />
+      <div className="admin-toolbar admin-filter-panel">
         <Select
           label="Регистрации аккаунтов за период"
           value={period}
@@ -1750,7 +2159,7 @@ export function ActivitySection({
   );
   return (
     <div className="admin-page">
-      <Heading title="Входы и активность" description="Последние входы и состояние доступных источников данных." />
+      <PageHeading title="Входы и активность" description="Последние входы и состояние доступных источников данных." />
       <Segments
         value={mode}
         onChange={setMode}
@@ -1789,7 +2198,7 @@ export function ActivitySection({
       ) : mode === "registrations" ? (
         <Surface>
           <Heading title="Создание аккаунтов" />
-          <div className="admin-table-wrap">
+          <div className="admin-desktop-list admin-table-wrap">
             <table className="admin-table">
               <thead>
                 <tr>
@@ -1817,14 +2226,32 @@ export function ActivitySection({
               </tbody>
             </table>
           </div>
-          <Notice>Дата создания аккаунта не является датой регистрации пользователя в Auth.</Notice>
+          <div className="admin-mobile-list">
+            {accounts
+              .filter(
+                (account) =>
+                  `${account.name} ${account.ownerName}`.toLowerCase().includes(search.toLowerCase()) &&
+                  (!detail || account.id === detail.account.id),
+              )
+              .map((account) => (
+                <article className="admin-activity-card" key={account.id}>
+                  <strong>{account.name}</strong>
+                  <p>{account.ownerName ?? "Владелец не указан"}</p>
+                  <p>
+                    <CalendarDays size={15} />
+                    {date(account.createdAt)}
+                  </p>
+                </article>
+              ))}
+          </div>
+          <Notice>Это даты создания аккаунтов, а не регистраций пользователей.</Notice>
         </Surface>
       ) : (
         <Surface>
           {detail ? (
             <>
               <Heading title={`Последний вход · ${detail.account.name}`} />
-              <div className="admin-table-wrap">
+              <div className="admin-desktop-list admin-table-wrap">
                 <table className="admin-table">
                   <thead>
                     <tr>
@@ -1848,6 +2275,24 @@ export function ActivitySection({
                     ))}
                   </tbody>
                 </table>
+              </div>
+              <div className="admin-mobile-list">
+                {visible.map((user) => (
+                  <article className="admin-activity-card" key={user.id}>
+                    <div className="admin-card-top">
+                      <strong>{user.fullName ?? "Без имени"}</strong>
+                      <Badge>{detail.account.name}</Badge>
+                    </div>
+                    <p>
+                      <CalendarDays size={15} />
+                      {date(user.lastLoginAt)}
+                    </p>
+                    <div className="admin-activity-unavailable">
+                      <span>Активное время: —</span>
+                      <span>Сеансы: —</span>
+                    </div>
+                  </article>
+                ))}
               </div>
               {!visible.length ? <Empty>Пользователи не найдены.</Empty> : null}
             </>

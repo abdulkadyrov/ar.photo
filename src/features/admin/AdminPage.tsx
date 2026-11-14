@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, ShieldCheck } from "lucide-react";
+import { RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../../app/layout/AppShell";
@@ -88,8 +88,8 @@ function AdminWorkspaceRoute() {
   const [contentSearch, setContentSearch] = useState("");
   const [contentResults, setContentResults] = useState<AdminContentResult[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
-  const [planOpen, setPlanOpen] = useState(false);
-  const [editingPlan, setEditingPlan] = useState<AdminPlan | null>(null);
+  const selectedPlanId = searchParams.get("plan");
+  const planOpen = selectedPlanId !== null;
   const [toast, setToast] = useState<{ title: string; message: string; tone: "success" | "error" } | null>(null);
 
   const accessQuery = useQuery({ queryKey: ["admin", "access"], queryFn: () => adminRepository.getAccess() });
@@ -243,6 +243,7 @@ function AdminWorkspaceRoute() {
   }
 
   const snapshot = snapshotQuery.data;
+  const editingPlan = snapshot.plans.find((plan) => plan.id === selectedPlanId) ?? null;
   const openConfirm = (action: ConfirmAction) => {
     setConfirmAction(action);
     setConfirmation("");
@@ -251,6 +252,7 @@ function AdminWorkspaceRoute() {
 
   return (
     <AppShell
+      hideHeader
       eyebrow={
         accessQuery.data.mfaRequired === false
           ? "MFA временно отключена · история действий включена"
@@ -269,7 +271,22 @@ function AdminWorkspaceRoute() {
       }
     >
       <div className="admin-workspace">
-        {tab === "overview" ? <OverviewSection snapshot={snapshot} onNavigate={setTab} /> : null}
+        <div
+          className={`admin-access-indicator${accessQuery.data.mfaRequired === false ? " admin-access-indicator-warning" : ""}`}
+          role="status"
+          aria-label="Защита административного доступа"
+        >
+          {accessQuery.data.mfaRequired === false ? (
+            <ShieldAlert size={13} aria-hidden="true" />
+          ) : (
+            <ShieldCheck size={13} aria-hidden="true" />
+          )}
+          <span>{accessQuery.data.mfaRequired === false ? "MFA временно отключена" : "MFA подтверждена"}</span>
+          <small>История действий включена</small>
+        </div>
+        {tab === "overview" ? (
+          <OverviewSection snapshot={snapshot} onNavigate={setTab} onRefresh={() => void snapshotQuery.refetch()} />
+        ) : null}
         {showAccountDetail && detail ? (
           <AccountDetailSection
             detail={detail}
@@ -347,17 +364,26 @@ function AdminWorkspaceRoute() {
             }
           />
         ) : null}
-        {tab === "plans" ? (
+        {tab === "plans" && planOpen ? (
+          <PlanEditor
+            plan={editingPlan}
+            onClose={() => navigation.back({ plan: null })}
+            onSuccess={async () => {
+              navigation.back({ plan: null });
+              setToast({
+                title: "Тариф сохранён",
+                message: "Условия обновлены. Уже выданные фото и срок сохранены.",
+                tone: "success",
+              });
+              await queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
+            }}
+          />
+        ) : null}
+        {tab === "plans" && !planOpen ? (
           <PlansSection
             plans={snapshot.plans}
-            onCreate={() => {
-              setEditingPlan(null);
-              setPlanOpen(true);
-            }}
-            onEdit={(plan) => {
-              setEditingPlan(plan);
-              setPlanOpen(true);
-            }}
+            onCreate={() => navigation.open({ plan: "new" })}
+            onEdit={(plan) => navigation.open({ plan: plan.id })}
           />
         ) : null}
         {tab === "storage" ? (
@@ -365,9 +391,16 @@ function AdminWorkspaceRoute() {
             accounts={snapshot.accounts.items}
             plans={snapshot.plans}
             totalBytes={snapshot.overview.storageBytes}
+            onRefresh={() => void snapshotQuery.refetch()}
           />
         ) : null}
-        {tab === "analytics" ? <AnalyticsSection snapshot={snapshot} onActivity={() => setTab("activity")} /> : null}
+        {tab === "analytics" ? (
+          <AnalyticsSection
+            snapshot={snapshot}
+            onActivity={() => setTab("activity")}
+            onRefresh={() => void snapshotQuery.refetch()}
+          />
+        ) : null}
         {tab === "activity" ? (
           <ActivitySection
             detail={detail}
@@ -388,13 +421,20 @@ function AdminWorkspaceRoute() {
         ) : null}
         {tab === "errors" ? (
           <ErrorsSection
+            onRefresh={() => void snapshotQuery.refetch()}
             errors={snapshot.errors.items}
             onRetry={(error) =>
               openConfirm({ kind: "retry", accountId: error.accountId, jobId: error.id, label: error.arItemTitle })
             }
           />
         ) : null}
-        {tab === "audit" ? <AuditSection audit={snapshot.audit.items} /> : null}
+        {tab === "audit" ? (
+          <AuditSection
+            accounts={snapshot.accounts.items}
+            audit={snapshot.audit.items}
+            onRefresh={() => void snapshotQuery.refetch()}
+          />
+        ) : null}
         {tab === "settings" ? (
           <SettingsSection
             settings={snapshot.settings}
@@ -451,21 +491,6 @@ function AdminWorkspaceRoute() {
           await queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
         }}
       />
-      {planOpen ? (
-        <PlanEditor
-          plan={editingPlan}
-          onClose={() => setPlanOpen(false)}
-          onSuccess={async () => {
-            setPlanOpen(false);
-            setToast({
-              title: "Тариф сохранён",
-              message: "Условия обновлены. Уже выданные фото и срок сохранены.",
-              tone: "success",
-            });
-            await queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
-          }}
-        />
-      ) : null}
       {toast ? (
         <Toast title={toast.title} message={toast.message} tone={toast.tone} onDismiss={() => setToast(null)} />
       ) : null}

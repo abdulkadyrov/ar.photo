@@ -1,0 +1,389 @@
+{
+  "measurement": "Application panel outer bounds measured visually and checked against raster border rows; tolerance about 2px for generated antialiasing. Sheet explanatory header is excluded.",
+  "screens": [
+    {
+      "id": "account-items",
+      "reference": "docs/design/khanzama-workspace/pages/account/account-items.png",
+      "crop": {
+        "pc": {
+          "x": 8,
+          "y": 78,
+          "width": 1292,
+          "height": 808
+        },
+        "mobile": {
+          "x": 1322,
+          "y": 77,
+          "width": 422,
+          "height": 808
+        }
+      },
+      "viewport": {
+        "pc": {
+          "width": 1292,
+          "height": 808
+        },
+        "mobile": {
+          "width": 422,
+          "height": 808
+        }
+      },
+      "evidence": {
+        "before": {
+          "pc": "/tmp/khanzama-fidelity/media/before/account-items-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/before/account-items-mobile.png"
+        },
+        "after": {
+          "pc": "/tmp/khanzama-fidelity/media/after/account-items-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/after/account-items-mobile.png"
+        }
+      }
+    },
+    {
+      "id": "account-item-detail",
+      "reference": "docs/design/khanzama-workspace/pages/account/account-item-detail.png",
+      "crop": {
+        "pc": {
+          "x": 8,
+          "y": 85,
+          "width": 1104,
+          "height": 929
+        },
+        "mobile": {
+          "x": 1134,
+          "y": 85,
+          "width": 394,
+          "height": 929
+        }
+      },
+      "viewport": {
+        "pc": {
+          "width": 1104,
+          "height": 929
+        },
+        "mobile": {
+          "width": 394,
+          "height": 929
+        }
+      },
+      "evidence": {
+        "before": {
+          "pc": "/tmp/khanzama-fidelity/media/before/account-item-detail-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/before/account-item-detail-mobile.png"
+        },
+        "after": {
+          "pc": "/tmp/khanzama-fidelity/media/after/account-item-detail-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/after/account-item-detail-mobile.png"
+        }
+      }
+    },
+    {
+      "id": "account-create",
+      "reference": "docs/design/khanzama-workspace/pages/account/account-create.png",
+      "crop": {
+        "pc": {
+          "x": 11,
+          "y": 71,
+          "width": 1093,
+          "height": 941
+        },
+        "mobile": {
+          "x": 1123,
+          "y": 71,
+          "width": 405,
+          "height": 941
+        }
+      },
+      "viewport": {
+        "pc": {
+          "width": 1093,
+          "height": 941
+        },
+        "mobile": {
+          "width": 405,
+          "height": 941
+        }
+      },
+      "evidence": {
+        "before": {
+          "pc": "/tmp/khanzama-fidelity/media/before/account-create-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/before/account-create-mobile.png"
+        },
+        "after": {
+          "pc": "/tmp/khanzama-fidelity/media/after/account-create-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/after/account-create-mobile.png"
+        }
+      }
+    },
+    {
+      "id": "account-edit",
+      "reference": "docs/design/khanzama-workspace/pages/account/account-edit.png",
+      "crop": {
+        "pc": {
+          "x": 17,
+          "y": 74,
+          "width": 1110,
+          "height": 932
+        },
+        "mobile": {
+          "x": 1152,
+          "y": 74,
+          "width": 366,
+          "height": 932
+        }
+      },
+      "viewport": {
+        "pc": {
+          "width": 1110,
+          "height": 932
+        },
+        "mobile": {
+          "width": 366,
+          "height": 932
+        }
+      },
+      "evidence": {
+        "before": {
+          "pc": "/tmp/khanzama-fidelity/media/before/account-edit-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/before/account-edit-mobile.png"
+        },
+        "after": {
+          "pc": "/tmp/khanzama-fidelity/media/after/account-edit-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/after/account-edit-mobile.png"
+        }
+      }
+    },
+    {
+      "id": "account-media",
+      "reference": "docs/design/khanzama-workspace/pages/account/account-media.png",
+      "crop": {
+        "pc": {
+          "x": 8,
+          "y": 97,
+          "width": 1084,
+          "height": 901
+        },
+        "mobile": {
+          "x": 1115,
+          "y": 97,
+          "width": 411,
+          "height": 901
+        }
+      },
+      "viewport": {
+        "pc": {
+          "width": 1084,
+          "height": 901
+        },
+        "mobile": {
+          "width": 411,
+          "height": 901
+        }
+      },
+      "evidence": {
+        "before": {
+          "pc": "/tmp/khanzama-fidelity/media/before/account-media-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/before/account-media-mobile.png"
+        },
+        "after": {
+          "pc": "/tmp/khanzama-fidelity/media/after/account-media-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/after/account-media-mobile.png"
+        }
+      }
+    },
+    {
+      "id": "account-qr-list",
+      "reference": "docs/design/khanzama-workspace/pages/account/account-qr-list.png",
+      "crop": {
+        "pc": {
+          "x": 7,
+          "y": 81,
+          "width": 1102,
+          "height": 885
+        },
+        "mobile": {
+          "x": 1134,
+          "y": 81,
+          "width": 425,
+          "height": 885
+        }
+      },
+      "viewport": {
+        "pc": {
+          "width": 1102,
+          "height": 885
+        },
+        "mobile": {
+          "width": 425,
+          "height": 885
+        }
+      },
+      "evidence": {
+        "before": {
+          "pc": "/tmp/khanzama-fidelity/media/before/account-qr-list-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/before/account-qr-list-mobile.png"
+        },
+        "after": {
+          "pc": "/tmp/khanzama-fidelity/media/after/account-qr-list-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/after/account-qr-list-mobile.png"
+        }
+      }
+    },
+    {
+      "id": "account-qr-detail",
+      "reference": "docs/design/khanzama-workspace/pages/account/account-qr-detail.png",
+      "crop": {
+        "pc": {
+          "x": 8,
+          "y": 115,
+          "width": 1084,
+          "height": 883
+        },
+        "mobile": {
+          "x": 1117,
+          "y": 115,
+          "width": 407,
+          "height": 883
+        }
+      },
+      "viewport": {
+        "pc": {
+          "width": 1084,
+          "height": 883
+        },
+        "mobile": {
+          "width": 407,
+          "height": 883
+        }
+      },
+      "evidence": {
+        "before": {
+          "pc": "/tmp/khanzama-fidelity/media/before/account-qr-detail-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/before/account-qr-detail-mobile.png"
+        },
+        "after": {
+          "pc": "/tmp/khanzama-fidelity/media/after/account-qr-detail-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/after/account-qr-detail-mobile.png"
+        }
+      }
+    },
+    {
+      "id": "viewer-camera",
+      "reference": "docs/design/khanzama-workspace/pages/access/viewer-camera.png",
+      "crop": {
+        "pc": {
+          "x": 26,
+          "y": 120,
+          "width": 1204,
+          "height": 752
+        },
+        "mobile": {
+          "x": 1272,
+          "y": 120,
+          "width": 462,
+          "height": 752
+        }
+      },
+      "viewport": {
+        "pc": {
+          "width": 1204,
+          "height": 752
+        },
+        "mobile": {
+          "width": 462,
+          "height": 752
+        }
+      },
+      "evidence": {
+        "before": {
+          "pc": "/tmp/khanzama-fidelity/media/before/viewer-camera-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/before/viewer-camera-mobile.png"
+        },
+        "after": {
+          "pc": "/tmp/khanzama-fidelity/media/after/viewer-camera-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/after/viewer-camera-mobile.png"
+        }
+      }
+    },
+    {
+      "id": "viewer-public",
+      "reference": "docs/design/khanzama-workspace/pages/access/viewer-public.png",
+      "crop": {
+        "pc": {
+          "x": 40,
+          "y": 77,
+          "width": 1233,
+          "height": 805
+        },
+        "mobile": {
+          "x": 1317,
+          "y": 77,
+          "width": 399,
+          "height": 805
+        }
+      },
+      "viewport": {
+        "pc": {
+          "width": 1233,
+          "height": 805
+        },
+        "mobile": {
+          "width": 399,
+          "height": 805
+        }
+      },
+      "evidence": {
+        "before": {
+          "pc": "/tmp/khanzama-fidelity/media/before/viewer-public-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/before/viewer-public-mobile.png"
+        },
+        "after": {
+          "pc": "/tmp/khanzama-fidelity/media/after/viewer-public-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/after/viewer-public-mobile.png"
+        }
+      }
+    },
+    {
+      "id": "viewer-unsupported",
+      "reference": "docs/design/khanzama-workspace/pages/access/viewer-unsupported.png",
+      "crop": {
+        "pc": {
+          "x": 51,
+          "y": 130,
+          "width": 996,
+          "height": 881
+        },
+        "mobile": {
+          "x": 1080,
+          "y": 129,
+          "width": 412,
+          "height": 881
+        }
+      },
+      "viewport": {
+        "pc": {
+          "width": 996,
+          "height": 881
+        },
+        "mobile": {
+          "width": 412,
+          "height": 881
+        }
+      },
+      "evidence": {
+        "before": {
+          "pc": "/tmp/khanzama-fidelity/media/before/viewer-unsupported-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/before/viewer-unsupported-mobile.png"
+        },
+        "after": {
+          "pc": "/tmp/khanzama-fidelity/media/after/viewer-unsupported-pc.png",
+          "mobile": "/tmp/khanzama-fidelity/media/after/viewer-unsupported-mobile.png"
+        }
+      },
+      "contextualEvidence": {
+        "pc": "/tmp/khanzama-fidelity/media/after/viewer-unsupported-context-pc.png",
+        "mobile": "/tmp/khanzama-fidelity/media/after/viewer-unsupported-context-mobile.png"
+      }
+    }
+  ]
+}

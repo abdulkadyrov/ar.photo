@@ -1,5 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, CalendarClock, Camera, Clock3, ImagePlay, Layers3, Plus } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarClock,
+  Camera,
+  Clock3,
+  ImagePlay,
+  Layers3,
+  Plus,
+  Crown,
+  CheckCircle2,
+  QrCode,
+  Users,
+  FolderPlus,
+} from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { AppShell } from "../../app/layout/AppShell";
 import type { ArItem } from "../../entities/ar-item/model";
@@ -71,132 +84,190 @@ export function DashboardRoute() {
   const items = itemsQuery.data ?? [];
   const draft = items.find((item) => item.status === "draft");
   const projects = projectsQuery.data?.items ?? [];
+  const fullPackage = Boolean(
+    entitlements && entitlements.limits.arItems === null && !entitlements.subscription.expiresAt,
+  );
   return (
     <AppShell
       eyebrow={workspace.accountName}
-      title="Главная"
+      title={fullPackage ? workspace.accountName : "Главная"}
+      description={fullPackage ? "Ваши проекты, AR-фото и быстрые действия" : undefined}
       compactMobile
       actions={
         workspace.canWrite ? (
-          <Link className="btn btn-primary dashboard-top-create" to="/create">
-            <Plus size={18} /> Создать AR-фото
+          <Link className="btn btn-primary dashboard-top-create" to={fullPackage ? "/projects?create=1" : "/create"}>
+            <Plus size={18} /> {fullPackage ? "Создать проект" : "Создать AR-фото"}
           </Link>
         ) : undefined
       }
     >
-      <section aria-label="Мой пакет" className="dashboard-summary">
-        <Link to="/settings/subscription">
-          <Layers3 size={22} />
-          <span>
-            {entitlementsQuery.isPending ? (
-              "Загружаем пакет…"
-            ) : entitlements ? (
-              <>
-                Осталось{" "}
-                <strong>
-                  {entitlements.limits.arItems === null
-                    ? "без ограничений"
-                    : Math.max(0, entitlements.limits.arItems - entitlements.usage.arItems).toLocaleString("ru")}
-                </strong>
-                {entitlements.limits.arItems === null ? "" : " добавлений"}
-              </>
-            ) : (
-              "Пакет недоступен"
-            )}
+      {fullPackage ? (
+        <section className="dashboard-full-summary" aria-label="Полный пакет">
+          <span className="dashboard-full-badge">
+            <Crown size={20} />
+            Полный пакет
           </span>
-        </Link>
-        <Link to="/settings/subscription">
-          <CalendarClock size={22} />
           <span>
-            {workspace.subscriptionExpiresAt ? (
-              <>
-                Срок до <strong>{shortDate(workspace.subscriptionExpiresAt)}</strong>
-              </>
-            ) : (
-              "Без даты окончания"
-            )}
+            <ImagePlay size={22} />
+            <span>
+              Добавления фото:<strong>без лимита</strong>
+            </span>
           </span>
-        </Link>
-        <Link to="/items">
-          <Clock3 size={22} />
           <span>
-            В обработке{" "}
-            <strong>
-              {itemsQuery.isPending
-                ? "…"
-                : itemsQuery.error
-                  ? "—"
-                  : items.filter((item) => item.status === "processing").length}
-            </strong>
+            <CalendarClock size={22} />
+            <span>
+              Срок:<strong>без окончания</strong>
+            </span>
           </span>
-        </Link>
-      </section>
+          <span>
+            <CheckCircle2 size={22} />
+            <span>Возможности по вашей роли</span>
+          </span>
+        </section>
+      ) : (
+        <section aria-label="Мой пакет" className="dashboard-summary">
+          <Link to="/settings/subscription">
+            <Layers3 size={22} />
+            <span>
+              {entitlementsQuery.isPending ? (
+                "Загружаем пакет…"
+              ) : entitlements ? (
+                <>
+                  Осталось{" "}
+                  <strong>
+                    {entitlements.limits.arItems === null
+                      ? "без ограничений"
+                      : Math.max(0, entitlements.limits.arItems - entitlements.usage.arItems).toLocaleString("ru")}
+                  </strong>
+                  {entitlements.limits.arItems === null ? "" : " добавлений"}
+                </>
+              ) : (
+                "Пакет недоступен"
+              )}
+            </span>
+          </Link>
+          <Link to="/settings/subscription">
+            <CalendarClock size={22} />
+            <span>
+              {workspace.subscriptionExpiresAt ? (
+                <>
+                  Срок до <strong>{shortDate(workspace.subscriptionExpiresAt)}</strong>
+                </>
+              ) : (
+                "Без даты окончания"
+              )}
+            </span>
+          </Link>
+          <Link to="/items">
+            <Clock3 size={22} />
+            <span>
+              В обработке{" "}
+              <strong>
+                {itemsQuery.isPending
+                  ? "…"
+                  : itemsQuery.error
+                    ? "—"
+                    : items.filter((item) => item.status === "processing").length}
+              </strong>
+            </span>
+          </Link>
+        </section>
+      )}
+      {fullPackage ? (
+        <section className="dashboard-quick">
+          <h2>Быстрые действия</h2>
+          <div>
+            {[
+              {
+                to: "/projects?create=1",
+                title: "Создать проект",
+                text: "Новый AR-проект",
+                icon: <FolderPlus size={24} />,
+              },
+              { to: "/create", title: "Добавить AR-фото", text: "Оживить снимок", icon: <ImagePlay size={24} /> },
+              { to: "/qr-codes", title: "QR-коды", text: "Публикации ваших работ", icon: <QrCode size={24} /> },
+              { to: "/settings/team", title: "Моя команда", text: "Управление доступом", icon: <Users size={24} /> },
+            ].map((action) => (
+              <Link key={action.to} to={action.to}>
+                {action.icon}
+                <div>
+                  <strong>{action.title}</strong>
+                  <span>{action.text}</span>
+                </div>
+                <ArrowRight size={16} />
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
       {!workspace.canWrite ? (
         <p className="dashboard-readonly" role="status">
           Кабинет доступен для просмотра. Условия доступа — в разделе «Мой пакет».
         </p>
       ) : null}
-      <Panel className="dashboard-section">
-        <div className="section-heading-row">
-          <h2>Недавние AR-фото</h2>
-          <Link
-            className="text-link"
-            state={captureWorkspaceOrigin(location, accountId)}
-            to={draft ? `/items/${draft.id}/edit` : "/items"}
-          >
-            {draft ? "Продолжить черновик" : "Все AR-фото"}
-            <ArrowRight size={16} />
-          </Link>
-        </div>
-        {itemsQuery.isPending ? (
-          <Skeleton className="mt-4 h-48" />
-        ) : itemsQuery.error ? (
-          <ErrorState
-            text="Не удалось загрузить AR-фото."
-            action={<Button onClick={() => void itemsQuery.refetch()}>Повторить</Button>}
-          />
-        ) : items.length ? (
-          <div className="dashboard-work-grid">
-            {items.slice(0, 3).map((item) => (
-              <RecentWork key={item.id} item={item} canWrite={workspace.canWrite} />
-            ))}
-          </div>
-        ) : (
-          <div className="dashboard-empty">
-            <Camera size={28} />
-            <p>Пока нет AR-фото. Добавьте фотографию и видео, чтобы создать первую работу.</p>
-          </div>
-        )}
-      </Panel>
-      <Panel className="dashboard-section">
-        <div className="section-heading-row">
-          <h2>Недавние проекты</h2>
-          <Link className="text-link" to="/projects">
-            Все проекты <ArrowRight size={16} />
-          </Link>
-        </div>
-        {projectsQuery.isPending ? (
-          <Skeleton className="mt-4 h-32" />
-        ) : projectsQuery.error ? (
-          <ErrorState
-            text="Не удалось загрузить проекты."
-            action={<Button onClick={() => void projectsQuery.refetch()}>Повторить</Button>}
-          />
-        ) : projects.length ? (
-          <div className="dashboard-project-list">
-            {projects.map((project) => (
-              <RecentProject key={project.id} project={project} />
-            ))}
-          </div>
-        ) : (
-          <p className="dashboard-empty-projects">
-            Созданные проекты появятся здесь.{" "}
-            <Link className="text-link" to="/projects">
-              Перейти в проекты <ArrowRight size={15} />
+      <div className={`dashboard-lists ${fullPackage ? "dashboard-lists-full" : ""}`}>
+        <Panel className="dashboard-section dashboard-recent-works">
+          <div className="section-heading-row">
+            <h2>Недавние AR-фото</h2>
+            <Link
+              className="text-link"
+              state={captureWorkspaceOrigin(location, accountId)}
+              to={draft ? `/items/${draft.id}/edit` : "/items"}
+            >
+              {draft ? "Продолжить черновик" : "Все AR-фото"}
+              <ArrowRight size={16} />
             </Link>
-          </p>
-        )}
-      </Panel>
+          </div>
+          {itemsQuery.isPending ? (
+            <Skeleton className="mt-4 h-48" />
+          ) : itemsQuery.error ? (
+            <ErrorState
+              text="Не удалось загрузить AR-фото."
+              action={<Button onClick={() => void itemsQuery.refetch()}>Повторить</Button>}
+            />
+          ) : items.length ? (
+            <div className="dashboard-work-grid">
+              {items.slice(0, 3).map((item) => (
+                <RecentWork key={item.id} item={item} canWrite={workspace.canWrite} />
+              ))}
+            </div>
+          ) : (
+            <div className="dashboard-empty">
+              <Camera size={28} />
+              <p>Пока нет AR-фото. Добавьте фотографию и видео, чтобы создать первую работу.</p>
+            </div>
+          )}
+        </Panel>
+        <Panel className="dashboard-section dashboard-recent-projects">
+          <div className="section-heading-row">
+            <h2>Недавние проекты</h2>
+            <Link className="text-link" to="/projects">
+              Все проекты <ArrowRight size={16} />
+            </Link>
+          </div>
+          {projectsQuery.isPending ? (
+            <Skeleton className="mt-4 h-32" />
+          ) : projectsQuery.error ? (
+            <ErrorState
+              text="Не удалось загрузить проекты."
+              action={<Button onClick={() => void projectsQuery.refetch()}>Повторить</Button>}
+            />
+          ) : projects.length ? (
+            <div className="dashboard-project-list">
+              {projects.slice(0, fullPackage ? 3 : 2).map((project) => (
+                <RecentProject key={project.id} project={project} canWrite={workspace.canWrite} />
+              ))}
+            </div>
+          ) : (
+            <p className="dashboard-empty-projects">
+              Созданные проекты появятся здесь.{" "}
+              <Link className="text-link" to="/projects">
+                Перейти в проекты <ArrowRight size={15} />
+              </Link>
+            </p>
+          )}
+        </Panel>
+      </div>
     </AppShell>
   );
 }
@@ -240,7 +311,7 @@ function RecentWork({ item, canWrite }: { item: ArItem; canWrite: boolean }) {
     </article>
   );
 }
-function RecentProject({ project }: { project: ProjectListItem }) {
+function RecentProject({ project, canWrite }: { project: ProjectListItem; canWrite: boolean }) {
   const location = useLocation();
   const origin = captureWorkspaceOrigin(location, project.account_id);
   return (
@@ -259,14 +330,22 @@ function RecentProject({ project }: { project: ProjectListItem }) {
       <span className="dashboard-state">
         {project.status === "active" ? "Активен" : project.status === "draft" ? "Черновик" : "Архив"}
       </span>
-      <Link
-        aria-label={`Открыть проект «${project.name}»`}
-        className="btn btn-ghost"
-        state={origin}
-        to={`/projects/${project.id}`}
-      >
-        Открыть <ArrowRight size={16} />
-      </Link>
+      <div className="dashboard-project-actions">
+        {" "}
+        <Link
+          aria-label={`Открыть проект «${project.name}»`}
+          className="btn btn-primary"
+          state={origin}
+          to={`/projects/${project.id}`}
+        >
+          Открыть <ArrowRight size={16} />
+        </Link>
+        {canWrite ? (
+          <Link className="btn btn-ghost" state={origin} to={`/projects/${project.id}/edit`}>
+            Изменить
+          </Link>
+        ) : null}
+      </div>
     </article>
   );
 }

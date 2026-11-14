@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
-import { Button, Input, Modal, Select } from "../../shared/ui";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { ArrowLeft, CalendarDays, ChevronRight, Image, Save } from "lucide-react";
+import { Button, Input, Modal } from "../../shared/ui";
 import { getAdminRepository } from "./adminRepository";
 import type { AdminPlan, AdminPlanInput } from "./adminSchemas";
 import "./AdminWorkspace.css";
@@ -84,117 +85,211 @@ export function PlanEditor({
     },
     onSuccess,
   });
+  const mobile = useSyncExternalStore(subscribeMobile, mobileSnapshot, () => false);
+  const [previewExpanded, setPreviewExpanded] = useState(false);
+  const [discard, setDiscard] = useState(false);
+  const dirty =
+    name !== (plan?.name ?? "") ||
+    description !== (plan?.description ?? "") ||
+    productKind !== (plan?.productKind ?? "subscription") ||
+    duration !== (plan ? String(plan.durationDays ?? "") : "30") ||
+    price !== String((plan?.priceKopecks ?? 0) / 100) ||
+    active !== (plan?.isActive ?? true) ||
+    numericFields.some(
+      ([key, , scale]) =>
+        values[key] !==
+        (plan ? (plan[key] === null ? "" : String(plan[key]! / scale)) : key === "arItemLimit" ? "100" : ""),
+    );
+  const cancel = () => {
+    if (mutation.isPending) return;
+    if (dirty) setDiscard(true);
+    else onClose();
+  };
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !discard) cancel();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  });
+  const changeKind = (kind: "subscription" | "addon") => {
+    setProductKind(kind);
+    if (kind === "addon") {
+      if (duration === "") setDuration("0");
+      if (values.arItemLimit === "") setValues({ ...values, arItemLimit: "100" });
+    }
+  };
   return (
-    <Modal
-      open
-      title={plan ? "Редактировать тариф" : "Новый тариф или пакет"}
-      onClose={onClose}
-      description="Укажите название, цену, срок и количество новых AR-фото."
-      actions={
-        <Button disabled={mutation.isPending || !name.trim()} onClick={() => mutation.mutate()}>
-          {mutation.isPending ? "Сохраняем…" : "Сохранить тариф"}
-        </Button>
-      }
+    <section
+      className="admin-page admin-plan-editor-page"
+      role="dialog"
+      aria-modal="false"
+      aria-label={plan ? "Редактировать тариф" : "Новый тариф или пакет"}
     >
-      <div className="admin-plan-editor">
-        <Select
-          label="Тип"
-          value={productKind}
-          onChange={(e) => {
-            const kind = e.target.value as typeof productKind;
-            setProductKind(kind);
-            if (kind === "addon") {
-              if (duration === "") setDuration("0");
-              if (values.arItemLimit === "") setValues({ ...values, arItemLimit: "100" });
-            }
-          }}
-          options={[
-            { value: "subscription", label: "Тариф: фото и срок" },
-            { value: "addon", label: "Дополнение: фото и/или время" },
-          ]}
-        />
-        <Field label="Название" value={name} onChange={setName} />
-        <Field label="Стоимость, ₽" value={price} onChange={setPrice} />
-        <Field
-          label="Срок, дней (30 — месяц, 365 — год)"
-          value={duration}
-          onChange={setDuration}
-          disabled={productKind === "subscription" && duration === ""}
-        />
-        <Field
-          label="Добавления AR-фото"
-          value={values.arItemLimit}
-          onChange={(v) => setValues({ ...values, arItemLimit: v })}
-          disabled={productKind === "subscription" && values.arItemLimit === ""}
-        />
-        {productKind === "subscription" ? (
-          <div className="admin-editor-options">
-            <label>
-              <input
-                type="checkbox"
-                checked={duration === ""}
-                onChange={(event) => setDuration(event.target.checked ? "" : "30")}
-              />
-              Без срока
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={values.arItemLimit === ""}
-                onChange={(event) => setValues({ ...values, arItemLimit: event.target.checked ? "" : "100" })}
-              />
-              Без лимита фото
-            </label>
+      <button type="button" className="admin-back" onClick={cancel}>
+        <ArrowLeft size={16} />
+        Тарифы
+      </button>
+      <header className="admin-section-heading admin-page-heading">
+        <div>
+          <h1>Редактор тарифа</h1>
+          <p>Создание и настройка тарифа.</p>
+        </div>
+      </header>
+      <form
+        className="admin-plan-editor-layout"
+        onSubmit={(event) => {
+          event.preventDefault();
+          mutation.mutate();
+        }}
+      >
+        <div className="admin-surface admin-plan-editor">
+          <fieldset className="admin-product-kind">
+            <legend>Тип продукта</legend>
+            <div>
+              {(["subscription", "addon"] as const).map((kind) => (
+                <label key={kind} className={productKind === kind ? "is-selected" : ""}>
+                  <input
+                    type="radio"
+                    name="plan-kind"
+                    value={kind}
+                    checked={productKind === kind}
+                    onChange={() => changeKind(kind)}
+                    disabled={mutation.isPending}
+                  />
+                  {kind === "subscription" ? "Тариф" : "Дополнение"}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <Field label="Название" value={name} onChange={setName} disabled={mutation.isPending} />
+          <div className="admin-price-duration">
+            <Field label="Стоимость, ₽" value={price} onChange={setPrice} disabled={mutation.isPending} />
+            <Field
+              label="Срок, дней"
+              value={duration}
+              onChange={setDuration}
+              disabled={mutation.isPending || (productKind === "subscription" && duration === "")}
+            />
           </div>
-        ) : null}
-        <aside className="admin-editor-preview" aria-label="Предпросмотр тарифа">
-          <span className="text-xs text-muted">{productKind === "subscription" ? "Базовый тариф" : "Дополнение"}</span>
-          <h3>{name || "Новый тариф"}</h3>
-          <strong>{price || "0"} ₽</strong>
-          <p>
-            {duration === "" ? "Без срока" : `${duration} дней`} ·{" "}
-            {values.arItemLimit === "" ? "Без лимита добавлений" : `${values.arItemLimit} добавлений фото`}
-          </p>
-        </aside>
-        <p className="text-sm text-muted">
-          Удаление фото не возвращает добавление. Пустой лимит фото или срок — без ограничений для тарифа; 0 дней —
-          пакет только фото.
-        </p>
-        <details>
-          <summary className="min-h-12 cursor-pointer py-3 text-sm font-semibold">Дополнительные настройки</summary>
-          <div className="grid gap-4">
-            <Field label="Код тарифа" value={code} onChange={setCode} />
-            <Field label="Описание" value={description} onChange={setDescription} />
-            {productKind === "subscription"
-              ? numericFields
-                  .filter(([key]) => key !== "arItemLimit")
-                  .map(([key, label]) => (
-                    <Field
-                      key={key}
-                      label={label}
-                      value={values[key]}
-                      onChange={(v) => setValues({ ...values, [key]: v })}
-                    />
-                  ))
-              : null}
-            <p className="text-sm text-muted">
-              Код заполняется автоматически. Пустые технические лимиты — без ограничений. Ранее выданные фото и срок
-              сохраняются; прочие лимиты меняются у всех аккаунтов на этом тарифе.
+          <Field
+            label="Добавления AR-фото"
+            value={values.arItemLimit}
+            onChange={(value) => setValues({ ...values, arItemLimit: value })}
+            disabled={mutation.isPending || (productKind === "subscription" && values.arItemLimit === "")}
+          />
+          {productKind === "subscription" ? (
+            <div className="admin-plan-options">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={duration === ""}
+                  onChange={(event) => setDuration(event.target.checked ? "" : "30")}
+                  disabled={mutation.isPending}
+                />
+                <span>
+                  <strong>Без срока</strong>
+                  <small>Тариф действует без ограничения по времени.</small>
+                </span>
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={values.arItemLimit === ""}
+                  onChange={(event) => setValues({ ...values, arItemLimit: event.target.checked ? "" : "100" })}
+                  disabled={mutation.isPending}
+                />
+                <span>
+                  <strong>Без лимита фото</strong>
+                  <small>Неограниченное количество добавлений фото.</small>
+                </span>
+              </label>
+            </div>
+          ) : null}
+          <details>
+            <summary className="min-h-12 cursor-pointer py-3 text-sm font-semibold">Дополнительные настройки</summary>
+            <div className="grid gap-4">
+              <Field label="Код тарифа" value={code} onChange={setCode} />
+              <Field label="Описание" value={description} onChange={setDescription} />
+              {productKind === "subscription"
+                ? numericFields
+                    .filter(([key]) => key !== "arItemLimit")
+                    .map(([key, label]) => (
+                      <Field
+                        key={key}
+                        label={label}
+                        value={values[key]}
+                        onChange={(v) => setValues({ ...values, [key]: v })}
+                      />
+                    ))
+                : null}
+              <p className="text-sm text-muted">
+                Код заполняется автоматически. Пустые технические лимиты — без ограничений. Ранее выданные фото и срок
+                сохраняются; прочие лимиты меняются у всех аккаунтов на этом тарифе.
+              </p>
+              <label className="flex min-h-12 items-center gap-3 text-sm">
+                <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+                Доступен для назначения
+              </label>
+              <Field label="Причина изменения (необязательно)" value={reason} onChange={setReason} />
+            </div>
+          </details>
+          {mutation.error ? (
+            <p role="alert" className="text-sm text-rose-700">
+              {mutation.error.message}
             </p>
-            <label className="flex min-h-12 items-center gap-3 text-sm">
-              <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-              Доступен для назначения
-            </label>
-            <Field label="Причина изменения (необязательно)" value={reason} onChange={setReason} />
+          ) : null}
+        </div>
+        <details
+          className="admin-surface admin-plan-preview"
+          open={!mobile || previewExpanded}
+          onToggle={(event) => {
+            if (mobile) setPreviewExpanded(event.currentTarget.open);
+          }}
+        >
+          <summary>
+            <h2>Предпросмотр тарифа</h2>
+            <ChevronRight size={17} aria-hidden="true" />
+          </summary>
+          <p className="admin-plan-preview-description">Так тариф будет отображаться при выборе пакета.</p>
+          <div className="admin-preview-card">
+            <span className="admin-badge">{productKind === "subscription" ? "Тариф" : "Дополнение"}</span>
+            <h3>{name || "Новый тариф"}</h3>
+            <strong className="admin-price">{price || "0"} ₽</strong>
+            <p>
+              <CalendarDays size={17} />
+              {duration === "" ? "Без срока" : `Срок: ${duration} дней`}
+            </p>
+            <p>
+              <Image size={17} />
+              {values.arItemLimit === "" ? "Без лимита фото" : `Добавлений фото: ${values.arItemLimit}`}
+            </p>
           </div>
         </details>
-      </div>
-      {mutation.error ? (
-        <p role="alert" className="mt-3 text-sm text-rose-700">
-          {mutation.error.message}
+        <p className="admin-plan-warning">
+          Удаление уже созданных фото не возвращает добавления. Для дополнения 0 дней означает пакет только фото.
         </p>
-      ) : null}
-    </Modal>
+        <footer className="admin-editor-footer">
+          <Button type="submit" icon={<Save size={16} />} disabled={mutation.isPending || !name.trim()}>
+            {mutation.isPending ? "Сохраняем…" : "Сохранить тариф"}
+          </Button>
+          <Button type="button" variant="quiet" onClick={cancel} disabled={mutation.isPending}>
+            Отмена
+          </Button>
+        </footer>
+      </form>
+      <Modal
+        open={discard}
+        title="Отменить изменения?"
+        description="Введённые условия тарифа ещё не сохранены."
+        onClose={() => setDiscard(false)}
+        actions={
+          <Button type="button" variant="danger" onClick={onClose}>
+            Не сохранять
+          </Button>
+        }
+      />
+    </section>
   );
 }
 function Field({
@@ -214,4 +309,13 @@ function Field({
       <Input value={value} onValueChange={onChange} disabled={disabled} />
     </label>
   );
+}
+
+function subscribeMobile(listener: () => void) {
+  const media = window.matchMedia?.("(max-width:700px)");
+  media?.addEventListener("change", listener);
+  return () => media?.removeEventListener("change", listener);
+}
+function mobileSnapshot() {
+  return window.matchMedia?.("(max-width:700px)").matches ?? false;
 }
