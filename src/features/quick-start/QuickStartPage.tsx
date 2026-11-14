@@ -661,6 +661,7 @@ export function MediaPicker({
 }) {
   const marker = kind === "marker";
   const inputId = useId();
+  const fileInput = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [pickerError, setPickerError] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -752,16 +753,22 @@ export function MediaPicker({
               </span>
             </button>
           ) : (
-            <label className="quick-media-select-surface" htmlFor={disabled ? undefined : inputId}>
+            <button
+              className="quick-media-select-surface"
+              type="button"
+              disabled={disabled}
+              aria-label={marker ? "Добавить фотографию" : "Добавить видео"}
+              onClick={() => fileInput.current?.click()}
+            >
               <span className="quick-media-empty">
                 <span className="quick-media-icon">{marker ? <ImagePlus size={29} /> : <FileVideo2 size={29} />}</span>
                 <strong>{marker ? "Выберите фотографию" : "Выберите видео"}</strong>
                 <span>{marker ? "JPG, PNG или WebP" : "MP4, MOV, AVI и другие видеоформаты"}</span>
               </span>
               <span className="quick-pick-file">
-                <Upload size={16} /> Добавить файл
+                <Upload size={16} /> {marker ? "Добавить фотографию" : "Добавить видео"}
               </span>
-            </label>
+            </button>
           )}
 
           {file ? (
@@ -794,6 +801,7 @@ export function MediaPicker({
           </span>
         ) : null}
         <input
+          ref={fileInput}
           id={inputId}
           aria-label={marker ? "Выбрать фотографию-маркер" : "Выбрать видео"}
           className="sr-only"

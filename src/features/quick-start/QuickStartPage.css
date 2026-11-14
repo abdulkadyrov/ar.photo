@@ -357,6 +357,35 @@
   display: block;
   background: #f7f6f2;
 }
+.quick-workspace .quick-media-select-surface {
+  position: relative;
+  width: 100%;
+  min-height: 192px;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+.quick-workspace .quick-media-select-surface:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -3px;
+}
+.quick-workspace .quick-media-select-surface:disabled {
+  cursor: not-allowed;
+}
+.quick-workspace .quick-media-select-surface .quick-media-empty {
+  padding: 0;
+}
+.quick-workspace .quick-media-select-surface .quick-pick-file {
+  position: static;
+  min-height: 44px;
+  background: var(--primary);
+  color: white;
+  border: 0;
+}
 .quick-workspace .quick-media-open {
   position: relative;
   inset: auto;

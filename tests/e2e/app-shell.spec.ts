@@ -5,6 +5,30 @@ async function signInToDemo(page: Page) {
   await page.getByRole("button", { name: "Войти" }).click();
 }
 
+for (const width of [319, 390, 1280]) {
+  test(`opens native photo and video pickers at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("./");
+    await signInToDemo(page);
+    await page.goto("./create");
+    for (const [label, path, picker] of [
+      ["Добавить фотографию", "public/test-assets/test.jpg", "marker-media-picker"],
+      ["Добавить видео", "test-assets/fixtures/h264-aac.mp4", "video-media-picker"],
+    ]) {
+      const button = page.getByRole("button", { name: label, exact: true });
+      await expect(button).toBeVisible();
+      const bounds = await button.boundingBox();
+      expect(bounds?.height).toBeGreaterThanOrEqual(44);
+      const chooser = page.waitForEvent("filechooser");
+      await button.click();
+      await (await chooser).setFiles(path);
+      await expect(page.getByTestId(picker).getByText(path.split("/").pop()!, { exact: true })).toBeVisible();
+      await expect(page.getByTestId(picker).getByRole("button", { name: /^Просмотреть/ })).toBeVisible();
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+}
+
 test("opens the explicit authentication screen", async ({ page }) => {
   await page.goto("./");
 
