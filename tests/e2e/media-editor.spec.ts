@@ -43,9 +43,7 @@ for (const width of [390, 1280]) {
     expect(
       await dialog
         .locator(".media-timeline-section")
-        .evaluate(
-          (el) => el.getBoundingClientRect().right <= document.querySelector("dialog")!.getBoundingClientRect().right,
-        ),
+        .evaluate((el) => el.getBoundingClientRect().right <= el.closest("dialog")!.getBoundingClientRect().right),
     ).toBe(true);
     await dialog.getByRole("button", { name: /^Фрагмент 2/ }).click();
     await dialog.getByRole("button", { name: "Удалить фрагмент 2" }).click();

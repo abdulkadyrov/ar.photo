@@ -41,7 +41,7 @@ export function ArCameraEntryRoute() {
       streamRef.current = stream;
       const result = await waitForPublicProjectQr(video, {
         signal: controller.signal,
-        onInvalid: () => setMessage("Это не QR-код AR Photo"),
+        onInvalid: () => setMessage("Это не QR-код KHANZAMA"),
       });
       stopMediaStream(stream);
       streamRef.current = null;
@@ -75,24 +75,39 @@ export function ArCameraEntryRoute() {
 
   return (
     <main className="ar-viewer" data-mode="camera-entry">
-      <section className="ar-intro ar-camera-entry-intro">
-        <div className="ar-camera-entry-backdrop" />
-        <div className="ar-intro-shade" />
-        <div className="ar-intro-card">
-          <span className="ar-intro-icon">{mode === "error" ? <Camera size={22} /> : <ScanLine size={22} />}</span>
-          <span className="ar-intro-label">AR Photo</span>
-          <h1>{mode === "error" ? "Камера не запустилась" : "Сканируйте QR-код"}</h1>
+      <section className="ar-public-intro">
+        <header>
+          <strong>KHANZAMA</strong>
+          <span>AR-камера</span>
+        </header>
+        <div className="ar-public-content">
+          <div className="grid aspect-[4/3] place-items-center rounded-xl border border-line bg-card text-primary">
+            <Camera size={84} aria-hidden="true" />
+          </div>
+          <div>
+            <span className="ar-public-tag">AR-просмотр</span>
+            <h1>{mode === "error" ? "Камера не запустилась" : "Оживите печатную фотографию"}</h1>
+            <p>
+              {mode === "error"
+                ? message
+                : "Откройте проект по QR-коду. Затем наведите камеру на саму фотографию — на ней появится связанное видео."}
+            </p>
+            <div className="ar-public-buttons">
+              <Button type="button" onClick={() => void startScanning()} icon={<Camera size={18} />} full>
+                {mode === "error" ? "Повторить" : "Разрешить камеру"}
+              </Button>
+            </div>
+            <p className="ar-public-note">
+              <ShieldCheck size={22} /> Камера обрабатывается только на вашем устройстве.
+            </p>
+          </div>
+        </div>
+        <div className="ar-public-help">
+          <h2>Только фотография и ваше видео</h2>
           <p>
-            {mode === "error"
-              ? message
-              : "Наведите камеру на QR проекта. Затем AR Photo загрузит материалы и попросит навести камеру на фотографию."}
+            QR-код открывает проект. Для распознавания используется само изображение напечатанной фотографии, без
+            специальных меток.
           </p>
-          <Button type="button" onClick={() => void startScanning()} icon={<Camera size={18} />} full>
-            {mode === "error" ? "Повторить" : "Включить камеру"}
-          </Button>
-          <span className="ar-intro-privacy">
-            <ShieldCheck size={15} /> Камера обрабатывается только на устройстве
-          </span>
         </div>
       </section>
     </main>

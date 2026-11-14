@@ -25,6 +25,7 @@ import { useEffect, useId, useMemo, useRef, useState, type DragEvent } from "rea
 import { createPortal } from "react-dom";
 import { QRCodeSVG } from "qrcode.react";
 import type { ArItem, QrCode as QrCodeRecord } from "../../entities/ar-item/model";
+import { AppShell } from "../../app/layout/AppShell";
 import { Button, Input } from "../../shared/ui";
 import { getArItemRepository } from "../ar-items/arItemRepository";
 import { useAuth } from "../auth/authContext";
@@ -395,10 +396,10 @@ function QuickCreatePage({ userId }: { userId: string }) {
     <QuickShell
       currentStep={visibleStage === "form" ? 1 : 2}
       eyebrow={visibleStage === "form" ? "Новый AR-момент" : "Обработка запущена"}
-      title={visibleStage === "form" ? "Оживите фотографию" : "Создаём ваше AR-фото"}
+      title={visibleStage === "form" ? "Новое AR-фото" : "Создаём ваше AR-фото"}
       description={
         visibleStage === "form"
-          ? "Добавьте фотографию и видео — обработку и QR-код мы подготовим автоматически."
+          ? "Загрузите снимок и видео, настройте пару и опубликуйте."
           : "Можно оставить страницу открытой или вернуться позже — незавершённая работа восстановится автоматически."
       }
     >
@@ -502,6 +503,12 @@ function QuickCreatePage({ userId }: { userId: string }) {
           </div>
         ) : null}
 
+        <p className="mt-4 rounded-xl bg-primary/10 px-3 py-2.5 text-xs leading-5 text-primary-text">
+          Создание каждого AR-фото расходует одно добавление.{" "}
+          {additionalPairs.length
+            ? `В этом QR будет ${additionalPairs.length + 1} AR-фото.`
+            : "Удаление работы не возвращает добавление."}
+        </p>
         <div className="quick-form-actions">
           {visibleStage === "error" && itemId ? (
             <Button full onClick={() => void retryProcessing()}>
@@ -510,7 +517,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
           ) : (
             <Button full disabled={!canSubmit} onClick={() => void submit()}>
               {processing ? <LoaderCircle className="animate-spin" size={19} /> : <Sparkles size={19} />}
-              {processing ? "Создаём AR…" : "Оживить фото"}
+              {processing ? "Создаём AR…" : "Подготовить и опубликовать"}
             </Button>
           )}
           <Button full variant="quiet" disabled={processing} onClick={reset}>
@@ -1021,22 +1028,12 @@ function QuickShell({
   children: React.ReactNode;
 }) {
   return (
-    <main className="quick-flow">
-      <QuickHeader />
-      <div className="quick-flow-content">
-        <QuickStepper currentStep={currentStep} />
-        <header className="quick-page-heading">
-          <span>{eyebrow}</span>
-          <h1>{title}</h1>
-          <p>{description}</p>
-        </header>
+    <AppShell eyebrow={eyebrow} title={title} description={description} compactMobile showDescriptionOnMobile>
+      <div className="quick-workspace">
+        {currentStep > 1 ? <QuickStepper currentStep={currentStep} /> : null}
         {children}
       </div>
-      <footer className="quick-footer">
-        <span>AR Photo · личный кабинет</span>
-        <span>Фото превращается в воспоминание, которое можно услышать</span>
-      </footer>
-    </main>
+    </AppShell>
   );
 }
 

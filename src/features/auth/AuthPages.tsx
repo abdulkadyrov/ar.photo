@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, KeyRound, LoaderCircle, LockKeyhole, Mail, Sparkles, UserRound } from "lucide-react";
+import { ArrowLeft, KeyRound, LoaderCircle, LockKeyhole, Mail, Eye, EyeOff, UserRound } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useForm, type FieldError, type UseFormRegisterReturn } from "react-hook-form";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
@@ -7,6 +7,7 @@ import { getSupabaseBrowserClient } from "../../shared/api/supabase";
 import { Button, Panel } from "../../shared/ui";
 import { useAuth } from "./authContext";
 import { getSignUpErrorMessage } from "./authErrors";
+import "./AuthPages.css";
 import {
   loginSchema,
   registerSchema,
@@ -22,6 +23,7 @@ export function LoginRoute() {
   const auth = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const returnTo = (location.state as { from?: string } | null)?.from ?? "/dashboard";
   const [formError, setFormError] = useState("");
   const {
     register,
@@ -43,21 +45,20 @@ export function LoginRoute() {
     );
   }
 
-  if (auth.status === "authenticated") return <Navigate replace to="/dashboard" />;
+  if (auth.status === "authenticated") return <Navigate replace to={returnTo} />;
 
   const submit = handleSubmit(async (values) => {
     setFormError("");
     try {
       await auth.signIn(values.email, values.password);
-      const state = location.state as { from?: string } | null;
-      navigate(state?.from ?? "/dashboard", { replace: true });
+      navigate(returnTo, { replace: true });
     } catch {
       setFormError("Не удалось войти. Проверьте email и пароль и повторите попытку.");
     }
   });
 
   return (
-    <AuthLayout title="Добро пожаловать" description="Войдите в защищённое пространство AR Photo.">
+    <AuthLayout title="Вход в кабинет" description="Войдите, чтобы создавать и управлять AR-работами.">
       {auth.mode === "demo" ? (
         <div className="mb-5 rounded-2xl border border-primary/20 bg-primary/10 p-3 text-sm leading-5 text-[#5140b8]">
           Локальный demo-режим: используйте предзаполненный email и любой пароль от 8 символов.
@@ -82,6 +83,9 @@ export function LoginRoute() {
           autoComplete="current-password"
           placeholder="Не менее 8 символов"
         />
+        <Link className="auth-recovery-link" to="/reset-password">
+          Забыли пароль?
+        </Link>
         {formError ? <FormNotice tone="error">{formError}</FormNotice> : null}
         <Button
           full
@@ -91,15 +95,9 @@ export function LoginRoute() {
           {isSubmitting ? "Входим…" : "Войти"}
         </Button>
       </form>
-      <Link className="mt-5 inline-flex text-sm font-semibold text-primary" to="/reset-password">
-        Забыли пароль?
+      <Link className="btn btn-ghost auth-register-link" to="/register">
+        Создать аккаунт
       </Link>
-      <p className="mt-4 text-sm text-muted">
-        Нет аккаунта?{" "}
-        <Link className="font-semibold text-primary" to="/register">
-          Зарегистрироваться
-        </Link>
-      </p>
     </AuthLayout>
   );
 }
@@ -370,27 +368,23 @@ export function UpdatePasswordRoute({ recovery = false }: { recovery?: boolean }
 }
 
 function AuthLayout({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+  const auth = useAuth();
   return (
-    <main className="relative grid min-h-screen place-items-center overflow-hidden bg-background px-5 py-10 text-ink">
-      <div className="pointer-events-none absolute left-1/2 top-[-20rem] h-[36rem] w-[36rem] -translate-x-1/2 rounded-full bg-primary/15 blur-[110px]" />
-      <div className="relative w-full max-w-md">
-        <Link className="brand-mark mb-7 justify-center" to="/">
-          <span className="brand-symbol">
-            <Sparkles size={20} />
-          </span>
-          <span>
-            <strong>AR</strong> Photo
-          </span>
+    <main className="auth-page">
+      <header className="auth-page-header">
+        <Link className="auth-wordmark" to="/">
+          KHANZAMA
         </Link>
-        <Panel className="p-6 sm:p-7">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Личный кабинет</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight">{title}</h1>
-          <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
-          <div className="mt-6">{children}</div>
+        <span>Кабинет студии</span>
+        {auth.mode === "demo" ? <small>Демо-режим</small> : null}
+      </header>
+      <div className="auth-page-content">
+        <Panel className="auth-panel">
+          <h1>{title}</h1>
+          <p className="auth-description">{description}</p>
+          <div className="auth-form-content">{children}</div>
         </Panel>
-        <p className="mt-5 text-center text-xs leading-5 text-muted">
-          Продолжая, вы подтверждаете, что имеете право работать с загружаемыми материалами.
-        </p>
+        <p className="auth-legal">Продолжая, вы подтверждаете, что имеете право работать с загружаемыми материалами.</p>
       </div>
     </main>
   );
@@ -408,12 +402,32 @@ function AuthField({
   error?: FieldError;
   inputProps: UseFormRegisterReturn;
 } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "name">) {
+  const [visible, setVisible] = useState(false);
+  const password = props.type === "password";
   return (
     <label className="block text-sm font-semibold">
       <span>{label}</span>
       <span className="relative mt-2 block">
         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">{icon}</span>
-        <input {...props} {...inputProps} className="field-control auth-field-control" aria-invalid={Boolean(error)} />
+        <input
+          {...props}
+          {...inputProps}
+          type={password && visible ? "text" : props.type}
+          className={`field-control auth-field-control ${password ? "auth-password-field" : ""}`}
+          aria-label={label}
+          aria-invalid={Boolean(error)}
+        />
+        {password ? (
+          <button
+            type="button"
+            className="auth-password-toggle"
+            aria-label={visible ? "Скрыть пароль" : "Показать пароль"}
+            aria-pressed={visible}
+            onClick={() => setVisible(!visible)}
+          >
+            {visible ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+        ) : null}
       </span>
       {error ? <span className="mt-1.5 block text-xs font-medium text-rose-700">{error.message}</span> : null}
     </label>

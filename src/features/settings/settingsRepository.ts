@@ -3,6 +3,8 @@ import type { Json } from "../../shared/api/database.types";
 import { assertDemoRuntimeEnabled } from "../../shared/config/env";
 import {
   accountEntitlementsSchema,
+  accountSettingsSchema,
+  type AccountSettings,
   inviteDeliverySchema,
   inviteTeamMemberSchema,
   normalizePermissions,
@@ -21,6 +23,7 @@ import { createDemoSettingsRepository } from "./demoSettingsRepository";
 type SupabaseBrowserClient = NonNullable<ReturnType<typeof getSupabaseBrowserClient>>;
 
 export type SettingsErrorCode =
+  | "conflict"
   | "forbidden"
   | "team_limit_reached"
   | "already_member"
@@ -43,6 +46,8 @@ export class SettingsError extends Error {
 
 export interface SettingsRepository {
   getEntitlements(accountId: string): Promise<AccountEntitlements>;
+  getAccountSettings(accountId: string): Promise<AccountSettings>;
+  updateAccountSettings(accountId: string, input: AccountSettings): Promise<AccountSettings>;
   getTeamRoster(accountId: string): Promise<TeamRoster>;
   getPendingInvitations(): Promise<PendingTeamInvitation[]>;
   inviteMember(accountId: string, input: InviteTeamMemberInput): Promise<InviteDelivery>;
@@ -59,6 +64,50 @@ export interface SettingsRepository {
 
 export class SupabaseSettingsRepository implements SettingsRepository {
   constructor(private readonly client: SupabaseBrowserClient) {}
+
+  async getAccountSettings(accountId: string) {
+    const { data, error } = await this.client.from("accounts").select("name,settings").eq("id", accountId).single();
+    if (error) throw mapSettingsError(error);
+    return readAccountSettings(data.name, data.settings);
+  }
+
+  async updateAccountSettings(accountId: string, rawInput: AccountSettings) {
+    const input = accountSettingsSchema.parse(rawInput);
+    const { data: current, error: readError } = await this.client
+      .from("accounts")
+      .select("settings,updated_at")
+      .eq("id", accountId)
+      .single();
+    if (readError) throw mapSettingsError(readError);
+    const existing =
+      current.settings && typeof current.settings === "object" && !Array.isArray(current.settings)
+        ? current.settings
+        : {};
+    const previousProfile =
+      existing.workspace_profile &&
+      typeof existing.workspace_profile === "object" &&
+      !Array.isArray(existing.workspace_profile)
+        ? existing.workspace_profile
+        : {};
+    const settings = {
+      ...existing,
+      workspace_profile: { ...previousProfile, description: input.description, notifications: input.notifications },
+    };
+    const { data, error } = await this.client
+      .from("accounts")
+      .update({ name: input.name, settings })
+      .eq("id", accountId)
+      .eq("updated_at", current.updated_at)
+      .select("name,settings")
+      .maybeSingle();
+    if (error) throw mapSettingsError(error);
+    if (!data)
+      throw new SettingsError(
+        "conflict",
+        "Настройки были изменены в другой вкладке или доступ к ним изменился. Загрузите актуальные настройки и повторите изменения.",
+      );
+    return readAccountSettings(data.name, data.settings);
+  }
 
   async getEntitlements(accountId: string) {
     const { data, error } = await this.client.rpc("get_account_entitlements", { p_target_account_id: accountId });
@@ -179,4 +228,16 @@ export function getSettingsRepository(): SettingsRepository {
 
 export function setSettingsRepositoryForTests(nextRepository?: SettingsRepository) {
   repository = nextRepository;
+}
+
+function readAccountSettings(name: string, settings: Json): AccountSettings {
+  const record = settings && typeof settings === "object" && !Array.isArray(settings) ? settings : {};
+  const candidate = record.workspace_profile;
+  const profile = candidate && typeof candidate === "object" && !Array.isArray(candidate) ? candidate : {};
+  const parsed = accountSettingsSchema.safeParse({
+    name,
+    description: profile.description ?? "",
+    notifications: profile.notifications ?? undefined,
+  });
+  return parsed.success ? parsed.data : accountSettingsSchema.parse({ name });
 }

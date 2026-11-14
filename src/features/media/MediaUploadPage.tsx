@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, CircleAlert, FileImage, Film, LoaderCircle, Pause, RefreshCw, Trash2, UploadCloud } from "lucide-react";
+import {
+  Check,
+  Eye,
+  CircleAlert,
+  FileImage,
+  Film,
+  LoaderCircle,
+  Pause,
+  RefreshCw,
+  Trash2,
+  UploadCloud,
+} from "lucide-react";
 import type { MediaAsset, PreparedMedia } from "../../entities/media/model";
 import { AppShell } from "../../app/layout/AppShell";
 import { useAuth } from "../auth/authContext";
 import { getCatalogRepository } from "../catalog/catalogRepository";
-import { Button, ErrorState, FileDropzone, Panel, Select, Skeleton, Toast } from "../../shared/ui";
+import { Button, ErrorState, FileDropzone, Input, Modal, Panel, Select, Skeleton, Toast } from "../../shared/ui";
 import { getMediaRepository, MediaRepositoryError } from "./mediaRepository";
 import { classifyMediaFile, mediaAccept, prepareUnclassifiedMediaFile } from "./mediaValidation";
 import {
@@ -42,6 +53,8 @@ export function MediaUploadRoute() {
   const auth = useAuth();
   const queryClient = useQueryClient();
   const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [search, setSearch] = useState("");
+  const [fileKind, setFileKind] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [notice, setNotice] = useState<{ title: string; message?: string; tone: "success" | "error" }>();
@@ -297,8 +310,8 @@ export function MediaUploadRoute() {
   return (
     <AppShell
       eyebrow={workspace.accountName}
-      title="Медиа"
-      description="Проверяем файлы в браузере, загружаем частями и сохраняем только после серверной верификации."
+      title="Медиа и загрузки"
+      description="Фото и видео ваших проектов"
       actions={
         readyCount ? (
           <Button disabled={uploadDisabled} icon={<UploadCloud size={17} />} onClick={() => void uploadReady()}>
@@ -308,12 +321,12 @@ export function MediaUploadRoute() {
       }
     >
       {auth.mode === "demo" ? (
-        <div className="mt-6 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
+        <div className="mt-6 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-900">
           Демо-режим: очередь работает локально. В online-режиме те же действия используют приватный Supabase Storage.
         </div>
       ) : null}
 
-      <section className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.8fr)]">
+      <section className="mt-5 grid gap-4">
         <Panel>
           <div className="grid gap-4 sm:grid-cols-2">
             <Select
@@ -346,14 +359,17 @@ export function MediaUploadRoute() {
             </p>
           ) : null}
 
-          <div className="mt-5">
+          <details className="mt-4 rounded-xl border border-line p-3">
+            <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-primary">
+              Загрузить фото и видео
+            </summary>
             <FileDropzone
               accept={mediaAccept}
               disabled={uploadDisabled}
               hint="Фото любого расширения нормализуются и очищаются от EXIF. Видео автоматически преобразуются в MP4/H.264."
               onPick={addFiles}
             />
-          </div>
+          </details>
 
           {queue.length ? (
             <div className="mt-5 grid gap-3" aria-label="Очередь загрузки">
@@ -373,10 +389,7 @@ export function MediaUploadRoute() {
               Очередь пуста. Файлы не покидают браузер до успешной проверки.
             </div>
           )}
-          <p className="mt-4 text-xs leading-5 text-muted">
-            Подготовленные файлы сохраняются в IndexedDB этого устройства. После перезагрузки очередь можно продолжить;
-            после успешной загрузки локальная копия удаляется.
-          </p>
+          <p className="mt-3 text-xs text-muted">Загрузку можно продолжить после перезагрузки страницы.</p>
         </Panel>
 
         <Panel>
@@ -389,6 +402,22 @@ export function MediaUploadRoute() {
               {assetsQuery.data?.length ?? 0}
             </span>
           </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-xs text-muted">
+              Поиск по названию
+              <Input value={search} onValueChange={setSearch} placeholder="Название файла" />
+            </label>
+            <Select
+              label="Тип файла"
+              value={fileKind}
+              onChange={(event) => setFileKind(event.target.value)}
+              options={[
+                { label: "Все файлы", value: "" },
+                { label: "Фото", value: "image" },
+                { label: "Видео", value: "video" },
+              ]}
+            />
+          </div>
           {assetsQuery.isPending ? (
             <div className="mt-5 grid gap-3">
               <Skeleton className="h-16 rounded-xl" />
@@ -398,9 +427,17 @@ export function MediaUploadRoute() {
             <p className="mt-5 text-sm text-rose-300">{readableError(assetsQuery.error)}</p>
           ) : assetsQuery.data?.length ? (
             <div className="mt-5 grid gap-2">
-              {assetsQuery.data.map((asset) => (
-                <AssetRow key={asset.id} asset={asset} />
-              ))}
+              {assetsQuery.data
+                .filter(
+                  (asset) =>
+                    (!fileKind || (fileKind === "video" ? asset.kind === "video" : asset.kind !== "video")) &&
+                    (asset.original_file_name ?? "")
+                      .toLocaleLowerCase("ru-RU")
+                      .includes(search.trim().toLocaleLowerCase("ru-RU")),
+                )
+                .map((asset) => (
+                  <AssetRow key={asset.id} asset={asset} />
+                ))}
             </div>
           ) : (
             <div className="mt-5 rounded-xl border border-dashed border-line p-5 text-center text-sm text-muted">
@@ -561,19 +598,56 @@ function MetadataLine({ prepared }: { prepared: PreparedMedia }) {
 
 function AssetRow({ asset }: { asset: MediaAsset }) {
   const isVideo = asset.kind === "video";
+  const [viewing, setViewing] = useState(false);
+  const urlQuery = useQuery({
+    queryKey: ["media-preview", asset.id, asset.version],
+    queryFn: () => mediaRepository.getAssetUrl(asset),
+    staleTime: 8 * 60_000,
+  });
+  const name = asset.original_file_name ?? (isVideo ? "Видео" : "Фото");
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-line bg-white/[0.025] p-3">
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-        {isVideo ? <Film size={18} /> : <FileImage size={18} />}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">{asset.original_file_name ?? (isVideo ? "Видео" : "Маркер")}</p>
-        <p className="mt-1 text-[11px] text-muted">
-          v{asset.version} · {formatBytes(asset.size_bytes)} · {new Date(asset.created_at).toLocaleDateString("ru-RU")}
-        </p>
+    <>
+      <div className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-card p-3">
+        <span className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-lg bg-primary/10 text-primary">
+          {!isVideo && urlQuery.data ? (
+            <img src={urlQuery.data} alt="" loading="lazy" className="h-full w-full object-cover" />
+          ) : isVideo ? (
+            <Film size={22} />
+          ) : (
+            <FileImage size={22} />
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold" title={name}>
+            {name}
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            {isVideo ? "Видео" : "Фото"} · {formatBytes(asset.size_bytes)}
+          </p>
+          <p className="mt-1 text-xs text-emerald-800">
+            Готово · {new Date(asset.created_at).toLocaleDateString("ru-RU")}
+          </p>
+        </div>
+        <Button
+          variant="quiet"
+          aria-label={`Просмотр ${name}`}
+          disabled={!urlQuery.data}
+          onClick={() => setViewing(true)}
+        >
+          <Eye size={17} />
+          <span className="hidden sm:inline">Просмотр</span>
+        </Button>
       </div>
-      <Check className="text-emerald-300" size={16} />
-    </div>
+      <Modal open={viewing} title={name} onClose={() => setViewing(false)}>
+        {viewing && urlQuery.data ? (
+          isVideo ? (
+            <video src={urlQuery.data} controls playsInline className="max-h-[65dvh] w-full rounded-lg" />
+          ) : (
+            <img src={urlQuery.data} alt={name} className="max-h-[65dvh] w-full rounded-lg object-contain" />
+          )
+        ) : null}
+      </Modal>
+    </>
   );
 }
 

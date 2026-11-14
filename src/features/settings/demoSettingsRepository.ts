@@ -1,6 +1,8 @@
 import type { SettingsRepository } from "./settingsRepository";
 import {
   accountEntitlementsSchema,
+  accountSettingsSchema,
+  type AccountSettings,
   defaultPermissions,
   inviteTeamMemberSchema,
   normalizePermissions,
@@ -20,6 +22,7 @@ export type DemoSettingsState = {
   entitlements: AccountEntitlements;
   roster: TeamRoster;
   pendingInvitations: PendingTeamInvitation[];
+  accountSettings?: AccountSettings;
 };
 
 export interface DemoSettingsStore {
@@ -39,6 +42,26 @@ export class DemoSettingsRepository implements SettingsRepository {
     private readonly store: DemoSettingsStore,
     private readonly now: () => Date = () => new Date(),
   ) {}
+
+  async getAccountSettings(accountId: string) {
+    const state = this.state();
+    this.assertAccount(state, accountId);
+    return structuredClone(
+      state.accountSettings ?? accountSettingsSchema.parse({ name: state.entitlements.accountName }),
+    );
+  }
+
+  async updateAccountSettings(accountId: string, input: AccountSettings) {
+    const state = this.state();
+    this.assertAccount(state, accountId);
+    if (!state.entitlements.canWrite || !["owner", "manager", "superadmin"].includes(state.entitlements.memberRole))
+      throw new SettingsError("forbidden", "Изменять настройки может владелец или менеджер студии");
+    const settings = accountSettingsSchema.parse(input);
+    state.accountSettings = settings;
+    state.entitlements.accountName = settings.name;
+    this.store.write(state);
+    return structuredClone(settings);
+  }
 
   async getEntitlements(accountId: string) {
     const state = this.state();

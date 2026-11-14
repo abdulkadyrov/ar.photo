@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { adminAccessSchema, adminAccountDetailSchema, adminReasonSchema } from "./adminSchemas";
+import {
+  adminAccessSchema,
+  adminAccountDetailSchema,
+  adminReasonSchema,
+  adminAccountUpdateSchema,
+  adminUserUpdateSchema,
+} from "./adminSchemas";
 
 describe("admin schemas", () => {
   it("keeps access responses strict", () => {
@@ -13,6 +19,15 @@ describe("admin schemas", () => {
   it("requires a meaningful administrative reason", () => {
     expect(() => adminReasonSchema.parse("short")).toThrow();
     expect(adminReasonSchema.parse("Обращение клиента SUPPORT-1042")).toBe("Обращение клиента SUPPORT-1042");
+  });
+
+  it("limits profile edits to safe non-authorization fields", () => {
+    expect(() =>
+      adminAccountUpdateSchema.parse({ name: "Studio", timezone: "Europe/Moscow", ownerUserId: crypto.randomUUID() }),
+    ).toThrow();
+    expect(() => adminUserUpdateSchema.parse({ fullName: "User", role: "superadmin" })).toThrow();
+    expect(() => adminUserUpdateSchema.parse({ fullName: "User", email: "other@example.com" })).toThrow();
+    expect(() => adminAccountUpdateSchema.parse({ name: "Studio", timezone: "Invalid/Zone" })).toThrow();
   });
 
   it("rejects password fields in account detail", () => {

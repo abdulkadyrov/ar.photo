@@ -9,9 +9,9 @@ test("opens the explicit authentication screen", async ({ page }) => {
   await page.goto("./");
 
   await expect(page).toHaveURL(/\/ar\.photo\/login$/);
-  await expect(page.getByRole("heading", { name: "Добро пожаловать" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Вход в кабинет" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Войти" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Зарегистрироваться" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Создать аккаунт" })).toBeVisible();
 });
 
 test("navigates through the protected router and opens quick creation", async ({ page }) => {
@@ -20,10 +20,9 @@ test("navigates through the protected router and opens quick creation", async ({
   await expect(page).toHaveURL(/\/ar\.photo\/dashboard$/);
   await page.getByRole("link", { name: "Создать AR-фото" }).first().click();
   await expect(page).toHaveURL(/\/ar\.photo\/create$/);
-  await expect(page.getByRole("heading", { name: "Оживите фотографию" })).toBeVisible();
-  await expect(
-    page.getByRole("navigation", { name: "Этапы создания AR-фото" }).getByText("Шаг 1", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Новое AR-фото" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Создание AR-фото", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Название", { exact: true })).toBeVisible();
 });
 
 test("times and automatically publishes quick creation", async ({ page }) => {
@@ -34,12 +33,23 @@ test("times and automatically publishes quick creation", async ({ page }) => {
   await page.getByLabel("Название").fill("Быстрая публикация");
   await page.getByLabel("Выбрать фотографию-маркер").setInputFiles("public/test-assets/test.jpg");
   await page.getByLabel("Выбрать видео").setInputFiles("test-assets/fixtures/h264-aac.mp4");
-  await page.getByRole("button", { name: "Оживить фото" }).click();
+  await page.getByRole("button", { name: "Подготовить и опубликовать" }).click();
 
   await expect(page.getByRole("timer")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Всё готово" })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("Подготовлено и опубликовано за")).toBeVisible();
   await expect(page.getByRole("button", { name: "Открыть AR" })).toBeEnabled();
+  await page.goto("./qr-codes");
+  const selection = page.getByRole("checkbox", { name: "Выбрать QR Быстрая публикация", exact: true });
+  await selection.click();
+  await expect(selection).toBeChecked();
+  await expect(page.getByRole("button", { name: "Печать выбранных", exact: true })).toBeEnabled();
+  await expect(page.locator(".qr-print-batch figure")).toHaveCount(1);
+  await expect(page.locator(".qr-print-batch figure")).toContainText("Быстрая публикация");
+  await page.emulateMedia({ media: "print" });
+  await expect(page.locator(".qr-print-batch")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Основная навигация", exact: true })).not.toBeVisible();
+  await page.emulateMedia({ media: "screen" });
 });
 
 test("publishes two photo-video pairs behind one quick-start QR", async ({ page }) => {
@@ -56,7 +66,7 @@ test("publishes two photo-video pairs behind one quick-start QR", async ({ page 
   await videoInputs.nth(0).setInputFiles("test-assets/fixtures/h264-aac.mp4");
   await markerInputs.nth(1).setInputFiles("test-assets/test2.jpg");
   await videoInputs.nth(1).setInputFiles("test-assets/fixtures/h264-aac.mp4");
-  await page.getByRole("button", { name: "Оживить фото" }).click();
+  await page.getByRole("button", { name: "Подготовить и опубликовать" }).click();
 
   await expect(page.getByRole("heading", { name: "Всё готово" })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("2 AR-фото привязаны к одному QR-коду.")).toBeVisible();
@@ -95,15 +105,13 @@ test("opens the production QR camera from the protected workspace", async ({ pag
     });
   });
   await page.goto("./camera");
-  await expect(page).toHaveURL(/\/ar\.photo\/login$/);
-  await signInToDemo(page);
-  await page.goto("./camera");
+  await expect(page).toHaveURL(/\/ar\.photo\/camera$/);
 
-  await expect(page.getByRole("heading", { name: "Сканируйте QR-код" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Оживите печатную фотографию" })).toBeVisible();
   expect(
     await page.evaluate(() => (window as typeof window & { __entryCameraRequests: number }).__entryCameraRequests),
   ).toBe(0);
-  await page.getByRole("button", { name: "Включить камеру" }).click();
+  await page.getByRole("button", { name: "Разрешить камеру" }).click();
   await expect(page.getByRole("heading", { name: "Камера не запустилась" })).toBeVisible();
   expect(
     await page.evaluate(() => (window as typeof window & { __entryCameraRequests: number }).__entryCameraRequests),
@@ -118,7 +126,7 @@ test("keeps the dashboard and project catalog compact on a narrow phone", async 
   const mobileNav = page.getByRole("navigation", { name: "Мобильная навигация" });
   await expect(mobileNav).toBeVisible();
   const [heroBox, recentHeadingBox, navBox] = await Promise.all([
-    page.locator(".dashboard-hero").boundingBox(),
+    page.locator(".dashboard-summary").boundingBox(),
     page.getByRole("heading", { name: "Недавние проекты" }).boundingBox(),
     mobileNav.boundingBox(),
   ]);
@@ -140,7 +148,7 @@ test("keeps the dashboard and project catalog compact on a narrow phone", async 
   expect(toolbarBox!.height).toBeLessThanOrEqual(130);
   await expect(page.getByRole("button", { name: "Черновики", exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "Создать", exact: true }).click();
+  await page.getByRole("button", { name: "Создать проект", exact: true }).first().click();
   const projectDialog = page.getByRole("dialog", { name: "Новый проект" });
   await projectDialog.getByPlaceholder("Например, Выпускной 2027").fill("Компактный черновик");
   await projectDialog.getByRole("button", { name: "Создать проект" }).click();
@@ -150,8 +158,8 @@ test("keeps the dashboard and project catalog compact on a narrow phone", async 
     page.locator(".projects-grid").evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ")),
   ]);
   expect(firstProjectCardBox).not.toBeNull();
-  expect(Math.abs(firstProjectCardBox!.width - firstProjectCardBox!.height)).toBeLessThanOrEqual(2);
-  expect(projectGridColumns).toHaveLength(2);
+  expect(firstProjectCardBox!.height).toBeLessThan(firstProjectCardBox!.width);
+  expect(projectGridColumns).toHaveLength(1);
 
   const projectCard = page.locator(".project-card").filter({ hasText: "Компактный черновик" });
   await projectCard.locator('summary[aria-label="Действия проекта «Компактный черновик»"]').click();
@@ -171,11 +179,11 @@ test("protects the workspace and clears the demo session on logout", async ({ pa
   await page.setViewportSize({ width: 390, height: 844 });
 
   await page.getByRole("navigation", { name: "Мобильная навигация" }).getByRole("link", { name: "Профиль" }).click();
-  await expect(page.getByRole("heading", { name: "Профиль", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Выйти" }).click();
+  await expect(page.getByRole("heading", { name: "Мой профиль", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Выйти из аккаунта" }).click();
 
   await expect(page).toHaveURL(/\/ar\.photo\/login$/);
-  await expect(page.getByRole("heading", { name: "Добро пожаловать" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Вход в кабинет" })).toBeVisible();
 });
 
 test("registers with email and password through the explicit signup route", async ({ page }) => {
@@ -193,12 +201,9 @@ test("registers with email and password through the explicit signup route", asyn
 
 test("redirects the legacy test viewer to the production QR camera", async ({ page }) => {
   await page.goto("./viewer/test");
-  await expect(page).toHaveURL(/\/ar\.photo\/login$/);
-  await signInToDemo(page);
-  await page.goto("./viewer/test");
 
   await expect(page).toHaveURL(/\/ar\.photo\/camera$/);
-  await expect(page.getByRole("heading", { name: "Сканируйте QR-код" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Оживите печатную фотографию" })).toBeVisible();
 });
 
 test("keeps the public AR viewer camera-explicit with a no-camera fallback", async ({ page }) => {
@@ -217,16 +222,16 @@ test("keeps the public AR viewer camera-explicit with a no-camera fallback", asy
   });
   await page.goto("./ar/demo");
 
-  await expect(page.getByRole("heading", { name: "Отсканируйте QR-код" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Включить камеру" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Демо AR Photo" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Открыть AR-камеру" })).toBeVisible();
   expect(
     await page.evaluate(() => (window as typeof window & { __arPhotoCameraRequests: number }).__arPhotoCameraRequests),
   ).toBe(0);
 
-  await page.getByRole("button", { name: "Включить камеру" }).click();
-  await expect(page.getByRole("heading", { name: "Не удалось открыть AR" })).toBeVisible();
+  await page.getByRole("button", { name: "Открыть AR-камеру" }).click();
+  await expect(page.getByText("Доступ к камере запрещён.", { exact: false })).toBeVisible();
 
-  await page.getByRole("button", { name: "Смотреть обычное видео" }).click();
+  await page.getByRole("button", { name: "Смотреть видео" }).click();
   await expect(page.getByTestId("public-ar-fallback-video")).toBeVisible();
   expect(
     await page.evaluate(() => (window as typeof window & { __arPhotoCameraRequests: number }).__arPhotoCameraRequests),
@@ -255,16 +260,15 @@ test("creates a production project and group without duplicate submissions", asy
   await expect(page.getByRole("link", { name: "Выпускной 2027 — Школа №25" })).toHaveCount(1);
   await expect(page.locator("article").filter({ hasText: "Выпускной 2027 — Школа №25" }).locator("img")).toHaveCount(1);
   await page.getByRole("link", { name: "Выпускной 2027 — Школа №25" }).click();
-  await expect(page).toHaveURL(/\/items\?projectId=/);
-  const createdProjectId = new URL(page.url()).searchParams.get("projectId");
+  await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+$/);
+  const createdProjectId = new URL(page.url()).pathname.split("/").pop();
   expect(createdProjectId).toBeTruthy();
   await page.goto(`./projects/${createdProjectId}`);
   await expect(page.getByRole("heading", { name: "Выпускной 2027 — Школа №25" })).toBeVisible();
 
   const projectUrl = page.url();
-  await page.getByRole("link", { name: "Открыть ar-работы проекта: 0" }).click();
-  await expect(page).toHaveURL(/\/items\?projectId=/);
-  await expect(page.getByRole("heading", { name: "Выпускной 2027 — Школа №25", exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "Работы", exact: true }).click();
+  await expect(page.getByText("В проекте пока нет AR-фото.", { exact: true })).toBeVisible();
   await page.goto(projectUrl);
 
   await page.getByRole("button", { name: "Добавить группу" }).first().click();
@@ -281,7 +285,8 @@ test("creates a production project and group without duplicate submissions", asy
   const secondGroupDialog = page.getByRole("dialog", { name: "Новая группа" });
   await secondGroupDialog.getByPlaceholder("Например, 11А класс").fill("Учителя");
   await secondGroupDialog.getByRole("button", { name: "Создать группу" }).click();
-  await page.getByRole("button", { name: "Поднять группу «Учителя»" }).click();
+  await page.getByLabel("Действия группы «Учителя»").click();
+  await page.getByRole("menuitem", { name: "Выше", exact: true }).click();
   await expect(page.locator('section[aria-label="Группы проекта"] h3')).toHaveText(["Учителя", "11А класс"]);
 
   await page.getByRole("button", { name: "Проекты", exact: true }).click();
@@ -291,8 +296,9 @@ test("creates a production project and group without duplicate submissions", asy
   await destinationDialog.getByRole("button", { name: "Создать проект" }).click();
   await page.goto(projectUrl);
 
-  const teachersCard = page.locator('section[aria-label="Группы проекта"] > div').filter({ hasText: "Учителя" });
-  await teachersCard.getByRole("button", { name: "Перенести" }).click();
+  const teachersCard = page.locator('section[aria-label="Группы проекта"] article').filter({ hasText: "Учителя" });
+  await teachersCard.getByLabel("Действия группы «Учителя»").click();
+  await teachersCard.getByRole("menuitem", { name: "Перенести" }).click();
   const moveDialog = page.getByRole("dialog", { name: "Перенести группу" });
   await moveDialog.getByLabel("Проект назначения").selectOption({ label: "Архив школы №25" });
   await moveDialog.getByRole("button", { name: "Перенести", exact: true }).click();
@@ -313,7 +319,7 @@ test("validates and uploads a marker through the resumable media queue", async (
   await projectDialog.getByPlaceholder("Например, Выпускной 2027").fill("Media upload project");
   await projectDialog.getByRole("button", { name: "Создать проект" }).click();
   await page.getByRole("link", { name: "Media upload project" }).click();
-  const mediaProjectId = new URL(page.url()).searchParams.get("projectId");
+  const mediaProjectId = new URL(page.url()).pathname.split("/").pop();
   expect(mediaProjectId).toBeTruthy();
   await page.goto(`./projects/${mediaProjectId}`);
   await page.getByRole("button", { name: "Добавить группу" }).first().click();
@@ -322,8 +328,9 @@ test("validates and uploads a marker through the resumable media queue", async (
   await groupDialog.getByRole("button", { name: "Создать группу" }).click();
   await page.goto("./media");
 
-  await expect(page.getByRole("heading", { name: "Медиа", exact: true })).toBeVisible();
-  await expect(page.getByText("Демо-режим", { exact: false })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Медиа и загрузки", exact: true })).toBeVisible();
+  await expect(page.getByText("Демо-режим: очередь работает локально.", { exact: false })).toBeVisible();
+  await page.getByText("Загрузить фото и видео", { exact: true }).click();
   const markerFixtures = await page.evaluate(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 640;
@@ -360,7 +367,7 @@ test("validates and uploads a marker through the resumable media queue", async (
   await page.getByRole("button", { name: "Загрузить готовые · 3" }).click();
   await expect(page.getByText("загружено", { exact: false })).toHaveCount(3);
   await expect(page.getByText("Файл загружен", { exact: true })).toBeVisible();
-  await expect(page.getByText("v1", { exact: false }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Просмотр marker-stage-4/ })).toHaveCount(3);
 
   await fileInput.setInputFiles("test-assets/fixtures/h264-aac.mp4");
   const h264Queue = page.getByRole("article").filter({ hasText: "h264-aac.mp4" });
@@ -381,8 +388,8 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   await projectDialog.getByPlaceholder("Например, Выпускной 2027").fill("AR workflow project");
   await projectDialog.getByRole("button", { name: "Создать проект" }).click();
   await page.getByRole("link", { name: "AR workflow project" }).click();
-  await expect(page).toHaveURL(/\/items\?projectId=/);
-  const projectId = new URL(page.url()).searchParams.get("projectId");
+  await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+$/);
+  const projectId = new URL(page.url()).pathname.split("/").pop();
   expect(projectId).toBeTruthy();
   await page.goto(`./projects/${projectId}`);
   await page.getByRole("button", { name: "Добавить группу" }).first().click();
@@ -391,7 +398,8 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   await groupDialog.getByRole("button", { name: "Создать группу" }).click();
 
   await page.goto("./items");
-  await page.getByRole("link", { name: "Новая AR-работа" }).click();
+  await page.getByRole("link", { name: "Добавить фото", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Новое AR-фото", exact: true })).toBeVisible();
   await page.getByRole("combobox", { name: "Проект", exact: true }).selectOption({ label: "AR workflow project" });
   await page.getByRole("combobox", { name: "Группа", exact: true }).selectOption({ label: "AR workflow group" });
   await page.getByRole("button", { name: "Продолжить" }).click();
@@ -400,6 +408,8 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   await page.getByPlaceholder("Что происходит в видео и для кого эта работа").fill("Проверка полного workflow");
   await page.getByRole("button", { name: "Продолжить" }).click();
 
+  await expect(page.getByRole("heading", { name: "Редактирование AR-фото", exact: true })).toBeVisible();
+  await expect(page.getByRole("definition").filter({ hasText: "AR workflow group" })).toBeVisible();
   const markerBase64 = await page.evaluate(() => {
     const canvas = document.createElement("canvas");
     canvas.width = 640;
@@ -423,10 +433,10 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   await expect(page.getByText("Маркер загружен", { exact: true })).toBeVisible();
   await workflowFileInputs.nth(1).setInputFiles("test-assets/fixtures/h264-aac.mp4");
   await expect(page.getByText("Видео загружено", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Обработать и продолжить" }).click();
+  await page.getByRole("button", { name: "Сохранить изменения", exact: true }).click();
 
   // Processing completion now publishes and opens the QR without another click.
-  await expect(page.getByRole("heading", { name: "Портрет Алексея", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "QR и публикация", level: 1 })).toBeVisible();
   await expect(page.getByTestId("qr-preview")).toBeVisible();
 
   const initialPublicUrl = await page.getByTestId("public-qr-url").textContent();
@@ -436,9 +446,11 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   await expect(page.getByRole("button", { name: "Открыть AR" })).toBeVisible();
 
   const qrPageUrl = page.url();
-  await page.getByRole("link", { name: "AR-работы" }).click();
-  await expect(page.getByRole("heading", { name: "AR workflow project", exact: true })).toBeVisible();
-  await expect(page.getByText("AR workflow group · 1 AR-работ", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Назад", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "AR-работы", exact: true })).toBeVisible();
+  await expect(page.getByText("AR workflow group", { exact: true })).toBeVisible();
+  await page.getByPlaceholder("Найти AR-работу").fill("Портрет");
+  await expect(page).toHaveURL(/q=/);
   const compactWork = page.getByRole("link", { name: "Открыть AR-работу «Портрет Алексея»" });
   await expect(compactWork).toBeVisible();
   await expect(compactWork.getByText("Портрет Алексея", { exact: true })).toBeVisible();
@@ -451,8 +463,8 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
     page.locator(".ar-items-grid").evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ")),
   ]);
   expect(firstCardBox).not.toBeNull();
-  expect(Math.abs(firstCardBox!.width - firstCardBox!.height)).toBeLessThanOrEqual(2);
-  expect(workGridColumns).toHaveLength(2);
+  expect(firstCardBox!.height).toBeLessThan(firstCardBox!.width);
+  expect(workGridColumns).toHaveLength(1);
   await page.evaluate(() => {
     const style = document.createElement("style");
     style.textContent = ".ar-items-grid { padding-top: 720px; }";
@@ -462,8 +474,8 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   const savedListScrollY = await page.evaluate(() => window.scrollY);
   expect(savedListScrollY).toBeGreaterThan(0);
   await compactWork.click();
-  await expect(page.getByRole("heading", { name: "Фото", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Видео", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Фото ·/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Видео ·/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "QR-код", exact: true })).toBeVisible();
   await expect(page.getByRole("timer")).toContainText("Готово за");
   await expect(page.getByLabel("Видео AR-работы")).toBeVisible();
@@ -481,9 +493,9 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   expect(photoPreviewBox).not.toBeNull();
   expect(videoPreviewBox).not.toBeNull();
   expect(qrSummaryBox).not.toBeNull();
-  expect(Math.abs(photoSectionBox!.y - videoSectionBox!.y)).toBeLessThanOrEqual(2);
-  expect(Math.abs(photoPreviewBox!.width - photoPreviewBox!.height)).toBeLessThanOrEqual(2);
-  expect(Math.abs(videoPreviewBox!.width - videoPreviewBox!.height)).toBeLessThanOrEqual(2);
+  expect(videoSectionBox!.y).toBeGreaterThanOrEqual(photoSectionBox!.y + photoSectionBox!.height);
+  expect(photoPreviewBox!.width).toBeLessThanOrEqual(photoSectionBox!.width);
+  expect(videoPreviewBox!.width).toBeLessThanOrEqual(videoSectionBox!.width);
   expect(qrSummaryBox!.y).toBeGreaterThan(photoSectionBox!.y + photoSectionBox!.height);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const detailScroll = await page.evaluate(() => window.scrollY);
@@ -510,7 +522,8 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   await expect(videoViewer).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Открыть видео", exact: true })).toBeFocused();
   await page.getByRole("button", { name: "Вернуться к AR-работам" }).click();
-  await expect(page.getByRole("heading", { name: "AR workflow project", exact: true })).toBeVisible();
+  await expect(page.getByPlaceholder("Найти AR-работу")).toHaveValue("Портрет");
+  await expect(page.getByRole("heading", { name: "AR-работы", exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThanOrEqual(savedListScrollY - 1);
   await page.goto(qrPageUrl);
 
@@ -525,10 +538,18 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   ]);
   expect(openArBox).not.toBeNull();
   expect(mobileNavBox).not.toBeNull();
-  expect(openArBox!.y + openArBox!.height).toBeLessThanOrEqual(mobileNavBox!.y);
+  // The mobile reference stacks the QR and link panels. Keep the action reachable
+  // above the fixed navigation after scrolling on a short phone.
+  await page
+    .getByRole("button", { name: "Открыть AR", exact: true })
+    .evaluate((element) => element.scrollIntoView({ block: "center" }));
+  await page.getByRole("button", { name: "Открыть AR", exact: true }).click({ trial: true });
+  const visibleOpenAr = await page.getByRole("button", { name: "Открыть AR", exact: true }).boundingBox();
+  expect(visibleOpenAr!.y + visibleOpenAr!.height).toBeLessThanOrEqual(mobileNavBox!.y);
 
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.getByText("Дополнительно", { exact: true }).click();
+  const printing = page.locator("details.qr-extra-card");
+  if ((await printing.getAttribute("open")) === null) await printing.locator("summary").first().click();
 
   await page.getByRole("button", { name: "AR Photo", exact: true }).click();
   await expect(page.getByText("Стиль QR сохранён", { exact: true })).toBeVisible();
@@ -536,6 +557,7 @@ test("publishes the completed AR workflow and rotates a printable QR", async ({ 
   await page.getByRole("button", { name: "SVG" }).click();
   await expect((await svgDownloadPromise).suggestedFilename()).toMatch(/Портрет-Алексея-qr-v2\.svg$/);
 
+  await page.getByText("Управление публикацией", { exact: true }).click();
   await page.getByRole("button", { name: "Обновить публичную ссылку" }).click();
   const rotateDialog = page.getByRole("dialog", { name: "Отозвать старую ссылку?" });
   await expect(rotateDialog.getByRole("button", { name: "Обновить ссылку" })).toBeDisabled();
@@ -559,18 +581,18 @@ test("shows subscription usage and manages team permissions within the tariff", 
   await page.goto("./settings/subscription");
   await signInToDemo(page);
 
-  await expect(page.getByRole("heading", { name: "Тариф и лимиты" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Мой пакет", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Студия" })).toBeVisible();
   await expect(page.getByRole("progressbar", { name: /Хранилище/ })).toBeVisible();
-  await expect(page.getByText("Продление без фиктивной оплаты", { exact: true })).toBeVisible();
+  await expect(page.getByText("Добавления фото расходуются", { exact: false })).toBeVisible();
 
   const settingsNavigation = page.getByRole("navigation", { name: "Разделы настроек" });
   await settingsNavigation.getByRole("link", { name: "Команда" }).click();
-  await expect(page.getByRole("heading", { name: "Команда", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Моя команда", exact: true })).toBeVisible();
   await expect(page.getByText("Алина Магомедова", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "Пригласить сотрудника" }).click();
-  const inviteDialog = page.getByRole("dialog", { name: "Пригласить сотрудника" });
+  await page.getByRole("button", { name: "Пригласить участника" }).click();
+  const inviteDialog = page.getByRole("dialog", { name: "Пригласить участника" });
   await inviteDialog.getByPlaceholder("employee@example.com").fill("designer@example.com");
   await inviteDialog.getByLabel("Роль").selectOption("viewer");
   await inviteDialog.getByText("Статистика", { exact: true }).click();
@@ -605,17 +627,16 @@ test("shows account, subscription and support inside the mobile profile", async 
   await page.goto("./profile");
   await signInToDemo(page);
 
-  await expect(page.getByRole("heading", { name: "Профиль", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Студия", exact: true })).toBeVisible();
-  await expect(page.getByText(/Действует до|Без даты окончания/)).toBeVisible();
-  await expect(page.getByRole("link", { name: "Поддержка" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Выйти" })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Мобильная навигация" }).getByText("Профиль")).toBeVisible();
-
-  await page.getByRole("button", { name: "Изменить имя" }).click();
-  await page.getByLabel("Отображаемое имя").fill("Алина Магомедова");
-  await page.getByRole("button", { name: "Сохранить имя" }).click();
-  await expect(page.getByRole("heading", { name: "Алина Магомедова" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Мой профиль", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Название аккаунта", { exact: true })).toHaveValue("Vakha Studio");
+  await expect(page.getByRole("link", { name: "Мой пакет", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Поддержка", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Выйти из аккаунта", exact: true })).toBeVisible();
+  await page.getByLabel("Имя и фамилия", { exact: true }).fill("Алина Магомедова");
+  await page.getByRole("button", { name: "Сохранить", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Профиль сохранён" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Имя и фамилия", { exact: true })).toHaveValue("Алина Магомедова");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
@@ -623,7 +644,7 @@ test("filters privacy-safe analytics across every scope and date mode", async ({
   await page.goto("./analytics");
   await signInToDemo(page);
 
-  await expect(page.getByRole("heading", { name: "Аналитика", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Статистика моих работ", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Ключевые показатели" })).toBeVisible();
   await expect(page.getByTestId("analytics-chart")).toBeVisible();
   await expect(page.getByText("Приватность по умолчанию", { exact: true })).toBeVisible();
@@ -647,82 +668,91 @@ test("filters privacy-safe analytics across every scope and date mode", async ({
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("runs MFA-gated admin support and dangerous operations with reason capture", async ({ page }) => {
+test("runs MFA-gated account editing and audited admin operations", async ({ page }) => {
   await page.goto("./admin");
   await signInToDemo(page);
-
-  await expect(page.getByRole("heading", { name: "Супер-админ", exact: true })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Сводка супер-админа" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Обзор платформы", exact: true })).toBeVisible();
   await expect(page.getByText("MFA подтверждена", { exact: false }).first()).toBeVisible();
-  const adminNavigation = page.getByRole("navigation", { name: "Разделы admin-панели" });
-  await expect(adminNavigation.getByRole("button")).toHaveCount(10);
-
-  await adminNavigation.getByRole("button", { name: "Аккаунты" }).click();
-  const alphaAccount = page.getByRole("article").filter({ hasText: "Alpha Studio" });
-  await alphaAccount.getByRole("button", { name: "Открыть аккаунт" }).click();
-  await expect(page.getByRole("dialog", { name: "Support access: Alpha Studio" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Пользователи · Alpha Studio" })).toBeVisible();
-  await expect(page.getByText("Иван Иванов", { exact: true })).toBeVisible();
+  const nav = page.getByRole("navigation", { name: "Разделы администрации", exact: true });
+  await expect(nav.getByRole("link")).toHaveCount(12);
+  await nav.getByRole("link", { name: "Аккаунты", exact: true }).click();
+  const alpha = page.getByRole("row").filter({ hasText: "Alpha Studio" });
+  await alpha.getByRole("button", { name: "Открыть аккаунт" }).click();
+  await expect(page.getByRole("heading", { name: "Alpha Studio", exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Изменить", exact: true }).click();
+  await page.getByLabel("Название аккаунта", { exact: false }).fill("Alpha Studio QA");
+  await page.getByRole("button", { name: "Сохранить изменения", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Alpha Studio QA", exact: false })).toBeVisible();
+  await nav.getByRole("link", { name: "Пользователи", exact: true }).click();
+  await expect(page.getByText("Иван Иванов", { exact: true }).first()).toBeVisible();
   await expect(page.locator("body")).not.toContainText("encrypted_password");
 
-  await page.getByRole("button", { name: "Сбросить пароль" }).first().click();
-  const resetDialog = page.getByRole("dialog", { name: /Отправить сброс/ });
-  await resetDialog.getByLabel("Комментарий (необязательно)").fill("Подтверждённый запрос клиента SUPPORT-1042");
-  await resetDialog.getByLabel("Введите СБРОС").fill("СБРОС");
-  await resetDialog.getByRole("button", { name: "Подтвердить" }).click();
+  async function openUser(name: string) {
+    await page.getByRole("row").filter({ hasText: name }).getByRole("button", { name: "Открыть", exact: true }).click();
+    return page.getByRole("dialog", { name: "Карточка пользователя" });
+  }
+  const owner = await openUser("Иван Иванов");
+  await owner.getByRole("button", { name: "Сбросить пароль" }).click();
+  const reset = page.getByRole("dialog", { name: /Отправить сброс/ });
+  await expect(reset.getByLabel("Введите СБРОС")).toHaveCount(0);
+  await reset.getByRole("button", { name: "Подтвердить", exact: true }).click();
   await expect(page.getByText("Операция выполнена", { exact: true })).toBeVisible();
 
-  const editor = page.getByRole("article").filter({ hasText: "Алина Магомедова" });
-  await editor.getByRole("button", { name: "Заблокировать" }).click();
-  const blockDialog = page.getByRole("dialog", { name: "Заблокировать Алина Магомедова?" });
-  await blockDialog.getByLabel("Комментарий (необязательно)").fill("Временная блокировка по обращению SECURITY-205");
-  await blockDialog.getByLabel("Введите ЗАБЛОКИРОВАТЬ").fill("ЗАБЛОКИРОВАТЬ");
-  await blockDialog.getByRole("button", { name: "Подтвердить" }).click();
-  await expect(editor.getByText("Заблокирован", { exact: true })).toBeVisible();
+  for (const action of ["Заблокировать", "Разблокировать"]) {
+    const editor = await openUser("Алина Магомедова");
+    await editor.getByRole("button", { name: action, exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: `${action} Алина Магомедова?` });
+    await expect(dialog.getByLabel(`Введите ${action.toUpperCase()}`)).toHaveCount(0);
+    await dialog.getByRole("button", { name: "Подтвердить", exact: true }).click();
+    await expect(page.getByRole("row").filter({ hasText: "Алина Магомедова" })).toContainText(
+      action === "Заблокировать" ? "Приостановлен" : "Активен",
+    );
+  }
+  const editor = await openUser("Алина Магомедова");
+  await editor.getByRole("button", { name: "Удалить", exact: true }).click();
+  const deletion = page.getByRole("dialog", { name: "Безвозвратно удалить Алина Магомедова?" });
+  await deletion.getByLabel("Введите УДАЛИТЬ").fill("УДАЛИТЬ");
+  await deletion.getByRole("button", { name: "Подтвердить", exact: true }).click();
+  await expect(page.getByRole("row").filter({ hasText: "Алина Магомедова" })).toHaveCount(0);
 
-  await editor.getByRole("button", { name: "Разблокировать" }).click();
-  const unblockDialog = page.getByRole("dialog", { name: "Разблокировать Алина Магомедова?" });
-  await unblockDialog.getByLabel("Комментарий (необязательно)").fill("Проверка завершена по обращению SECURITY-205");
-  await unblockDialog.getByLabel("Введите РАЗБЛОКИРОВАТЬ").fill("РАЗБЛОКИРОВАТЬ");
-  await unblockDialog.getByRole("button", { name: "Подтвердить" }).click();
-  await expect(editor.getByText("Активен", { exact: true })).toBeVisible();
-
-  await editor.getByRole("button", { name: "Удалить" }).click();
-  const deleteDialog = page.getByRole("dialog", { name: "Безвозвратно удалить Алина Магомедова?" });
-  await deleteDialog
-    .getByLabel("Комментарий (необязательно)")
-    .fill("Удаление по подтверждённому запросу владельца OWNER-812");
-  await deleteDialog.getByLabel("Введите УДАЛИТЬ").fill("УДАЛИТЬ");
-  await deleteDialog.getByRole("button", { name: "Подтвердить" }).click();
-  await expect(page.getByText("Алина Магомедова", { exact: true })).toHaveCount(0);
-
-  await adminNavigation.getByRole("button", { name: "Проекты и AR" }).click();
+  await nav.getByRole("link", { name: "Контент", exact: true }).click();
   await page.getByLabel("Поиск проектов и AR-работ").fill("Выпускной");
-  await page.getByRole("button", { name: "Найти" }).click();
-  const publishedItem = page.getByRole("article").filter({ hasText: "Алексей Иванов" });
-  await publishedItem.getByRole("button", { name: "Приостановить" }).click();
-  const itemDialog = page.getByRole("dialog", { name: "Приостановить Алексей Иванов?" });
-  await itemDialog.getByLabel("Комментарий (необязательно)").fill("Обращение правообладателя CONTENT-44");
-  await itemDialog.getByLabel("Введите ПРИОСТАНОВИТЬ").fill("ПРИОСТАНОВИТЬ");
-  await itemDialog.getByRole("button", { name: "Подтвердить" }).click();
-  await expect(publishedItem.getByText("suspended", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Найти", exact: true }).click();
+  const work = page.getByRole("row").filter({ hasText: "Алексей Иванов" });
+  await work.getByRole("button", { name: "Открыть", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Алексей Иванов" })
+    .getByRole("button", { name: "Приостановить", exact: true })
+    .click();
+  const suspension = page.getByRole("dialog", { name: "Приостановить Алексей Иванов?" });
+  await suspension.getByRole("button", { name: "Подтвердить", exact: true }).click();
+  await expect(work).toContainText("Приостановлен");
 
-  await adminNavigation.getByRole("button", { name: "Ошибки" }).click();
-  await page.getByRole("button", { name: "Повторить задачу" }).first().click();
-  const retryDialog = page.getByRole("dialog", { name: /Повторить processing/ });
-  await retryDialog.getByLabel("Комментарий (необязательно)").fill("Повтор после диагностики безопасной ошибки");
-  await retryDialog.getByLabel("Введите ПОВТОРИТЬ").fill("ПОВТОРИТЬ");
-  await retryDialog.getByRole("button", { name: "Подтвердить" }).click();
-  await expect(page.getByRole("button", { name: "Повторить задачу" })).toHaveCount(1);
-
-  await adminNavigation.getByRole("button", { name: "История действий" }).click();
-  await expect(page.getByText("admin.processing.retry", { exact: true })).toBeVisible();
-  await expect(page.getByText("admin.password_reset.request", { exact: true })).toBeVisible();
-  await expect(page.getByText("admin.user.suspend", { exact: true })).toBeVisible();
-  await expect(page.getByText("admin.user.activate", { exact: true })).toBeVisible();
-  await expect(page.getByText("admin.user.delete.authorized", { exact: true })).toBeVisible();
-
-  await page.setViewportSize({ width: 390, height: 844 });
+  await nav.getByRole("link", { name: "Обработка", exact: true }).click();
+  const job = page.locator(".admin-job").first();
+  await job.locator("summary").click();
+  await job.getByRole("button", { name: "Повторить задачу" }).click();
+  await page
+    .getByRole("dialog", { name: /Повторить обработку/ })
+    .getByRole("button", { name: "Подтвердить", exact: true })
+    .click();
+  await expect(page.locator(".admin-job")).toHaveCount(1);
+  await nav.getByRole("link", { name: "Журнал", exact: true }).click();
+  for (const event of [
+    "admin.processing.retry",
+    "admin.password_reset.request",
+    "admin.user.suspend",
+    "admin.user.activate",
+    "admin.user.delete.authorized",
+  ]) {
+    await expect(page.getByText(event, { exact: true }).first()).toBeVisible();
+  }
+  await page.setViewportSize({ width: 319, height: 628 });
+  await page.getByRole("button", { name: "Разделы", exact: true }).click();
+  const menu = page.getByRole("dialog", { name: "Разделы администрации" });
+  await menu.getByRole("link", { name: "Аккаунты", exact: true }).click();
+  await expect(menu).not.toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Мобильная навигация администрации" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
@@ -768,8 +798,8 @@ test("keeps PWA caching static-only and restores the last visited shell offline"
 test("edits photo credit packages and grants an addon from the admin panel", async ({ page }) => {
   await page.goto("./admin");
   await signInToDemo(page);
-  const nav = page.getByRole("navigation", { name: "Разделы admin-панели" });
-  await nav.getByRole("button", { name: "Тарифы", exact: true }).click();
+  const nav = page.getByRole("navigation", { name: "Разделы администрации", exact: true });
+  await nav.getByRole("link", { name: "Тарифы", exact: true }).click();
   await page.getByRole("button", { name: "Новый тариф", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "Новый тариф или пакет" });
   await editor.getByRole("combobox", { name: "Тип", exact: true }).selectOption("addon");
@@ -780,28 +810,34 @@ test("edits photo credit packages and grants an addon from the admin panel", asy
   await editor.getByLabel("Добавления AR-фото", { exact: true }).fill("50");
   await editor.getByRole("button", { name: "Сохранить тариф" }).click();
   await expect(editor).toHaveCount(0);
+  await page.getByRole("button", { name: "Дополнения", exact: true }).click();
   const card = page
-    .getByRole("article")
+    .locator(".admin-plan-card")
     .filter({ has: page.getByRole("heading", { name: "Ещё 50 фото", exact: true }) });
-  await expect(card).toContainText("50 добавлений фото · 0 дней · 490 ₽");
+  await expect(card).toContainText("50");
+  await expect(card).toContainText("490");
   await card.getByRole("button", { name: "Редактировать" }).click();
   const edit = page.getByRole("dialog", { name: "Редактировать тариф" });
   await expect(edit.getByLabel("Добавления AR-фото", { exact: true })).toHaveValue("50");
   await edit.getByLabel("Добавления AR-фото", { exact: true }).fill("75");
   await edit.getByRole("button", { name: "Сохранить тариф" }).click();
-  await expect(card).toContainText("75 добавлений фото");
-  await nav.getByRole("button", { name: "Аккаунты", exact: true }).click();
+  await expect(card).toContainText("75");
+  await nav.getByRole("link", { name: "Аккаунты", exact: true }).click();
   await page
-    .getByRole("article")
+    .getByRole("row")
     .filter({ hasText: "Alpha Studio" })
     .getByRole("button", { name: "Открыть аккаунт" })
     .click();
-  await expect(page.getByRole("heading", { name: "Пользователи · Alpha Studio" })).toBeVisible();
-  await nav.getByRole("button", { name: "Подписки", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Alpha Studio", exact: false })).toBeVisible();
+  await nav.getByRole("link", { name: "Подписки", exact: true }).click();
   await page
     .getByRole("combobox", { name: "Тариф или пакет", exact: true })
     .selectOption({ label: "Ещё 50 фото · 75 добавлений фото · 0 дней · 490 ₽" });
-  await page.getByRole("button", { name: "Подтвердить и начислить пакет" }).click();
+  await page.getByRole("button", { name: "Проверить начисление" }).click();
+  await page
+    .getByRole("dialog", { name: "Подтвердите назначение пакета" })
+    .getByRole("button", { name: "Подтвердить и начислить пакет" })
+    .click();
   await expect(page.getByRole("status").filter({ hasText: "Пакет начислен" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
@@ -809,9 +845,10 @@ test("edits photo credit packages and grants an addon from the admin panel", asy
 test("deletes an account with one confirmation and no typed service fields", async ({ page }) => {
   await page.goto("./admin");
   await signInToDemo(page);
-  const nav = page.getByRole("navigation", { name: "Разделы admin-панели" });
-  await nav.getByRole("button", { name: "Аккаунты", exact: true }).click();
-  const account = page.getByRole("article").filter({ hasText: "Beta Studio" });
+  const nav = page.getByRole("navigation", { name: "Разделы администрации", exact: true });
+  await nav.getByRole("link", { name: "Аккаунты", exact: true }).click();
+  const account = page.getByRole("row").filter({ hasText: "Beta Studio" });
+  await account.getByLabel("Другие действия: Beta Studio").click();
   await account.getByRole("button", { name: "Удалить аккаунт", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Удалить аккаунт Beta Studio?" });
   await expect(dialog.getByRole("textbox")).toHaveCount(0);

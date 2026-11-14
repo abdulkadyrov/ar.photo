@@ -1,7 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import "./PublicArViewerPage.css";
-import { AlertTriangle, Camera, Check, Download, LoaderCircle, Play, ScanLine, ShieldCheck } from "lucide-react";
-import { useParams } from "react-router-dom";
+import {
+  AlertTriangle,
+  Camera,
+  Download,
+  Expand,
+  LoaderCircle,
+  Pause,
+  Play,
+  ScanLine,
+  ShieldCheck,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
+import { Link, useParams } from "react-router-dom";
 import { Button } from "../../shared/ui";
 import { saveArRecording, type ArRecording } from "./arRecording";
 import {
@@ -34,10 +46,12 @@ type ViewerMode =
 export function PublicArViewerRoute() {
   const { publicSlug = "" } = useParams<{ publicSlug: string }>();
   const [manifest, setManifest] = useState<PublicArManifest | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const [cachedProject, setCachedProject] = useState<CachedPublicArProject | null>(null);
   const [mode, setMode] = useState<ViewerMode>("loading");
   const [message, setMessage] = useState("");
   const [muted, setMuted] = useState(true);
+  const [paused, setPaused] = useState(false);
   const [cacheStep, setCacheStep] = useState<1 | 2 | 3 | 4>(1);
   const [recording, setRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -66,6 +80,7 @@ export function PublicArViewerRoute() {
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
       setManifest(null);
+      setNotFound(false);
       setCachedProject(null);
       setMode("loading");
       refreshManifest(controller.signal)
@@ -80,6 +95,7 @@ export function PublicArViewerRoute() {
         .catch((error) => {
           if (controller.signal.aborted) return;
           setMode("error");
+          setNotFound(error instanceof PublicManifestError && error.code === "not_found");
           setMessage(publicManifestMessage(error));
         });
     });
@@ -266,7 +282,22 @@ export function PublicArViewerRoute() {
     }
   };
 
-  if (mode === "loading") return <ViewerNotice title="Открываем AR Photo" text="Подготавливаем проект…" />;
+  if (mode === "loading") return <ViewerNotice title="Открываем KHANZAMA" text="Подготавливаем проект…" />;
+  if (!manifest && notFound)
+    return (
+      <PublicInfo
+        title="Страница не найдена"
+        description="Возможно, ссылка изменилась, работа была удалена или введён неверный адрес."
+      >
+        <div className="py-6 text-center">
+          <strong className="text-6xl font-semibold text-primary">404</strong>
+          <p className="my-5 text-sm text-muted">Проверьте ссылку или отсканируйте QR-код ещё раз.</p>
+          <Link className="btn btn-primary" to="/camera">
+            <ScanLine size={18} /> Открыть другой QR
+          </Link>
+        </div>
+      </PublicInfo>
+    );
   if (!manifest) return <ViewerNotice title="AR-фотография недоступна" text={message} error />;
 
   const active = mode === "starting" || mode === "searching" || mode === "tracking";
@@ -339,6 +370,45 @@ export function PublicArViewerRoute() {
               </button>
             </div>
           ) : null}
+          <div className="ar-viewer-controls" aria-label="Управление AR-видео">
+            <button
+              type="button"
+              aria-pressed={!muted}
+              onClick={() => {
+                sessionRef.current?.setMuted(!muted);
+                setMuted(!muted);
+              }}
+            >
+              {muted ? <VolumeX size={18} /> : <Volume2 size={18} />} Звук
+            </button>
+            <button
+              type="button"
+              disabled={mode !== "tracking"}
+              onClick={() => {
+                void sessionRef.current
+                  ?.togglePlayback()
+                  .then((playing) => setPaused(!playing))
+                  .catch(() => setRecordingNotice("Не удалось изменить воспроизведение"));
+              }}
+            >
+              {paused ? <Play size={18} /> : <Pause size={18} />} {paused ? "Продолжить" : "Пауза"}
+            </button>
+            {typeof document.documentElement.requestFullscreen === "function" ? (
+              <button
+                type="button"
+                aria-label="Полный экран"
+                onClick={() => {
+                  void (
+                    document.fullscreenElement
+                      ? document.exitFullscreen()
+                      : document.documentElement.requestFullscreen()
+                  ).catch(() => setRecordingNotice("Полный экран недоступен в этом браузере"));
+                }}
+              >
+                <Expand size={18} />
+              </button>
+            ) : null}
+          </div>
           {recordingNotice ? (
             <div className="ar-record-notice" role="status">
               <span>{recordingNotice}</span>
@@ -401,31 +471,57 @@ function ViewerIntro({
   onFallback?: () => void;
 }) {
   return (
-    <section className="ar-intro">
-      <img src={manifest.assets.posterUrl} alt="" />
-      <div className="ar-intro-shade" />
-      <div className="ar-intro-card">
-        <span className="ar-intro-icon">{cached ? <Check size={22} /> : <ScanLine size={22} />}</span>
-        <span className="ar-intro-label">AR Photo</span>
-        <h1>{error ? "Не удалось открыть AR" : cached ? "Проект сохранён" : "Отсканируйте QR-код"}</h1>
-        <p>
-          {error
-            ? error
-            : cached
-              ? "Можно сразу навести камеру на фотографию."
-              : "Включите камеру и наведите её на QR-код ещё раз — дальше он не понадобится."}
-        </p>
-        <Button type="button" onClick={onStart} icon={<Camera size={18} />} full>
-          {error ? "Повторить" : cached ? "Открыть AR" : "Включить камеру"}
-        </Button>
-        {error && onFallback ? (
-          <button className="ar-intro-fallback" type="button" onClick={onFallback}>
-            <Play size={17} /> Смотреть обычное видео
-          </button>
-        ) : null}
-        <span className="ar-intro-privacy">
-          <ShieldCheck size={15} /> Камера обрабатывается только на устройстве
-        </span>
+    <section className="ar-public-intro">
+      <header>
+        <strong>KHANZAMA</strong>
+        <span>AR-живые фото</span>
+        <small>Просмотр без регистрации</small>
+      </header>
+      <div className="ar-public-content">
+        <img src={manifest.assets.posterUrl} alt={manifest.title} />
+        <div>
+          <span className="ar-public-tag">AR-живое фото</span>
+          <h1>{manifest.title}</h1>
+          <p>
+            {error ||
+              "Оживите напечатанное фото: откройте камеру и наведите её на фотографию, чтобы увидеть видео в дополненной реальности."}
+          </p>
+          <div className="ar-public-buttons">
+            <Button type="button" onClick={onStart} icon={<Camera size={18} />} full>
+              {error ? "Повторить" : "Открыть AR-камеру"}
+            </Button>
+            {onFallback ? (
+              <Button variant="quiet" type="button" onClick={onFallback} full>
+                <Play size={17} /> Смотреть видео
+              </Button>
+            ) : null}
+          </div>
+          <p className="ar-public-note">
+            <ShieldCheck size={22} /> Установка приложения не нужна. Камера обрабатывается на вашем устройстве.
+          </p>
+        </div>
+      </div>
+      <div className="ar-public-help">
+        <h2>Как это работает</h2>
+        <ol>
+          <li>
+            <strong>1 · Разрешите камеру</strong>
+            <span>Браузер запросит доступ — нажмите «Разрешить».</span>
+          </li>
+          <li>
+            <strong>2 · Наведите на фото</strong>
+            <span>
+              {cached
+                ? "Проект сохранён. Наведите камеру на напечатанное фото."
+                : "Сначала отсканируйте QR ещё раз, затем наведите камеру на фотографию."}
+            </span>
+          </li>
+          <li>
+            <strong>3 · Смотрите</strong>
+            <span>Фотография оживёт, и видео появится прямо на ней.</span>
+          </li>
+        </ol>
+        <p>QR-код открывает проект. Во время просмотра распознаётся само изображение фотографии.</p>
       </div>
     </section>
   );
@@ -444,34 +540,96 @@ function CornerGuide({ className, testId }: { className: string; testId?: string
 
 export function PublicArPrivacyRoute() {
   return (
-    <ViewerNotice
-      title="Камера и приватность"
-      text="AR Photo обрабатывает изображение камеры на устройстве для поиска маркера. Кадры не загружаются и не сохраняются без нажатия кнопки записи."
-    />
+    <PublicInfo
+      title="Камера и конфиденциальность"
+      description="Как KHANZAMA использует камеру при просмотре живых фото."
+    >
+      <InfoCard icon={<Camera size={25} />} title="Что использует камера">
+        Камера распознаёт изображение напечатанной фотографии и показывает связанное с ним видео. Разрешение
+        запрашивается только после нажатия кнопки открытия камеры.
+      </InfoCard>
+      <InfoCard icon={<ShieldCheck size={25} />} title="Обработка на устройстве">
+        Кадры камеры обрабатываются на вашем устройстве. Они не загружаются на сервер и не сохраняются без нажатия
+        кнопки записи AR-видео.
+      </InfoCard>
+      <InfoCard icon={<ScanLine size={25} />} title="Роль QR-кода">
+        QR-код открывает нужный проект. Во время AR-просмотра распознаётся сама фотография, без специальных меток на
+        изображении.
+      </InfoCard>
+      <Link className="btn btn-primary" to="/camera">
+        <Camera size={18} /> Открыть AR-камеру
+      </Link>
+    </PublicInfo>
   );
 }
 
 export function PublicArUnsupportedRoute() {
   return (
-    <ViewerNotice
-      title="AR не поддерживается"
-      text="Откройте QR-ссылку в актуальном Safari или Chrome либо используйте обычный просмотр видео."
-      error
-    />
+    <PublicInfo
+      title="Откройте в другом браузере"
+      description="В этом браузере невозможно запустить AR-камеру. Откройте ссылку на работу в актуальном Safari или Chrome."
+    >
+      <InfoCard icon={<Camera size={25} />} title="Доступ к камере">
+        Разрешите браузеру использовать камеру. Для распознавания понадобится напечатанная фотография.
+      </InfoCard>
+      <InfoCard icon={<Play size={25} />} title="Обычный просмотр видео">
+        На странице работы выберите «Смотреть видео», если автор разрешил этот вариант просмотра.
+      </InfoCard>
+      <InfoCard icon={<ShieldCheck size={25} />} title="Без регистрации">
+        Для просмотра опубликованной работы не нужны аккаунт, пароль или приложение.
+      </InfoCard>
+    </PublicInfo>
+  );
+}
+
+function PublicInfo({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+  return (
+    <main className="min-h-[100dvh] bg-surface px-4 py-5 text-ink">
+      <div className="mx-auto max-w-4xl">
+        <header className="flex flex-wrap items-center gap-3 border-b border-line pb-4">
+          <strong className="text-xl font-bold text-primary">KHANZAMA</strong>
+          <span className="text-sm text-muted">AR-живые фото</span>
+        </header>
+        <section className="mt-6 rounded-2xl border border-line bg-card p-5 sm:p-7">
+          <h1 className="text-2xl font-semibold sm:text-3xl">{title}</h1>
+          <p className="mb-5 mt-3 text-sm leading-6 text-muted">{description}</p>
+          <div className="grid gap-3">{children}</div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function InfoCard({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+  return (
+    <article className="flex items-start gap-4 rounded-xl border border-line p-4">
+      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">{icon}</span>
+      <div>
+        <h2 className="text-sm font-semibold">{title}</h2>
+        <p className="mt-1 text-sm leading-6 text-muted">{children}</p>
+      </div>
+    </article>
   );
 }
 
 function ViewerNotice({ title, text, error = false }: { title: string; text: string; error?: boolean }) {
   return (
-    <main className="grid min-h-[100dvh] place-items-center bg-black px-5 text-white">
-      <div className="w-full max-w-md rounded-[28px] border border-white/10 bg-white/[0.06] p-6 text-center">
+    <main className="grid min-h-[100dvh] place-items-center bg-surface px-5 text-ink">
+      <div className="w-full max-w-md rounded-2xl border border-line bg-card p-6 text-center">
+        <p className="mb-5 text-sm font-bold tracking-wide text-primary">KHANZAMA · AR-живые фото</p>
         <span
-          className={`mx-auto grid h-14 w-14 place-items-center rounded-2xl ${error ? "bg-amber-300/10 text-amber-200" : "bg-violet-400/10 text-violet-300"}`}
+          className={`mx-auto grid h-14 w-14 place-items-center rounded-2xl ${error ? "bg-amber-50 text-amber-800" : "bg-primary/10 text-primary"}`}
         >
-          {error ? <AlertTriangle /> : <LoaderCircle className="animate-spin" />}
+          {error ? (
+            <AlertTriangle />
+          ) : title.startsWith("Открываем") ? (
+            <LoaderCircle className="animate-spin" />
+          ) : (
+            <ShieldCheck />
+          )}
         </span>
         <h1 className="mt-5 text-2xl font-semibold">{title}</h1>
-        <p className="mt-3 text-sm leading-6 text-white/65">{text}</p>
+        <p className="mt-3 text-sm leading-6 text-muted">{text}</p>
       </div>
     </main>
   );

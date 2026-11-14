@@ -1,0 +1,217 @@
+.analytics-filters {
+  padding: 1rem;
+}
+.analytics-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+.analytics-metrics > .surface-card {
+  padding: 1rem;
+}
+.analytics-metrics .metric-icon {
+  background: transparent;
+  color: var(--primary-text);
+}
+.analytics-metrics strong {
+  font-size: 1.8rem;
+}
+.analytics-chart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.4fr);
+  gap: 1rem;
+}
+.analytics-chart {
+  overflow: hidden;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0.3rem;
+}
+.analytics-chart-grid .surface-card {
+  padding: 1rem;
+}
+.analytics-details > summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--primary-text);
+  padding: 0.75rem 0;
+}
+.analytics-privacy {
+  padding: 1rem;
+}
+.analytics-privacy .metric-icon {
+  width: 32px;
+  height: 32px;
+}
+.analytics-privacy p {
+  font-size: 0.76rem;
+  line-height: 1.6;
+}
+.analytics-works h2 {
+  font-size: 1.2rem;
+  font-weight: 650;
+}
+.analytics-work-table {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  margin-top: 0.8rem;
+}
+.analytics-work-table-heading,
+.analytics-work-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 85px 90px 85px 110px;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+}
+.analytics-work-table-heading {
+  background: var(--surface);
+  font-size: 0.74rem;
+}
+.analytics-work-row {
+  border-top: 1px solid var(--line);
+  font-size: 0.82rem;
+}
+.analytics-work-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.65rem;
+}
+.analytics-work-name img,
+.analytics-work-placeholder {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 56px;
+  height: 46px;
+  border-radius: 7px;
+  object-fit: cover;
+  background: var(--surface);
+  color: var(--primary-text);
+}
+.analytics-work-name > div {
+  min-width: 0;
+}
+.analytics-work-name strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.84rem;
+}
+.analytics-work-name > div > span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  margin-top: 0.2rem;
+}
+.analytics-work-row .btn {
+  min-height: 40px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.75rem;
+}
+.analytics-pagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+}
+@media (max-width: 1000px) {
+  .analytics-chart-grid {
+    grid-template-columns: 1fr;
+  }
+  .analytics-work-table-heading,
+  .analytics-work-row {
+    grid-template-columns: minmax(0, 1fr) 65px 65px 65px 90px;
+    gap: 0.5rem;
+  }
+}
+@media (max-width: 639px) {
+  .analytics-metrics {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  .analytics-metrics > .surface-card {
+    min-height: 52px;
+    padding: 0.6rem 0.8rem;
+  }
+  .analytics-metrics > .surface-card > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+  }
+  .analytics-metrics .metric-icon {
+    width: 28px;
+    height: 28px;
+  }
+  .analytics-metrics strong {
+    margin: 0;
+    font-size: 1.3rem;
+  }
+  .analytics-metrics p:last-child {
+    display: none;
+  }
+  .analytics-chart-grid {
+    gap: 0.75rem;
+  }
+  .analytics-chart-grid > .surface-card {
+    padding: 0.8rem;
+  }
+  .analytics-chart-grid > .surface-card:nth-child(2) {
+    display: none;
+  }
+  .analytics-filters {
+    padding: 0.85rem;
+  }
+  .analytics-work-table-heading {
+    display: none;
+  }
+  .analytics-work-row {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+  .analytics-work-name {
+    grid-column: 1;
+  }
+  .analytics-work-row > span {
+    display: none;
+  }
+  .analytics-work-row > .btn {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    font-size: 0;
+    gap: 0;
+  }
+  .analytics-work-name strong {
+    font-size: 0.8rem;
+  }
+  .analytics-work-name img,
+  .analytics-work-placeholder {
+    width: 52px;
+    height: 48px;
+  }
+  .analytics-works h2 {
+    font-size: 1rem;
+  }
+  .analytics-works .text-link {
+    font-size: 0.72rem;
+  }
+  .analytics-privacy .metric-icon {
+    display: none;
+  }
+  .analytics-privacy {
+    padding: 0.8rem;
+  }
+}

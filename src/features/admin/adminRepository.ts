@@ -3,6 +3,10 @@ import type { Json } from "../../shared/api/database.types";
 import { assertDemoRuntimeEnabled } from "../../shared/config/env";
 import {
   AdminError,
+  adminAccountUpdateSchema,
+  adminUserUpdateSchema,
+  type AdminAccountUpdate,
+  type AdminUserUpdate,
   adminAccessSchema,
   adminAccountDetailSchema,
   adminAccountListSchema,
@@ -47,6 +51,8 @@ export interface AdminRepository {
   getAccountDetail(accountId: string, reason: string): Promise<AdminAccountDetail>;
   searchContent(search: string): Promise<AdminContentResult[]>;
   createAccount(input: CreateAdminAccountInput): Promise<void>;
+  updateAccount(accountId: string, input: AdminAccountUpdate, reason: string): Promise<void>;
+  updateUser(accountId: string, userId: string, input: AdminUserUpdate, reason: string): Promise<void>;
   updateSubscription(accountId: string, input: SubscriptionAdminInput): Promise<void>;
   setAccountStatus(accountId: string, status: "active" | "suspended", reason: string): Promise<void>;
   deleteAccount(accountId: string, confirmation: "УДАЛИТЬ АККАУНТ", reason: string): Promise<void>;
@@ -123,6 +129,30 @@ export class SupabaseAdminRepository implements AdminRepository {
     const input = createAdminAccountSchema.parse(rawInput);
     const { error } = await this.client.functions.invoke("admin-create-user", { body: input });
     if (error) throw await mapEdgeAdminError(error);
+  }
+
+  async updateAccount(accountId: string, rawInput: AdminAccountUpdate, rawReason: string) {
+    const input = adminAccountUpdateSchema.parse(rawInput);
+    const reason = adminReasonSchema.parse(rawReason);
+    const { error } = await this.client.rpc("admin_update_account_profile", {
+      p_target_account_id: accountId,
+      p_name: input.name,
+      p_timezone: input.timezone,
+      p_reason: reason,
+    });
+    if (error) throw mapAdminError(error);
+  }
+
+  async updateUser(accountId: string, userId: string, rawInput: AdminUserUpdate, rawReason: string) {
+    const input = adminUserUpdateSchema.parse(rawInput);
+    const reason = adminReasonSchema.parse(rawReason);
+    const { error } = await this.client.rpc("admin_update_user_profile", {
+      p_target_account_id: accountId,
+      p_target_user_id: userId,
+      p_full_name: input.fullName,
+      p_reason: reason,
+    });
+    if (error) throw mapAdminError(error);
   }
 
   async updateSubscription(accountId: string, input: SubscriptionAdminInput) {

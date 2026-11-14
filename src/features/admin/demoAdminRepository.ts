@@ -1,6 +1,10 @@
 import type { AdminRepository, AdminSnapshot } from "./adminRepository";
 import {
   AdminError,
+  adminAccountUpdateSchema,
+  adminUserUpdateSchema,
+  type AdminAccountUpdate,
+  type AdminUserUpdate,
   adminReasonSchema,
   createAdminAccountSchema,
   type AdminAccountDetail,
@@ -139,6 +143,46 @@ export class DemoAdminRepository implements AdminRepository {
       usage: { projects: 0, groups: 0, arItems: 0, publishedItems: 0, storageBytes: 0, failedJobs: 0 },
     };
     this.audit(accountId, "admin.account.create", "accounts", accountId, input.reason);
+  }
+
+  async updateAccount(accountId: string, rawInput: AdminAccountUpdate, rawReason: string) {
+    const input = adminAccountUpdateSchema.parse(rawInput);
+    const reason = adminReasonSchema.parse(rawReason);
+    const account = this.account(accountId);
+    const detail = this.detail(accountId);
+    const before = { name: detail.account.name, timezone: detail.account.timezone };
+    Object.assign(detail.account, input);
+    account.name = input.name;
+    this.state.content
+      .filter((item) => item.accountId === accountId)
+      .forEach((item) => {
+        item.accountName = input.name;
+      });
+    this.state.snapshot.errors.items
+      .filter((item) => item.accountId === accountId)
+      .forEach((item) => {
+        item.accountName = input.name;
+      });
+    this.audit(accountId, "admin.account.profile.update", "accounts", accountId, reason, { before, after: input });
+  }
+
+  async updateUser(accountId: string, userId: string, rawInput: AdminUserUpdate, rawReason: string) {
+    const input = adminUserUpdateSchema.parse(rawInput);
+    const reason = adminReasonSchema.parse(rawReason);
+    const detail = this.detail(accountId);
+    const user = detail.users.find((candidate) => candidate.id === userId);
+    if (!user || userId === adminUserId) throw new AdminError("not_found", "Пользователь аккаунта не найден");
+    const before = { fullName: user.fullName };
+    for (const target of Object.values(this.state.details)) {
+      target.users
+        .filter((candidate) => candidate.id === userId)
+        .forEach((candidate) => {
+          candidate.fullName = input.fullName;
+        });
+      if (target.users.some((candidate) => candidate.id === userId && candidate.role === "owner"))
+        this.account(target.account.id).ownerName = input.fullName;
+    }
+    this.audit(accountId, "admin.user.profile.update", "profiles", userId, reason, { before, after: input });
   }
 
   async updateSubscription(accountId: string, input: SubscriptionAdminInput) {

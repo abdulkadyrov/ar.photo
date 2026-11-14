@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button, Input, Modal, Select } from "../../shared/ui";
 import { getAdminRepository } from "./adminRepository";
 import type { AdminPlan, AdminPlanInput } from "./adminSchemas";
+import "./AdminWorkspace.css";
 
 const repository = getAdminRepository();
 const numericFields = [
@@ -95,11 +96,18 @@ export function PlanEditor({
         </Button>
       }
     >
-      <div className="grid gap-4">
+      <div className="admin-plan-editor">
         <Select
           label="Тип"
           value={productKind}
-          onChange={(e) => setProductKind(e.target.value as typeof productKind)}
+          onChange={(e) => {
+            const kind = e.target.value as typeof productKind;
+            setProductKind(kind);
+            if (kind === "addon") {
+              if (duration === "") setDuration("0");
+              if (values.arItemLimit === "") setValues({ ...values, arItemLimit: "100" });
+            }
+          }}
           options={[
             { value: "subscription", label: "Тариф: фото и срок" },
             { value: "addon", label: "Дополнение: фото и/или время" },
@@ -107,12 +115,47 @@ export function PlanEditor({
         />
         <Field label="Название" value={name} onChange={setName} />
         <Field label="Стоимость, ₽" value={price} onChange={setPrice} />
-        <Field label="Срок, дней (30 — месяц, 365 — год)" value={duration} onChange={setDuration} />
+        <Field
+          label="Срок, дней (30 — месяц, 365 — год)"
+          value={duration}
+          onChange={setDuration}
+          disabled={productKind === "subscription" && duration === ""}
+        />
         <Field
           label="Добавления AR-фото"
           value={values.arItemLimit}
           onChange={(v) => setValues({ ...values, arItemLimit: v })}
+          disabled={productKind === "subscription" && values.arItemLimit === ""}
         />
+        {productKind === "subscription" ? (
+          <div className="admin-editor-options">
+            <label>
+              <input
+                type="checkbox"
+                checked={duration === ""}
+                onChange={(event) => setDuration(event.target.checked ? "" : "30")}
+              />
+              Без срока
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={values.arItemLimit === ""}
+                onChange={(event) => setValues({ ...values, arItemLimit: event.target.checked ? "" : "100" })}
+              />
+              Без лимита фото
+            </label>
+          </div>
+        ) : null}
+        <aside className="admin-editor-preview" aria-label="Предпросмотр тарифа">
+          <span className="text-xs text-muted">{productKind === "subscription" ? "Базовый тариф" : "Дополнение"}</span>
+          <h3>{name || "Новый тариф"}</h3>
+          <strong>{price || "0"} ₽</strong>
+          <p>
+            {duration === "" ? "Без срока" : `${duration} дней`} ·{" "}
+            {values.arItemLimit === "" ? "Без лимита добавлений" : `${values.arItemLimit} добавлений фото`}
+          </p>
+        </aside>
         <p className="text-sm text-muted">
           Удаление фото не возвращает добавление. Пустой лимит фото или срок — без ограничений для тарифа; 0 дней —
           пакет только фото.
@@ -154,11 +197,21 @@ export function PlanEditor({
     </Modal>
   );
 }
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function Field({
+  label,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
   return (
     <label className="grid min-w-0 gap-2 text-sm font-semibold">
       {label}
-      <Input value={value} onValueChange={onChange} />
+      <Input value={value} onValueChange={onChange} disabled={disabled} />
     </label>
   );
 }

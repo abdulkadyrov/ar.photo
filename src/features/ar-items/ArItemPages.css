@@ -1,75 +1,76 @@
 .ar-items-grid {
   display: grid;
-  gap: 0.8rem;
-  margin-top: 1.25rem;
+  gap: 0.65rem;
+  margin-top: 1rem;
 }
-
 .ar-item-card {
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--card);
-  box-shadow: 0 10px 28px rgba(23, 25, 31, 0.05);
-}
-
-.ar-item-card > a {
   display: grid;
-  min-height: 112px;
-  grid-template-columns: 112px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 0.8rem;
+}
+.ar-item-card > a {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
   color: inherit;
   text-decoration: none;
 }
-
 .ar-item-card-preview {
   display: grid;
-  height: 100%;
-  min-height: 112px;
-  place-items: center;
+  width: 88px;
+  aspect-ratio: 1;
   overflow: hidden;
+  place-items: center;
+  border-radius: 8px;
   background: #f0edf8;
   color: var(--primary);
 }
-
 .ar-item-card-preview img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-
 .ar-item-card-copy {
   min-width: 0;
 }
-
-.ar-item-card-group {
-  display: none;
-}
-
 .ar-item-card-copy h2 {
   overflow: hidden;
   margin: 0;
-  font-size: 1rem;
-  font-weight: 720;
+  font-size: 0.95rem;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
+.ar-item-card-group {
+  display: inline-block;
+  margin-top: 0.35rem;
+  border-radius: 5px;
+  background: #f0ebff;
+  padding: 0.15rem 0.4rem;
+  color: var(--primary-text);
+  font-size: 0.72rem;
+}
 .ar-item-card-copy time {
   display: block;
   margin-top: 0.35rem;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
 }
-
-.ar-item-card > a > svg {
-  margin-right: 1rem;
-  color: var(--muted);
+.ar-item-card-actions {
+  display: flex;
+  gap: 0.5rem;
 }
-
-.ar-item-card > a:hover,
-.ar-item-card > a:focus-visible {
-  background: rgba(115, 87, 255, 0.035);
+.ar-item-card-actions .btn {
+  font-size: 0.75rem;
+  min-height: 44px;
+  padding: 0.45rem 0.65rem;
 }
 
 .ar-item-detail {
@@ -101,10 +102,10 @@
   width: 100%;
   height: auto;
   min-height: 0;
-  aspect-ratio: 1;
-  border-radius: 14px;
+  aspect-ratio: 4 / 3;
+  border-radius: 10px;
   background: #f0edf8;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .ar-item-empty-preview {
@@ -260,109 +261,44 @@
   margin-top: 0.55rem;
 }
 
-@media (min-width: 720px) {
-  .ar-items-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 639px) {
   .ar-items-back span {
     display: none;
   }
-
   .ar-items-create {
-    width: 40px;
-    padding: 0;
+    min-height: 44px;
   }
-
-  .ar-items-create span {
-    display: none;
-  }
-
   .ar-items-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.55rem;
+    gap: 0.6rem;
     margin-top: 0.75rem;
   }
-
   .ar-item-card {
-    aspect-ratio: 1;
-    border-radius: 16px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.55rem;
+    padding: 0.6rem;
   }
-
   .ar-item-card > a {
-    position: relative;
-    display: block;
-    width: 100%;
-    height: 100%;
-    min-height: 0;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 0.6rem;
   }
-
-  .ar-item-card > a::after {
-    position: absolute;
-    z-index: 1;
-    inset: 35% 0 0;
-    background: linear-gradient(180deg, transparent, rgba(10, 14, 23, 0.88));
-    content: "";
+  .ar-item-card > a > span {
+    grid-column: 2;
+    justify-self: start;
   }
-
   .ar-item-card-preview {
-    position: absolute;
-    inset: 0;
-    min-height: 0;
+    width: 64px;
+    grid-row: 1 / span 2;
   }
-
-  .ar-item-card-copy {
-    position: absolute;
-    z-index: 2;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    padding: 0.7rem;
-    color: #ffffff;
-  }
-
-  .ar-item-card-group {
-    position: absolute;
-    z-index: 2;
-    top: 0.55rem;
-    left: 0.55rem;
-    display: block;
-    max-width: calc(100% - 1.1rem);
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 999px;
-    background: rgba(10, 14, 23, 0.52);
-    padding: 0.22rem 0.45rem;
-    color: #ffffff;
-    font-size: 0.56rem;
-    font-weight: 650;
-    line-height: 1;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    backdrop-filter: blur(8px);
-  }
-
-  .ar-item-card-copy h2 {
-    color: #ffffff;
-    font-size: 0.88rem;
-    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.45);
-  }
-
   .ar-item-card-copy time {
-    margin-top: 0.2rem;
-    color: rgba(255, 255, 255, 0.82);
-    font-size: 0.64rem;
-    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
+    font-size: 0.65rem;
   }
-
-  .ar-item-card > a > svg {
-    display: none;
+  .ar-item-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
-
   .ar-item-detail {
-    gap: 0.5rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.65rem;
     margin-top: 0.75rem;
   }
 

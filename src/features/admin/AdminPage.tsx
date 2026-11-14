@@ -1,29 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Activity,
-  Boxes,
-  Building2,
-  CircleAlert,
-  CreditCard,
-  Database,
-  FileSearch,
-  HardDrive,
-  KeyRound,
-  ListChecks,
-  RefreshCw,
-  Settings,
-  ShieldCheck,
-  Trash2,
-  UserCheck,
-  UserPlus,
-  UserX,
-  Users,
-  WandSparkles,
-} from "lucide-react";
+import { RefreshCw, ShieldCheck } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../../app/layout/AppShell";
-import { Button, ErrorState, Input, MetricCard, Modal, Panel, Select, Skeleton, Toast } from "../../shared/ui";
+import { Button, ErrorState, Input, Modal, Panel, Select, Skeleton, Toast } from "../../shared/ui";
 import {
   AdminError,
   type AdminAccount,
@@ -34,23 +14,41 @@ import {
 } from "./adminSchemas";
 import { getAdminRepository } from "./adminRepository";
 import { PlanEditor } from "./PlanEditor";
-import { packageSummary } from "./planPresentation";
-import { PackageGrant } from "./PackageGrant";
+import {
+  AccountDetailSection,
+  AccountsSection,
+  ActivitySection,
+  AnalyticsSection,
+  AuditSection,
+  ErrorsSection,
+  ItemsSection,
+  OverviewSection,
+  PlansSection,
+  SettingsSection,
+  StorageSection,
+  SubscriptionsSection,
+  UsersSection,
+} from "./AdminWorkspaceViews";
+import "./AdminWorkspace.css";
+import { AdminNavigationProvider } from "./AdminNavigation";
+import { useAdminNavigation } from "./useAdminNavigation";
 
 const adminRepository = getAdminRepository();
-const tabs = [
-  { id: "overview", label: "Обзор", icon: Activity },
-  { id: "accounts", label: "Аккаунты", icon: Building2 },
-  { id: "users", label: "Пользователь", icon: Users },
-  { id: "subscriptions", label: "Подписки", icon: CreditCard },
-  { id: "items", label: "Проекты и AR", icon: WandSparkles },
-  { id: "errors", label: "Ошибки", icon: CircleAlert },
-  { id: "audit", label: "История действий", icon: ListChecks },
-  { id: "plans", label: "Тарифы", icon: Boxes },
-  { id: "storage", label: "Хранилище", icon: HardDrive },
-  { id: "settings", label: "Настройки", icon: Settings },
-] as const;
-type TabId = (typeof tabs)[number]["id"];
+const tabTitles = {
+  overview: "Обзор платформы",
+  accounts: "Аккаунты",
+  users: "Пользователи",
+  subscriptions: "Подписки",
+  plans: "Тарифы и дополнения",
+  analytics: "Аналитика платформы",
+  activity: "Входы и активность",
+  items: "Контент платформы",
+  errors: "Обработка и ошибки",
+  storage: "Хранилище и ресурсы",
+  settings: "Настройки платформы",
+  audit: "История действий",
+} as const;
+type TabId = keyof typeof tabTitles;
 
 type ConfirmAction =
   | { kind: "account"; account: AdminAccount; nextStatus: "active" | "suspended" }
@@ -65,11 +63,25 @@ type ConfirmAction =
 type SubscriptionStatus = "trial" | "active" | "grace_period" | "expired" | "suspended" | "cancelled";
 
 export function AdminRoute() {
+  return (
+    <AdminNavigationProvider>
+      <AdminWorkspaceRoute />
+    </AdminNavigationProvider>
+  );
+}
+
+function AdminWorkspaceRoute() {
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<TabId>("overview");
-  const [accountSearch, setAccountSearch] = useState("");
-  const [submittedSearch, setSubmittedSearch] = useState("");
-  const [detail, setDetail] = useState<AdminAccountDetail | null>(null);
+  const navigation = useAdminNavigation();
+  const searchParams = navigation.params;
+  const section = searchParams.get("section") ?? "overview";
+  const tab: TabId = Object.hasOwn(tabTitles, section) ? (section as TabId) : "overview";
+  const setTab = (next: TabId) => navigation.open({ section: next });
+  const accountSearch = searchParams.get("accountSearch") ?? "";
+  const submittedSearch = searchParams.get("accountQuery") ?? "";
+  const selectedAccountId = searchParams.get("account");
+  const showAccountDetail =
+    tab === "accounts" && searchParams.get("accountView") === "detail" && Boolean(selectedAccountId);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [confirmation, setConfirmation] = useState("");
   const [reason, setReason] = useState("");
@@ -90,18 +102,30 @@ export function AdminRoute() {
     enabled: canLoad,
   });
 
-  const supportMutation = useMutation({
-    mutationFn: (account: AdminAccount) =>
-      adminRepository.getAccountDetail(account.id, `Просмотр аккаунта «${account.name}» администратором`),
-    onSuccess: (nextDetail) => {
-      setDetail(nextDetail);
-      setTab("users");
-      setToast({ title: "Аккаунт открыт", message: "Просмотр записан в историю действий.", tone: "success" });
+  const detailQuery = useQuery({
+    queryKey: ["admin", "account", selectedAccountId],
+    queryFn: async () => {
+      const next = await adminRepository.getAccountDetail(
+        selectedAccountId!,
+        "Просмотр карточки аккаунта администратором",
+      );
       void queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
+      return next;
     },
+    enabled: canLoad && Boolean(selectedAccountId),
   });
-
-  const supportError = supportMutation.error;
+  const detail = detailQuery.data ?? null;
+  const openAccount = (account: AdminAccount, next: TabId) =>
+    navigation.open({
+      section: next,
+      account: account.id,
+      accountView: next === "accounts" ? "detail" : null,
+      accountTab: next === "accounts" ? "overview" : null,
+      user: null,
+      userEdit: null,
+    });
+  const closeAccount = () => navigation.back({ account: null, accountView: null, accountTab: null, accountEdit: null });
+  const supportError = detailQuery.error;
 
   const actionMutation = useMutation({
     mutationFn: async () => {
@@ -149,30 +173,34 @@ export function AdminRoute() {
     onSuccess: async () => {
       const completedAction = confirmAction;
       const wasItem = confirmAction?.kind === "item";
-      if (completedAction?.kind === "user-status") {
-        setDetail((current) =>
-          current
-            ? {
-                ...current,
-                users: current.users.map((user) =>
-                  user.id === completedAction.userId ? { ...user, isActive: completedAction.active } : user,
-                ),
-              }
-            : current,
-        );
+      if (completedAction?.kind === "user-status" || completedAction?.kind === "user-delete") {
+        await queryClient.invalidateQueries({ queryKey: ["admin", "account", selectedAccountId] });
       }
-      if (completedAction?.kind === "user-delete") {
-        setDetail((current) =>
-          current ? { ...current, users: current.users.filter((user) => user.id !== completedAction.userId) } : current,
-        );
+      if (completedAction?.kind === "account-delete" && selectedAccountId === completedAction.account.id) {
+        navigation.update({
+          account: null,
+          accountView: null,
+          accountTab: null,
+          accountEdit: null,
+          user: null,
+          userEdit: null,
+        });
       }
-      if (completedAction?.kind === "account-delete") {
-        setDetail((current) => (current?.account.id === completedAction.account.id ? null : current));
-      }
-      setToast({ title: "Операция выполнена", message: "Изменение записано в admin audit.", tone: "success" });
+      setToast({ title: "Операция выполнена", message: "Изменение записано в историю действий.", tone: "success" });
       closeConfirmation();
       if (completedAction?.kind === "setting") await accessQuery.refetch();
       await queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
+      if (detail && (completedAction?.kind === "subscription" || completedAction?.kind === "account")) {
+        try {
+          await refreshDetail();
+        } catch {
+          setToast({
+            title: "Изменение сохранено",
+            message: "Не удалось обновить карточку. Откройте аккаунт заново.",
+            tone: "error",
+          });
+        }
+      }
       if (wasItem && contentSearch.trim().length >= 2) {
         setContentResults(await adminRepository.searchContent(contentSearch));
       }
@@ -192,6 +220,7 @@ export function AdminRoute() {
   if (!accessQuery.data?.isSuperadmin) {
     return (
       <AppShell
+        workspaceKind="account"
         eyebrow="Защищённые операции"
         title="Супер-админ"
         description="Доступ только для активного суперадминистратора."
@@ -227,129 +256,175 @@ export function AdminRoute() {
           ? "MFA временно отключена · история действий включена"
           : "MFA подтверждена · действия аудируются"
       }
-      title="Супер-админ"
-      description="Пользователи, подписки, проекты и системные события AR Photo в одном защищённом пространстве."
+      title={tabTitles[tab]}
+      description={
+        tab === "overview"
+          ? "Состояние сервиса, аккаунты, обработка и ключевые показатели."
+          : "Администратор платформы KHANZAMA"
+      }
       actions={
         <Button variant="quiet" icon={<RefreshCw size={17} />} onClick={() => void snapshotQuery.refetch()}>
           Обновить
         </Button>
       }
     >
-      <Panel className="mt-6 p-2">
-        <nav aria-label="Разделы admin-панели" className="flex gap-2 overflow-x-auto p-1">
-          {tabs.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-sm font-semibold transition ${tab === item.id ? "bg-primary text-white" : "text-muted hover:bg-white/[0.04] hover:text-ink"}`}
-                onClick={() => setTab(item.id)}
-              >
-                <Icon size={16} /> {item.label}
-              </button>
-            );
-          })}
-        </nav>
-      </Panel>
-
-      {tab === "overview" ? <OverviewSection snapshot={snapshot} /> : null}
-      {tab === "accounts" ? (
-        <AccountsSection
-          accounts={snapshot.accounts.items}
-          search={accountSearch}
-          onSearch={setAccountSearch}
-          onSubmit={() => setSubmittedSearch(accountSearch.trim())}
-          onCreate={() => setCreateOpen(true)}
-          onSupport={(account) => supportMutation.mutate(account)}
-          onStatus={(account) =>
-            openConfirm({
-              kind: "account",
-              account,
-              nextStatus: account.status === "suspended" ? "active" : "suspended",
-            })
-          }
-          onDelete={(account) => openConfirm({ kind: "account-delete", account })}
-        />
-      ) : null}
-      {tab === "users" ? (
-        <UsersSection
-          detail={detail}
-          onReset={(userId, label) => openConfirm({ kind: "reset", accountId: detail!.account.id, userId, label })}
-          onStatus={(userId, label, active) =>
-            openConfirm({ kind: "user-status", accountId: detail!.account.id, userId, label, active })
-          }
-          onDelete={(userId, label) =>
-            openConfirm({ kind: "user-delete", accountId: detail!.account.id, userId, label })
-          }
-        />
-      ) : null}
-      {tab === "subscriptions" ? (
-        <SubscriptionsSection
-          key={detail?.account.id ?? "no-account"}
-          detail={detail}
-          plans={snapshot.plans}
-          onGranted={async () => {
-            try {
-              await queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
-              setDetail(await adminRepository.getAccountDetail(detail!.account.id, "Проверка назначенного пакета"));
-            } catch {
-              setToast({
-                title: "Пакет начислен",
-                message: "Не удалось обновить данные. Нажмите «Обновить», не начисляя пакет повторно.",
-                tone: "error",
-              });
+      <div className="admin-workspace">
+        {tab === "overview" ? <OverviewSection snapshot={snapshot} onNavigate={setTab} /> : null}
+        {showAccountDetail && detail ? (
+          <AccountDetailSection
+            detail={detail}
+            audit={snapshot.audit.items}
+            account={snapshot.accounts.items.find((a) => a.id === detail.account.id)}
+            onUpdated={refreshDetail}
+            onClose={closeAccount}
+            onUsers={() => setTab("users")}
+            onSubscription={() => setTab("subscriptions")}
+            onStatus={(account) =>
+              openConfirm({
+                kind: "account",
+                account,
+                nextStatus: account.status === "suspended" ? "active" : "suspended",
+              })
             }
-          }}
-          onEdit={(planId, status, days) =>
-            openConfirm({ kind: "subscription", detail: detail!, planId, status, days })
-          }
-        />
+            onDelete={(account) => openConfirm({ kind: "account-delete", account })}
+          />
+        ) : null}
+        {tab === "accounts" && !showAccountDetail ? (
+          <AccountsSection
+            accounts={snapshot.accounts.items}
+            total={snapshot.accounts.total}
+            search={accountSearch}
+            onSearch={(value) => navigation.update({ accountSearch: value })}
+            onSubmit={() => navigation.update({ accountQuery: navigation.read("accountSearch")?.trim() ?? "" })}
+            onCreate={() => setCreateOpen(true)}
+            onSupport={(account) => openAccount(account, "accounts")}
+            onStatus={(account) =>
+              openConfirm({
+                kind: "account",
+                account,
+                nextStatus: account.status === "suspended" ? "active" : "suspended",
+              })
+            }
+            onDelete={(account) => openConfirm({ kind: "account-delete", account })}
+          />
+        ) : null}
+        {tab === "users" ? (
+          <UsersSection
+            onUpdated={refreshDetail}
+            detail={detail}
+            accounts={snapshot.accounts.items}
+            onSelectAccount={(account) => openAccount(account, "users")}
+            onReset={(userId, label) => openConfirm({ kind: "reset", accountId: detail!.account.id, userId, label })}
+            onStatus={(userId, label, active) =>
+              openConfirm({ kind: "user-status", accountId: detail!.account.id, userId, label, active })
+            }
+            onDelete={(userId, label) =>
+              openConfirm({ kind: "user-delete", accountId: detail!.account.id, userId, label })
+            }
+          />
+        ) : null}
+        {tab === "subscriptions" ? (
+          <SubscriptionsSection
+            key={detail?.account.id ?? "no-account"}
+            accounts={snapshot.accounts.items}
+            onSelectAccount={(account) => openAccount(account, "subscriptions")}
+            detail={detail}
+            plans={snapshot.plans}
+            onGranted={async () => {
+              try {
+                await queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
+                await detailQuery.refetch({ throwOnError: true });
+              } catch {
+                setToast({
+                  title: "Пакет начислен",
+                  message: "Не удалось обновить данные. Нажмите «Обновить», не начисляя пакет повторно.",
+                  tone: "error",
+                });
+              }
+            }}
+            onEdit={(planId, status, days) =>
+              openConfirm({ kind: "subscription", detail: detail!, planId, status, days })
+            }
+          />
+        ) : null}
+        {tab === "plans" ? (
+          <PlansSection
+            plans={snapshot.plans}
+            onCreate={() => {
+              setEditingPlan(null);
+              setPlanOpen(true);
+            }}
+            onEdit={(plan) => {
+              setEditingPlan(plan);
+              setPlanOpen(true);
+            }}
+          />
+        ) : null}
+        {tab === "storage" ? (
+          <StorageSection
+            accounts={snapshot.accounts.items}
+            plans={snapshot.plans}
+            totalBytes={snapshot.overview.storageBytes}
+          />
+        ) : null}
+        {tab === "analytics" ? <AnalyticsSection snapshot={snapshot} onActivity={() => setTab("activity")} /> : null}
+        {tab === "activity" ? (
+          <ActivitySection
+            detail={detail}
+            accounts={snapshot.accounts.items}
+            onSelectAccount={(account) => openAccount(account, "activity")}
+          />
+        ) : null}
+        {tab === "items" ? (
+          <ItemsSection
+            search={contentSearch}
+            results={contentResults}
+            pending={contentMutation.isPending}
+            error={contentMutation.error}
+            onSearch={setContentSearch}
+            onSubmit={() => contentMutation.mutate()}
+            onSuspend={(item) => openConfirm({ kind: "item", item, suspended: item.arItemStatus !== "suspended" })}
+          />
+        ) : null}
+        {tab === "errors" ? (
+          <ErrorsSection
+            errors={snapshot.errors.items}
+            onRetry={(error) =>
+              openConfirm({ kind: "retry", accountId: error.accountId, jobId: error.id, label: error.arItemTitle })
+            }
+          />
+        ) : null}
+        {tab === "audit" ? <AuditSection audit={snapshot.audit.items} /> : null}
+        {tab === "settings" ? (
+          <SettingsSection
+            settings={snapshot.settings}
+            onChange={(setting, value) => openConfirm({ kind: "setting", setting, value })}
+          />
+        ) : null}
+      </div>
+      {selectedAccountId && detailQuery.isPending ? (
+        <div className="mt-3">
+          <p role="status" className="text-sm text-muted">
+            Открываем аккаунт…
+          </p>
+          {showAccountDetail ? (
+            <Button variant="quiet" onClick={closeAccount}>
+              Назад к аккаунтам
+            </Button>
+          ) : null}
+        </div>
       ) : null}
-      {tab === "plans" ? (
-        <PlansSection
-          plans={snapshot.plans}
-          onCreate={() => {
-            setEditingPlan(null);
-            setPlanOpen(true);
-          }}
-          onEdit={(plan) => {
-            setEditingPlan(plan);
-            setPlanOpen(true);
-          }}
-        />
-      ) : null}
-      {tab === "storage" ? <StorageSection accounts={snapshot.accounts.items} /> : null}
-      {tab === "items" ? (
-        <ItemsSection
-          search={contentSearch}
-          results={contentResults}
-          pending={contentMutation.isPending}
-          error={contentMutation.error}
-          onSearch={setContentSearch}
-          onSubmit={() => contentMutation.mutate()}
-          onSuspend={(item) => openConfirm({ kind: "item", item, suspended: item.arItemStatus !== "suspended" })}
-        />
-      ) : null}
-      {tab === "errors" ? (
-        <ErrorsSection
-          errors={snapshot.errors.items}
-          onRetry={(error) =>
-            openConfirm({ kind: "retry", accountId: error.accountId, jobId: error.id, label: error.arItemTitle })
-          }
-        />
-      ) : null}
-      {tab === "audit" ? <AuditSection audit={snapshot.audit.items} /> : null}
-      {tab === "settings" ? (
-        <SettingsSection
-          settings={snapshot.settings}
-          onChange={(setting, value) => openConfirm({ kind: "setting", setting, value })}
-        />
-      ) : null}
-
       {supportError ? (
-        <p role="alert" className="text-rose-700">
-          {readableAdminError(supportError)}
-        </p>
+        <div>
+          <p role="alert" className="text-rose-700">
+            {readableAdminError(supportError)}
+          </p>
+          {showAccountDetail ? (
+            <Button variant="quiet" onClick={closeAccount}>
+              Назад к аккаунтам
+            </Button>
+          ) : null}
+        </div>
       ) : null}
       <ConfirmModal
         action={confirmAction}
@@ -397,549 +472,18 @@ export function AdminRoute() {
     </AppShell>
   );
 
+  async function refreshDetail() {
+    if (!detail) return;
+    await queryClient.invalidateQueries({ queryKey: ["admin", "snapshot"] });
+    await detailQuery.refetch({ throwOnError: true });
+  }
+
   function closeConfirmation() {
     setConfirmAction(null);
     setConfirmation("");
     setReason("");
     actionMutation.reset();
   }
-}
-
-function OverviewSection({ snapshot }: { snapshot: Awaited<ReturnType<typeof adminRepository.getSnapshot>> }) {
-  const overview = snapshot.overview;
-  return (
-    <>
-      <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Сводка супер-админа">
-        <MetricCard
-          icon={<Building2 size={20} />}
-          label="Аккаунты"
-          value={overview.accounts.total}
-          hint={`${overview.accounts.suspended} приостановлено`}
-        />
-        <MetricCard
-          icon={<Users size={20} />}
-          label="Пользователи"
-          value={overview.users.active}
-          hint={`${overview.users.total} всего`}
-        />
-        <MetricCard
-          icon={<HardDrive size={20} />}
-          label="Хранилище"
-          value={formatBytes(overview.storageBytes)}
-          hint={`${overview.arItems} AR-работ`}
-        />
-        <MetricCard
-          icon={<CircleAlert size={20} />}
-          label="Ошибки обработки"
-          value={overview.failedJobs}
-          hint={`${overview.publishedItems} опубликовано`}
-        />
-      </section>
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <Panel>
-          <SectionTitle icon={<ShieldCheck size={19} />} title="Защита операций" />
-          <p className="mt-3 text-sm leading-6 text-muted">
-            Доступ есть только у активного суперадминистратора. Требование MFA управляется в настройках админки.
-          </p>
-        </Panel>
-        <Panel>
-          <SectionTitle icon={<FileSearch size={19} />} title="Доступ поддержки" />
-          <p className="mt-3 text-sm leading-6 text-muted">
-            Открытие карточки требует причину от 10 символов. Администратор, аккаунт, причина и время сохраняются в
-            неизменяемой истории действий.
-          </p>
-        </Panel>
-      </div>
-    </>
-  );
-}
-
-function AccountsSection({
-  accounts,
-  search,
-  onSearch,
-  onSubmit,
-  onCreate,
-  onSupport,
-  onStatus,
-  onDelete,
-}: {
-  accounts: AdminAccount[];
-  search: string;
-  onSearch: (value: string) => void;
-  onSubmit: () => void;
-  onCreate: () => void;
-  onSupport: (account: AdminAccount) => void;
-  onStatus: (account: AdminAccount) => void;
-  onDelete: (account: AdminAccount) => void;
-}) {
-  return (
-    <Panel className="mt-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-semibold">Аккаунты пользователей</h2>
-          <p className="mt-1 text-sm text-muted">
-            Поиск, просмотр по указанной причине, блокировка и закрытие аккаунтов.
-          </p>
-        </div>
-        <Button icon={<UserPlus size={17} />} onClick={onCreate}>
-          Создать аккаунт
-        </Button>
-      </div>
-      <form
-        className="mt-5 flex flex-col gap-2 sm:flex-row"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit();
-        }}
-      >
-        <Input
-          aria-label="Поиск аккаунтов"
-          placeholder="Название, slug или UUID"
-          value={search}
-          onValueChange={onSearch}
-        />
-        <Button type="submit" variant="ghost">
-          Найти
-        </Button>
-      </form>
-      <div className="mt-5 grid gap-3">
-        {accounts.map((account) => (
-          <article key={account.id} className="rounded-2xl border border-line bg-white p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 className="font-semibold">{account.name}</h3>
-                <p className="mt-1 text-xs text-muted">
-                  {account.slug} · {account.planName ?? "Без тарифа"}
-                </p>
-              </div>
-              <StatusPill tone={account.status === "active" ? "success" : "danger"}>{account.status}</StatusPill>
-            </div>
-            <div className="mt-3 grid gap-2 text-sm text-muted sm:grid-cols-3">
-              <span>{formatBytes(account.storageUsedBytes)}</span>
-              <span>{account.arItemCount} AR-работ</span>
-              <span>{account.failedJobCount} ошибок</span>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="ghost" onClick={() => onSupport(account)}>
-                Открыть аккаунт
-              </Button>
-              <Button variant={account.status === "active" ? "danger" : "quiet"} onClick={() => onStatus(account)}>
-                {account.status === "active" ? "Приостановить" : "Восстановить"}
-              </Button>
-              <Button variant="danger" icon={<Trash2 size={16} />} onClick={() => onDelete(account)}>
-                Удалить аккаунт
-              </Button>
-            </div>
-          </article>
-        ))}
-      </div>
-    </Panel>
-  );
-}
-
-function UsersSection({
-  detail,
-  onReset,
-  onStatus,
-  onDelete,
-}: {
-  detail: AdminAccountDetail | null;
-  onReset: (userId: string, label: string) => void;
-  onStatus: (userId: string, label: string, active: boolean) => void;
-  onDelete: (userId: string, label: string) => void;
-}) {
-  if (!detail)
-    return (
-      <EmptyAdminSection
-        title="Пользователь не выбран"
-        text="Откройте аккаунт в разделе «Аккаунты» и укажите причину доступа."
-      />
-    );
-  return (
-    <Panel className="mt-6">
-      <SectionTitle icon={<Users size={19} />} title={`Пользователи · ${detail.account.name}`} />
-      <p className="mt-2 text-sm text-muted">
-        Пароли недоступны администратору. Можно отправить письмо сброса, заблокировать или удалить допустимого
-        пользователя.
-      </p>
-      <div className="mt-5 grid gap-3">
-        {detail.users.map((user) => (
-          <article key={user.id} className="rounded-2xl border border-line bg-white p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold">{user.fullName ?? "Без имени"}</h3>
-                  <StatusPill tone={user.isActive ? "success" : "danger"}>
-                    {user.isActive ? "Активен" : "Заблокирован"}
-                  </StatusPill>
-                </div>
-                <p className="mt-1 text-sm text-muted">
-                  {user.emailDisplay ?? "Email скрыт"} · {user.role}
-                </p>
-              </div>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4">
-              <Button
-                variant="quiet"
-                icon={<KeyRound size={16} />}
-                onClick={() => onReset(user.id, user.fullName ?? "пользователь")}
-              >
-                Сбросить пароль
-              </Button>
-              <Button
-                variant={user.isActive ? "danger" : "quiet"}
-                icon={user.isActive ? <UserX size={16} /> : <UserCheck size={16} />}
-                onClick={() => onStatus(user.id, user.fullName ?? "пользователь", !user.isActive)}
-                disabled={!user.acceptedAt}
-              >
-                {user.isActive ? "Заблокировать" : "Разблокировать"}
-              </Button>
-              <Button
-                variant="danger"
-                icon={<Trash2 size={16} />}
-                onClick={() => onDelete(user.id, user.fullName ?? "пользователь")}
-                disabled={user.role === "owner"}
-                title={user.role === "owner" ? "Сначала назначьте другого владельца аккаунта" : "Удалить пользователя"}
-              >
-                Удалить
-              </Button>
-            </div>
-          </article>
-        ))}
-      </div>
-    </Panel>
-  );
-}
-
-function SubscriptionsSection({
-  detail,
-  plans,
-  onEdit,
-  onGranted,
-}: {
-  onGranted: () => Promise<void>;
-  detail: AdminAccountDetail | null;
-  plans: AdminPlan[];
-  onEdit: (planId: string, status: SubscriptionStatus, days: number) => void;
-}) {
-  const [planId, setPlanId] = useState(detail?.subscription.planId ?? plans[0]?.id ?? "");
-  const [status, setStatus] = useState<SubscriptionStatus>(detail?.subscription.status ?? "active");
-  const [days, setDays] = useState("90");
-  if (!detail)
-    return <EmptyAdminSection title="Подписка не выбрана" text="Сначала откройте аккаунт и укажите причину доступа." />;
-  return (
-    <Panel className="mt-6">
-      <SectionTitle icon={<CreditCard size={19} />} title={`Подписка · ${detail.account.name}`} />
-      <PackageGrant detail={detail} plans={plans} onSuccess={onGranted} />
-      <h3 className="mt-8 text-lg font-semibold">Ручное управление состоянием подписки</h3>
-      <div className="mt-5 grid gap-4 md:grid-cols-3">
-        <Select
-          label="Тариф"
-          value={planId}
-          onChange={(event) => setPlanId(event.target.value)}
-          options={plans
-            .filter((plan) => plan.productKind === "subscription")
-            .map((plan) => ({ value: plan.id, label: plan.name }))}
-        />
-        <Select
-          label="Статус"
-          value={status}
-          onChange={(event) => setStatus(event.target.value as SubscriptionStatus)}
-          options={["trial", "active", "grace_period", "expired", "suspended", "cancelled"].map((value) => ({
-            value,
-            label: value,
-          }))}
-        />
-        <LabeledInput
-          label="Окончание через дней от сегодня"
-          type="number"
-          min="1"
-          max="730"
-          value={days}
-          onChange={setDays}
-        />
-      </div>
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted">
-          Особые лимиты:{" "}
-          {Object.keys(detail.subscription.customLimits).length
-            ? JSON.stringify(detail.subscription.customLimits)
-            : "по тарифу"}
-        </p>
-        <Button
-          variant={status === "suspended" ? "danger" : "primary"}
-          onClick={() => onEdit(planId, status, Math.max(1, Number(days) || 90))}
-        >
-          Проверить и применить
-        </Button>
-      </div>
-    </Panel>
-  );
-}
-
-function PlansSection({
-  plans,
-  onCreate,
-  onEdit,
-}: {
-  plans: AdminPlan[];
-  onCreate: () => void;
-  onEdit: (plan: AdminPlan) => void;
-}) {
-  return (
-    <Panel className="mt-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <SectionTitle icon={<Boxes size={19} />} title="Тарифы" />
-        <Button onClick={onCreate}>Новый тариф</Button>
-      </div>
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
-        {plans.map((plan) => (
-          <article key={plan.id} className="rounded-2xl border border-line p-4">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="font-semibold">{plan.name}</h3>
-              <StatusPill tone={plan.isActive ? "success" : "muted"}>
-                {plan.isActive ? "Активен" : "Отключён"}
-              </StatusPill>
-            </div>
-            <p className="mt-2 text-sm text-muted">
-              {plan.code}
-              {plan.productKind === "subscription"
-                ? ` · ${plan.projectLimit ?? "∞"} проектов · ${plan.teamLimit ?? "∞"} сотрудников`
-                : ""}
-            </p>
-            <p className="mt-2 text-sm font-semibold">
-              {plan.productKind === "addon" ? "Дополнительный пакет" : "Тариф"}
-            </p>
-            <p className="mt-2 text-sm text-muted">{packageSummary(plan)}</p>
-            <p className="mt-2 text-sm text-muted">
-              {plan.productKind === "addon"
-                ? "Хранилище и команда остаются по основному тарифу"
-                : `Хранилище: ${plan.storageLimitBytes === null ? "Без ограничений" : formatBytes(plan.storageLimitBytes)}`}
-            </p>
-            <Button className="mt-4" variant="quiet" onClick={() => onEdit(plan)}>
-              Редактировать
-            </Button>
-          </article>
-        ))}
-      </div>
-    </Panel>
-  );
-}
-
-function StorageSection({ accounts }: { accounts: AdminAccount[] }) {
-  return (
-    <Panel className="mt-6">
-      <SectionTitle icon={<Database size={19} />} title="Использование хранилища" />
-      <div className="mt-5 grid gap-3">
-        {accounts.map((account) => (
-          <div key={account.id} className="rounded-2xl border border-line p-4">
-            <div className="flex justify-between gap-3">
-              <span className="font-semibold">{account.name}</span>
-              <span className="text-sm text-muted">{formatBytes(account.storageUsedBytes)}</span>
-            </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-stone-100">
-              <div
-                className="h-full rounded-full bg-primary"
-                style={{ width: `${Math.min(100, Math.max(3, account.storageUsedBytes / 1_073_741_824))}%` }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    </Panel>
-  );
-}
-
-function ItemsSection({
-  search,
-  results,
-  pending,
-  error,
-  onSearch,
-  onSubmit,
-  onSuspend,
-}: {
-  search: string;
-  results: AdminContentResult[];
-  pending: boolean;
-  error: unknown;
-  onSearch: (value: string) => void;
-  onSubmit: () => void;
-  onSuspend: (item: AdminContentResult) => void;
-}) {
-  return (
-    <Panel className="mt-6">
-      <SectionTitle icon={<WandSparkles size={19} />} title="Проекты и AR-работы" />
-      <form
-        className="mt-5 flex flex-col gap-2 sm:flex-row"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit();
-        }}
-      >
-        <Input
-          aria-label="Поиск проектов и AR-работ"
-          placeholder="Проект, группа, работа или UUID"
-          value={search}
-          onValueChange={onSearch}
-        />
-        <Button type="submit" disabled={pending}>
-          {pending ? "Ищем…" : "Найти"}
-        </Button>
-      </form>
-      {error ? (
-        <p className="mt-3 text-sm text-rose-700" role="alert">
-          {readableAdminError(error)}
-        </p>
-      ) : null}
-      <div className="mt-5 grid gap-3">
-        {results.map((item) => (
-          <article
-            key={item.arItemId}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line p-4"
-          >
-            <div>
-              <h3 className="font-semibold">{item.arItemTitle}</h3>
-              <p className="mt-1 text-sm text-muted">
-                {item.accountName} · {item.projectName} · {item.groupName}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <StatusPill tone={item.arItemStatus === "suspended" ? "danger" : "success"}>
-                {item.arItemStatus}
-              </StatusPill>
-              <Button variant={item.arItemStatus === "suspended" ? "quiet" : "danger"} onClick={() => onSuspend(item)}>
-                {item.arItemStatus === "suspended" ? "Восстановить" : "Приостановить"}
-              </Button>
-            </div>
-          </article>
-        ))}
-        {!results.length ? (
-          <p className="text-sm text-muted">Введите минимум два символа для поиска по всем клиентским проектам.</p>
-        ) : null}
-      </div>
-    </Panel>
-  );
-}
-
-function ErrorsSection({
-  errors,
-  onRetry,
-}: {
-  errors: Awaited<ReturnType<typeof adminRepository.getSnapshot>>["errors"]["items"];
-  onRetry: (error: Awaited<ReturnType<typeof adminRepository.getSnapshot>>["errors"]["items"][number]) => void;
-}) {
-  return (
-    <Panel className="mt-6">
-      <SectionTitle icon={<CircleAlert size={19} />} title="Ошибки обработки" />
-      <div className="mt-5 grid gap-3">
-        {errors.map((error) => (
-          <article key={error.id} className="rounded-2xl border border-line p-4">
-            <div className="flex flex-wrap justify-between gap-3">
-              <div>
-                <h3 className="font-semibold">{error.arItemTitle}</h3>
-                <p className="mt-1 text-sm text-muted">
-                  {error.accountName} · {error.type}
-                </p>
-              </div>
-              <StatusPill tone="danger">{error.errorCode}</StatusPill>
-            </div>
-            <p className="mt-3 text-sm text-muted">{error.errorMessage}</p>
-            <div className="mt-4">
-              <Button variant="ghost" onClick={() => onRetry(error)}>
-                Повторить задачу
-              </Button>
-            </div>
-          </article>
-        ))}
-        {!errors.length ? <p className="text-sm text-muted">Необработанных ошибок нет.</p> : null}
-      </div>
-    </Panel>
-  );
-}
-
-function AuditSection({ audit }: { audit: Awaited<ReturnType<typeof adminRepository.getSnapshot>>["audit"]["items"] }) {
-  return (
-    <Panel className="mt-6">
-      <SectionTitle icon={<ListChecks size={19} />} title="История действий" />
-      <div className="mt-5 overflow-x-auto">
-        <table className="w-full min-w-[760px] text-left text-sm">
-          <thead className="text-muted">
-            <tr>
-              <th className="pb-3">Время</th>
-              <th className="pb-3">Actor</th>
-              <th className="pb-3">Action</th>
-              <th className="pb-3">Reason</th>
-            </tr>
-          </thead>
-          <tbody>
-            {audit.map((log) => (
-              <tr key={log.id} className="border-t border-line">
-                <td className="py-3 text-muted">{formatDate(log.createdAt)}</td>
-                <td className="py-3">{log.actorName ?? log.actorUserId}</td>
-                <td className="py-3 font-mono text-xs text-primary">{log.action}</td>
-                <td className="py-3 text-muted">{log.reason}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Panel>
-  );
-}
-
-function SettingsSection({
-  settings,
-  onChange,
-}: {
-  settings: AdminSetting[];
-  onChange: (setting: AdminSetting, value: AdminSetting["value"]) => void;
-}) {
-  const [retention, setRetention] = useState(
-    String(settings.find((item) => item.key === "analytics_retention_days")?.value ?? 90),
-  );
-  return (
-    <Panel className="mt-6">
-      <SectionTitle icon={<Settings size={19} />} title="Protected system settings" />
-      <div className="mt-5 grid gap-3">
-        {settings.map((setting) => (
-          <article key={setting.key} className="rounded-2xl border border-line p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="font-mono text-sm font-semibold text-primary">
-                  {setting.key === "admin_mfa_required" ? "Подтверждение MFA в админке" : setting.key}
-                </h3>
-                <p className="mt-1 text-sm text-muted">{setting.description}</p>
-              </div>
-              {typeof setting.value === "boolean" ? (
-                <Button variant={setting.value ? "danger" : "quiet"} onClick={() => onChange(setting, !setting.value)}>
-                  {setting.value ? "Выключить" : "Включить"}
-                </Button>
-              ) : setting.key === "analytics_retention_days" ? (
-                <div className="flex items-center gap-2">
-                  <Input
-                    aria-label="Analytics retention days"
-                    className="w-28"
-                    type="number"
-                    min="30"
-                    max="730"
-                    value={retention}
-                    onValueChange={setRetention}
-                  />
-                  <Button variant="ghost" onClick={() => onChange(setting, Number(retention))}>
-                    Изменить
-                  </Button>
-                </div>
-              ) : (
-                <span className="text-sm text-muted">{String(setting.value) || "Не задано"}</span>
-              )}
-            </div>
-          </article>
-        ))}
-      </div>
-    </Panel>
-  );
 }
 
 function ConfirmModal({
@@ -964,6 +508,7 @@ function ConfirmModal({
   onSubmit: () => void;
 }) {
   const word = actionWord(action);
+  const requiresWord = action?.kind === "user-delete";
   return (
     <Modal
       open={Boolean(action)}
@@ -971,7 +516,13 @@ function ConfirmModal({
       description={
         action?.kind === "account-delete"
           ? `Удалить аккаунт «${action.account.name}»? Он исчезнет из списка, подписка и доступы пользователей будут отключены. Данные и история останутся в архиве.`
-          : `Подтвердите действие: введите «${word}». Оно будет записано в историю.`
+          : action?.kind === "setting" && action.setting.key === "admin_mfa_required" && action.value === false
+            ? "Отключение требования MFA уменьшает защиту административных операций. Подтвердите изменение настройки."
+            : action?.kind === "user-delete"
+              ? `Удаление пользователя необратимо. Введите «${word}», чтобы подтвердить удаление.`
+              : action?.kind === "subscription"
+                ? `Будет изменён тариф и статус подписки аккаунта «${action.detail.account.name}». Новый срок: ${new Date(addDaysIso(action.days)).toLocaleDateString("ru-RU")}.`
+                : "Проверьте название объекта и подтвердите действие. Изменение автоматически записывается в историю."
       }
       onClose={onClose}
       actions={
@@ -985,7 +536,7 @@ function ConfirmModal({
               ? "danger"
               : "primary"
           }
-          disabled={pending || (action?.kind !== "account-delete" && confirmation !== word)}
+          disabled={pending || (requiresWord && confirmation !== word)}
           onClick={onSubmit}
         >
           {pending ? "Выполняем…" : action?.kind === "account-delete" ? "Удалить аккаунт" : "Подтвердить"}
@@ -1000,7 +551,9 @@ function ConfirmModal({
             value={reason}
             onChange={onReason}
           />
-          <LabeledInput label={`Введите ${word}`} value={confirmation} onChange={onConfirmation} />
+          {requiresWord ? (
+            <LabeledInput label={`Введите ${word}`} value={confirmation} onChange={onConfirmation} />
+          ) : null}
         </div>
       ) : null}
       {error ? (
@@ -1086,14 +639,14 @@ function MfaRequired({ onVerified }: { onVerified: () => void }) {
   const mutation = useMutation({ mutationFn: () => adminRepository.verifyMfa(code), onSuccess: onVerified });
   return (
     <AppShell
-      eyebrow="Protected operations"
+      eyebrow="Защищённый доступ"
       title="Требуется MFA"
-      description="Admin RPC доступны только с assurance level aal2."
+      description="Подтвердите второй фактор для доступа к административным данным."
     >
       <Panel className="mt-6 max-w-2xl">
         <SectionTitle icon={<ShieldCheck size={20} />} title="Подтвердите второй фактор" />
         <p className="mt-3 text-sm leading-6 text-muted">
-          Введите код подтверждённого TOTP-фактора. До успешного challenge клиентские данные и mutations не загружаются.
+          Введите одноразовый код из приложения-аутентификатора. Данные аккаунтов откроются после проверки.
         </p>
         <p className="mt-3 text-sm leading-6 text-muted">
           Если это первый вход, сначала{" "}
@@ -1158,14 +711,6 @@ function AdminFailure({ error, onRetry }: { error: unknown; onRetry: () => void 
     </AppShell>
   );
 }
-function EmptyAdminSection({ title, text }: { title: string; text: string }) {
-  return (
-    <Panel className="mt-6 text-center">
-      <h2 className="text-xl font-semibold">{title}</h2>
-      <p className="mt-2 text-sm text-muted">{text}</p>
-    </Panel>
-  );
-}
 function SectionTitle({ icon, title }: { icon: ReactNode; title: string }) {
   return (
     <div className="flex items-center gap-2">
@@ -1190,15 +735,6 @@ function LabeledInput({
     </label>
   );
 }
-function StatusPill({ tone, children }: { tone: "success" | "danger" | "muted"; children: ReactNode }) {
-  const colors =
-    tone === "success"
-      ? "bg-emerald-50 text-emerald-700"
-      : tone === "danger"
-        ? "bg-rose-50 text-rose-700"
-        : "bg-stone-100 text-muted";
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${colors}`}>{children}</span>;
-}
 function actionWord(action: ConfirmAction | null) {
   if (!action) return "";
   if (action.kind === "retry") return "ПОВТОРИТЬ";
@@ -1222,7 +758,7 @@ function actionTitle(action: ConfirmAction | null) {
   if (action.kind === "account-delete") return `Удалить аккаунт ${action.account.name}?`;
   if (action.kind === "item")
     return `${action.suspended ? "Приостановить" : "Восстановить"} ${action.item.arItemTitle}?`;
-  if (action.kind === "retry") return `Повторить processing: ${action.label}?`;
+  if (action.kind === "retry") return `Повторить обработку: ${action.label}?`;
   if (action.kind === "reset") return `Отправить сброс: ${action.label}?`;
   if (action.kind === "user-status") return `${action.active ? "Разблокировать" : "Заблокировать"} ${action.label}?`;
   if (action.kind === "user-delete") return `Безвозвратно удалить ${action.label}?`;
@@ -1233,14 +769,6 @@ function readableAdminError(error: unknown) {
   if (error instanceof AdminError) return error.message;
   if (error instanceof Error) return error.message;
   return "Не удалось выполнить admin-операцию";
-}
-function formatBytes(value: number) {
-  if (value >= 1_073_741_824)
-    return `${(value / 1_073_741_824).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} ГБ`;
-  return `${Math.round(value / 1_048_576).toLocaleString("ru-RU")} МБ`;
-}
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
 }
 function addDaysIso(days: number) {
   const date = new Date();

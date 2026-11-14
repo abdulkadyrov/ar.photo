@@ -1,0 +1,97 @@
+.support-grid {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.15fr);
+  gap: 1rem;
+}
+.support-correspondence {
+  margin-bottom: 1.25rem;
+  padding: 1rem;
+}
+.support-correspondence h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 650;
+}
+.support-correspondence p {
+  margin: 0.6rem 0;
+  color: var(--muted);
+  font-size: 0.83rem;
+  line-height: 1.6;
+}
+.support-correspondence > span {
+  display: block;
+  border-top: 1px solid var(--line);
+  padding-top: 0.65rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.support-contact-card {
+  border-radius: 12px;
+  padding: 1rem;
+}
+.support-contact-card h2 {
+  font-size: 1.15rem;
+}
+.support-contact-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  box-shadow: none;
+  background: rgba(115, 87, 255, 0.1);
+  color: var(--primary-text);
+}
+.support-contact-card .section-kicker {
+  display: none;
+}
+.support-contact-intro {
+  font-size: 0.8rem;
+}
+.support-faq-item {
+  border-radius: 10px;
+  box-shadow: none;
+}
+.support-faq-item summary {
+  min-height: 50px;
+  padding: 0.75rem 0.85rem;
+  font-size: 0.82rem;
+}
+.support-faq-item p {
+  padding: 0.8rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+.support-grid .section-heading-row h2 {
+  font-size: 1.05rem;
+}
+.support-grid .section-kicker {
+  display: none;
+}
+.support-form {
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+.support-form textarea {
+  min-height: 140px;
+}
+.support-privacy {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 639px) {
+  .support-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  .support-contact-card {
+    grid-row: 1;
+  }
+  .support-correspondence {
+    margin-bottom: 1rem;
+  }
+  .support-faq-item summary {
+    min-height: 50px;
+  }
+  .support-form textarea {
+    min-height: 120px;
+  }
+}

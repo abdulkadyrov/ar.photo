@@ -140,7 +140,7 @@ function RoutedContent() {
           <Route path="/admin" element={<Protected element={<AdminRoute />} />} />
           <Route path="/support" element={<Protected element={<SupportRoute />} />} />
           <Route path="/profile" element={<Protected element={<ProfileRoute />} />} />
-          <Route path="/camera" element={<Protected element={<ArCameraEntryRoute />} />} />
+          <Route path="/camera" element={<ArCameraEntryRoute />} />
           <Route path="/settings" element={<Protected element={<SettingsRoute />} />} />
           <Route path="/settings/subscription" element={<Protected element={<SubscriptionRoute />} />} />
           <Route path="/settings/team" element={<Protected element={<TeamRoute />} />} />

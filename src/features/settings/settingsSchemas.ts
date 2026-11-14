@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+export const accountSettingsSchema = z.object({
+  name: z.string().trim().min(1, "Введите название студии").max(120, "Не более 120 символов"),
+  description: z.string().trim().max(160, "Не более 160 символов").default(""),
+  notifications: z
+    .object({ projects: z.boolean().default(true), team: z.boolean().default(true), news: z.boolean().default(false) })
+    .default({ projects: true, team: true, news: false }),
+});
+export type AccountSettings = z.infer<typeof accountSettingsSchema>;
+
 export const permissionKeys = [
   "upload",
   "edit",
@@ -137,9 +146,7 @@ export const inviteTeamMemberSchema = z
 
 export const inviteDeliverySchema = z
   .object({
-    invitation: z
-      .object({ id: z.string().uuid(), role: assignableMemberRoleSchema, expiresAt: timestamp })
-      .strict(),
+    invitation: z.object({ id: z.string().uuid(), role: assignableMemberRoleSchema, expiresAt: timestamp }).strict(),
     delivery: z.enum(["email", "in_app"]),
   })
   .strict();

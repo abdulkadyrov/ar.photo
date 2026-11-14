@@ -1,14 +1,14 @@
 {
-  "name": "AR Photo",
-  "short_name": "AR Photo",
+  "name": "KHANZAMA — AR-живые фото",
+  "short_name": "KHANZAMA",
   "description": "Безопасная платформа для создания и просмотра оживающих фотографий.",
   "id": "/ar.photo/",
   "start_url": "/ar.photo/",
   "scope": "/ar.photo/",
   "lang": "ru",
   "display": "standalone",
-  "background_color": "#070B11",
-  "theme_color": "#6C5CFF",
+  "background_color": "#f7f6f3",
+  "theme_color": "#7357ff",
   "icons": [
     {
       "src": "icon.svg",

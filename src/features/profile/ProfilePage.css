@@ -1,211 +1,110 @@
 .profile-page {
   display: grid;
   min-width: 0;
-  width: min(100%, 760px);
-  gap: 1rem;
-  margin: 1.25rem auto 0;
+  width: min(100%, 900px);
+  gap: 1.25rem;
+  margin-top: 1.5rem;
 }
-
 .profile-identity-card,
-.profile-subscription-card,
 .profile-links {
   min-width: 0;
-  max-width: 100%;
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 14px;
   background: var(--card);
-  box-shadow: 0 10px 28px rgba(23, 25, 31, 0.05);
 }
-
 .profile-identity-card {
-  display: flex;
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
   align-items: center;
-  gap: 1rem;
-  padding: 1rem;
+  gap: 1.5rem;
+  padding: 1.5rem;
 }
-
 .profile-avatar {
   display: grid;
-  width: 62px;
-  height: 62px;
-  flex: 0 0 auto;
+  width: 112px;
+  height: 112px;
   place-items: center;
   border-radius: 50%;
-  background: linear-gradient(145deg, var(--primary), #8f73ff);
-  color: #ffffff;
-  font-size: 1.15rem;
+  background: rgba(115, 87, 255, 0.12);
+  color: var(--primary-text);
+  font-size: 2rem;
   font-weight: 750;
 }
-
-.profile-name-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.7rem;
-}
-
-.profile-name-row h2 {
-  overflow: hidden;
-  margin: 0;
-  font-size: 1.15rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.profile-name-row p {
-  overflow: hidden;
-  margin: 0.2rem 0 0;
-  color: var(--muted);
-  font-size: 0.78rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.profile-name-row button,
-.profile-name-form button {
+.profile-fields {
   display: grid;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 auto;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 11px;
-  background: #ffffff;
-  color: var(--ink);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
 }
-
-.profile-name-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 38px 38px;
-  align-items: center;
-  gap: 0.35rem;
+.profile-fields label {
+  min-width: 0;
 }
-
-.profile-account-name {
+.profile-fields label > span,
+.profile-field-label {
   display: block;
-  margin-top: 0.45rem;
-  color: var(--primary-text);
-  font-size: 0.7rem;
-  font-weight: 700;
+  margin-bottom: 0.4rem;
+  font-size: 0.83rem;
 }
-
-.profile-subscription-card {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  padding: 1rem;
-}
-
-.profile-plan-icon {
-  display: grid;
-  width: 52px;
-  height: 52px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 15px;
-  background: linear-gradient(145deg, var(--primary), #8f73ff);
-  color: #ffffff;
-}
-
-.profile-subscription-card p,
-.profile-subscription-card h2,
-.profile-subscription-card span {
-  margin: 0;
-}
-
-.profile-subscription-card p {
+.profile-fields input[readonly] {
+  background: var(--surface);
   color: var(--muted);
-  font-size: 0.68rem;
 }
-
-.profile-subscription-card h2 {
-  margin-top: 0.15rem;
-  font-size: 1.05rem;
-}
-
-.profile-subscription-card div > span {
-  display: block;
-  margin-top: 0.25rem;
-  color: var(--muted);
-  font-size: 0.7rem;
-}
-
-.profile-status {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  border-radius: 999px;
-  background: rgba(245, 158, 11, 0.1);
-  padding: 0.32rem 0.5rem;
-  color: #9a5d05;
-  font-size: 0.58rem;
-  font-weight: 700;
-}
-
-.profile-status-active {
-  background: rgba(16, 185, 129, 0.1);
-  color: #147a5c;
-}
-
 .profile-role {
-  position: absolute;
-  right: 0.85rem;
-  bottom: 0.7rem;
-  color: var(--muted);
-  font-size: 0.58rem;
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  min-height: 40px;
+  border-radius: 8px;
+  background: rgba(115, 87, 255, 0.1);
+  padding: 0.45rem 0.75rem;
+  color: var(--primary-text);
+  font-size: 0.87rem;
+  font-weight: 650;
 }
-
+.profile-form-actions {
+  display: flex;
+  grid-column: 1/-1;
+  gap: 0.75rem;
+}
+.profile-form-actions .btn {
+  min-width: 130px;
+}
 .profile-links {
   overflow: hidden;
-  padding: 0.3rem;
 }
-
 .profile-link {
   display: grid;
-  min-height: 52px;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
+  min-height: 72px;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.6rem;
-  border-bottom: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 0 0.7rem;
+  gap: 0.75rem;
+  padding: 0.8rem 1.3rem;
   color: var(--ink);
   text-decoration: none;
 }
-
-.profile-link:last-child {
-  border-bottom: 0;
+.profile-link + .profile-link {
+  border-top: 1px solid var(--line);
 }
-
 .profile-link > span {
   display: grid;
   place-items: center;
+  color: var(--primary-text);
+}
+.profile-link strong {
+  font-size: 0.95rem;
+}
+.profile-link p {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
   color: var(--muted);
 }
-
-.profile-link strong {
-  font-size: 0.82rem;
-}
-
 .profile-link > svg {
   color: var(--muted);
 }
-
-.profile-link-primary > span,
-.profile-link-primary strong {
-  color: var(--primary);
-}
-
 .profile-sign-out {
-  min-width: 0;
-  max-width: 100%;
+  justify-content: flex-start;
   width: 100%;
+  min-height: 52px;
 }
-
 .profile-toast-wrapper {
   position: fixed;
   z-index: 50;
@@ -213,41 +112,48 @@
   bottom: 1.5rem;
   width: min(calc(100vw - 2.5rem), 24rem);
 }
-
 .profile-toast-wrapper .toast {
   width: 100%;
 }
-
 @media (max-width: 639px) {
   .profile-page {
-    gap: 0.65rem;
-    margin-top: 0.75rem;
+    gap: 1rem;
+    margin-top: 1rem;
   }
-
-  .profile-identity-card,
-  .profile-subscription-card {
-    padding: 0.75rem;
+  .profile-identity-card {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 1rem;
   }
-
   .profile-avatar {
-    width: 52px;
-    height: 52px;
-    font-size: 0.95rem;
+    width: 70px;
+    height: 70px;
+    font-size: 1.5rem;
   }
-
-  .profile-plan-icon {
-    width: 46px;
-    height: 46px;
+  .profile-fields {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
   }
-
-  .profile-links {
-    padding: 0.25rem;
+  .profile-form-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
   }
-
+  .profile-form-actions .btn {
+    min-width: 0;
+  }
   .profile-link {
-    min-height: 46px;
+    min-height: 50px;
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+    gap: 0.6rem;
+    padding: 0.65rem 0.8rem;
   }
-
+  .profile-link strong {
+    font-size: 0.85rem;
+  }
+  .profile-link p {
+    display: none;
+  }
   .profile-toast-wrapper {
     right: 0.75rem;
     bottom: calc(5.5rem + env(safe-area-inset-bottom));
