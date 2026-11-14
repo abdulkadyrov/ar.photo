@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-rou
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { AdminRoute } from "./AdminPage";
+import { AccountProfileEditor } from "./AdminProfileEditors";
 import { getAdminRepository } from "./adminRepository";
 
 vi.mock("../../app/layout/AppShell", () => ({
@@ -156,5 +157,33 @@ describe("exact administration back navigation", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Аккаунты$/ }));
     await screen.findByRole("heading", { name: "Управление аккаунтами" });
     expect(location()).toBe("/admin?section=accounts&accountStatus=suspended&accountSearch=Beta&accountQuery=Beta");
+  });
+});
+
+describe("account editor cancellation", () => {
+  it("does not save dirty fields when cancelling and discarding", async () => {
+    const repository = getAdminRepository();
+    const detail = await repository.getAccountDetail(
+      "20000000-0000-4000-8000-000000000001",
+      "Подготовка проверки отмены редактирования",
+    );
+    const update = vi.spyOn(repository, "updateAccount").mockResolvedValue(undefined);
+    const onSaved = vi.fn(async () => {});
+    const onCancel = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <AccountProfileEditor detail={detail} onCancel={onCancel} onSaved={onSaved} />
+      </QueryClientProvider>,
+    );
+    fireEvent.change(screen.getByLabelText("Название аккаунта *"), { target: { value: "Несохранённое название" } });
+    fireEvent.click(screen.getByRole("button", { name: "Отмена" }));
+    const discard = await screen.findByRole("dialog", { name: "Отменить изменения?" });
+    await act(async () => {});
+    expect(update).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+    fireEvent.click(within(discard).getByRole("button", { name: "Не сохранять" }));
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(update).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
   });
 });

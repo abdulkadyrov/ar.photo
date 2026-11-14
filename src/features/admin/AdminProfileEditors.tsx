@@ -38,7 +38,7 @@ export function AccountProfileEditor({
   };
   return (
     <div className="admin-page">
-      <button className="admin-back" onClick={cancel}>
+      <button type="button" className="admin-back" onClick={cancel}>
         <ArrowLeft size={16} />
         {detail.account.name}
       </button>
@@ -107,7 +107,7 @@ export function AccountProfileEditor({
           </p>
         ) : null}
         <div className="admin-editor-footer">
-          <Button variant="quiet" onClick={cancel} disabled={mutation.isPending}>
+          <Button type="button" variant="quiet" onClick={cancel} disabled={mutation.isPending}>
             Отмена
           </Button>
           <Button
@@ -205,7 +205,7 @@ function DiscardModal({ open, onClose, onDiscard }: { open: boolean; onClose: ()
       description="Введённые данные ещё не сохранены."
       onClose={onClose}
       actions={
-        <Button variant="danger" onClick={onDiscard}>
+        <Button type="button" variant="danger" onClick={onDiscard}>
           Не сохранять
         </Button>
       }

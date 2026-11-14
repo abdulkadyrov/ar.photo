@@ -43,7 +43,8 @@ test("keeps public AR camera-explicit with a normal-video fallback", async ({ pa
     ),
   ).toBe(0);
   await page.getByRole("button", { name: "Открыть AR-камеру" }).click();
-  await expect(page.getByText("Доступ к камере запрещён.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Повторить", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Смотреть видео" }).click();
   await expect(page.getByTestId("public-ar-fallback-video")).toBeVisible();
   await expectNoHorizontalOverflow(page);

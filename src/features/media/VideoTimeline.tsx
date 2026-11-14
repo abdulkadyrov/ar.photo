@@ -96,7 +96,7 @@ export function VideoTimeline({
   const [zoom, setZoom] = useState(1);
   const [trimming, setTrimming] = useState(false);
   const expectedScroll = useRef<number | undefined>(undefined);
-  const pan = useRef<{ x: number; scroll: number; moved: boolean } | undefined>(undefined);
+  const pan = useRef<{ x: number; scroll: number; moved: boolean; active: boolean } | undefined>(undefined);
   const drag = useRef<
     { edge: "start" | "end"; x: number; time: number; segments: VideoSegment[]; scroll: number } | undefined
   >(undefined);
@@ -110,7 +110,9 @@ export function VideoTimeline({
   }, []);
   useEffect(() => {
     const el = viewport.current;
-    if (!el || drag.current) return;
+    // A decoded video's timeupdate can arrive behind the pointer. During a pan,
+    // the pointer owns the viewport; an older cursor must not rewind the gesture.
+    if (!el || drag.current || (pan.current?.active && pan.current.moved)) return;
     const target = cursor * scale;
     if (Math.abs(el.scrollLeft - target) > 1) {
       expectedScroll.current = target;
@@ -147,12 +149,13 @@ export function VideoTimeline({
           onPointerDown={(e) => {
             pan.current = undefined;
             if (e.pointerType !== "mouse" || (e.target as HTMLElement).closest('[role="slider"]')) return;
-            pan.current = { x: e.clientX, scroll: e.currentTarget.scrollLeft, moved: false };
+            expectedScroll.current = undefined;
+            pan.current = { x: e.clientX, scroll: e.currentTarget.scrollLeft, moved: false, active: true };
           }}
           onPointerMove={(e) => {
             if (!e.buttons) return;
             const p = pan.current;
-            if (!p) return;
+            if (!p?.active) return;
             if (Math.abs(e.clientX - p.x) > 4) {
               p.moved = true;
               e.currentTarget.setPointerCapture(e.pointerId);
@@ -160,6 +163,16 @@ export function VideoTimeline({
             if (p.moved) e.currentTarget.scrollLeft = p.scroll + p.x - e.clientX;
           }}
           onPointerUp={(e) => {
+            const p = pan.current;
+            if (p?.active && p.moved) {
+              // Commit the release position even if WebKit coalesced a move or
+              // has not dispatched its final scroll event yet.
+              e.currentTarget.scrollLeft = p.scroll + p.x - e.clientX;
+              const left = e.currentTarget.scrollLeft;
+              expectedScroll.current = left;
+              p.active = false;
+              onSeek(Math.max(0, Math.min(duration, left / scale)));
+            } else if (p) p.active = false;
             if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
           }}
           onPointerCancel={() => {

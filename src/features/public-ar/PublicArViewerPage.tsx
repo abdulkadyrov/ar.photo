@@ -482,7 +482,7 @@ function ViewerIntro({
         <div>
           <span className="ar-public-tag">AR-живое фото</span>
           <h1>{manifest.title}</h1>
-          <p>
+          <p role={error ? "alert" : undefined}>
             {error ||
               "Оживите напечатанное фото: откройте камеру и наведите её на фотографию, чтобы увидеть видео в дополненной реальности."}
           </p>
