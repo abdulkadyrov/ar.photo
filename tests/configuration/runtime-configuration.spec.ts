@@ -15,5 +15,5 @@ test("fails closed instead of exposing demo data without backend configuration",
   await expect(page.getByRole("heading", { name: "Конфигурация сервиса недоступна" })).toBeVisible();
 
   await page.goto("./privacy");
-  await expect(page.getByRole("heading", { name: "Камера и приватность" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Камера и конфиденциальность" })).toBeVisible();
 });
