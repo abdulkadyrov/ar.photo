@@ -14,3 +14,6 @@ supabase/.temp/
 !.env.example
 !.env.demo
 !.env.unconfigured
+
+__pycache__/
+*.py[cod]
