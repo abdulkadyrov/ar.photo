@@ -52,6 +52,6 @@ test("keeps critical public and protected surfaces free of serious WCAG violatio
   await expectNoSeriousAccessibilityViolations(page, "admin");
 
   await page.goto("./ar/demo");
-  await expect(page.getByRole("button", { name: "Открыть AR-камеру" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Повторить", exact: true })).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page, "public AR intro");
 });

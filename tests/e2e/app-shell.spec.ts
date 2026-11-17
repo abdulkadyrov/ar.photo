@@ -131,11 +131,6 @@ test("opens the production QR camera from the protected workspace", async ({ pag
   await page.goto("./camera");
   await expect(page).toHaveURL(/\/ar\.photo\/camera$/);
 
-  await expect(page.getByRole("heading", { name: "Оживите печатную фотографию" })).toBeVisible();
-  expect(
-    await page.evaluate(() => (window as typeof window & { __entryCameraRequests: number }).__entryCameraRequests),
-  ).toBe(0);
-  await page.getByRole("button", { name: "Разрешить камеру" }).click();
   await expect(page.getByRole("heading", { name: "Камера не запустилась" })).toBeVisible();
   expect(
     await page.evaluate(() => (window as typeof window & { __entryCameraRequests: number }).__entryCameraRequests),
@@ -227,10 +222,10 @@ test("redirects the legacy test viewer to the production QR camera", async ({ pa
   await page.goto("./viewer/test");
 
   await expect(page).toHaveURL(/\/ar\.photo\/camera$/);
-  await expect(page.getByRole("heading", { name: "Оживите печатную фотографию" })).toBeVisible();
+  await expect(page.locator(".ar-camera-live")).toBeVisible();
 });
 
-test("keeps the public AR viewer camera-explicit with a no-camera fallback", async ({ page }) => {
+test("automatically opens AR and keeps a video fallback after denied permission", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(window, "__arPhotoCameraRequests", { value: 0, writable: true });
     Object.defineProperty(navigator, "mediaDevices", {
@@ -246,13 +241,6 @@ test("keeps the public AR viewer camera-explicit with a no-camera fallback", asy
   });
   await page.goto("./ar/demo");
 
-  await expect(page.getByRole("heading", { name: "Демо AR Photo" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Открыть AR-камеру" })).toBeVisible();
-  expect(
-    await page.evaluate(() => (window as typeof window & { __arPhotoCameraRequests: number }).__arPhotoCameraRequests),
-  ).toBe(0);
-
-  await page.getByRole("button", { name: "Открыть AR-камеру" }).click();
   await expect(page.getByText("Доступ к камере запрещён.", { exact: false })).toBeVisible();
 
   await page.getByRole("button", { name: "Смотреть видео" }).click();

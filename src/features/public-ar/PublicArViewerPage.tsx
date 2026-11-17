@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import "./PublicArViewerPage.css";
 import { PrivacyRoute } from "./PrivacyPage";
 import {
@@ -31,13 +32,7 @@ import {
   type CachedPublicArProject,
   type MaterializedPublicArProject,
 } from "./publicArCache";
-import {
-  initialArMuted,
-  loadPublicManifest,
-  manifestRefreshDelay,
-  PublicManifestError,
-  type PublicArManifest,
-} from "./publicManifest";
+import { loadPublicManifest, manifestRefreshDelay, PublicManifestError, type PublicArManifest } from "./publicManifest";
 import {
   createPublicArPlaybackVideos,
   startPublicMindAr,
@@ -97,7 +92,8 @@ export function PublicArViewerRoute() {
         .then(async (next) => {
           const cached = await loadCachedPublicArProject(publicSlug, next);
           if (controller.signal.aborted) return;
-          setMuted(initialArMuted(next));
+          // Automatic camera entry has no audio gesture; start muted for Safari autoplay.
+          setMuted(true);
           setCachedProject(cached);
           telemetry.track("page_open");
           setMode(ordinaryVideo && next.fallbackEnabled ? "fallback" : "intro");
@@ -163,7 +159,7 @@ export function PublicArViewerRoute() {
     try {
       let project = cachedProject;
       if (!project) {
-        setMode("pairing");
+        flushSync(() => setMode("pairing"));
         await nextPaint();
         const scannerVideo = scannerVideoRef.current;
         if (!scannerVideo) throw new Error("QR camera is not ready");
@@ -233,6 +229,18 @@ export function PublicArViewerRoute() {
     }
     sessionRef.current = session;
   };
+
+  const autoStartViewer = useEffectEvent(() => void startViewer());
+  useEffect(() => {
+    if (mode !== "intro") return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) autoStartViewer();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
 
   const openFallback = () => {
     flowControllerRef.current?.abort();
@@ -316,7 +324,13 @@ export function PublicArViewerRoute() {
     <main className="ar-viewer" data-mode={mode}>
       <div ref={containerRef} className={active ? "ar-viewer-stage" : "hidden"} aria-hidden={!active} />
 
-      {mode === "intro" || mode === "error" ? (
+      {mode === "intro" ? (
+        <div className="ar-camera-launch" role="status">
+          <h1>Хан Зама</h1>
+          <p>Открываем камеру…</p>
+        </div>
+      ) : null}
+      {mode === "error" ? (
         <ViewerIntro
           manifest={manifest}
           cached={Boolean(cachedProject)}

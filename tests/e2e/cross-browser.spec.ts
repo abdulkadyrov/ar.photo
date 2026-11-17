@@ -21,7 +21,7 @@ test("opens the protected workspace with responsive navigation", async ({ page }
   await expectNoHorizontalOverflow(page);
 });
 
-test("keeps public AR camera-explicit with a normal-video fallback", async ({ page }) => {
+test("automatically opens public AR with a normal-video fallback", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(window, "__crossBrowserCameraRequests", { value: 0, writable: true });
     Object.defineProperty(navigator, "mediaDevices", {
@@ -36,13 +36,6 @@ test("keeps public AR camera-explicit with a normal-video fallback", async ({ pa
   });
   await page.goto("./ar/demo");
 
-  await expect(page.getByRole("button", { name: "Открыть AR-камеру" })).toBeVisible();
-  expect(
-    await page.evaluate(
-      () => (window as typeof window & { __crossBrowserCameraRequests: number }).__crossBrowserCameraRequests,
-    ),
-  ).toBe(0);
-  await page.getByRole("button", { name: "Открыть AR-камеру" }).click();
   await expect(page.getByRole("alert")).toBeVisible();
   await expect(page.getByRole("button", { name: "Повторить", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Смотреть видео" }).click();

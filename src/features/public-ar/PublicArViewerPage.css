@@ -1194,3 +1194,132 @@
   font-size: 0.7rem;
   text-decoration: none;
 }
+
+/* Camera-first entry: the live picture stays visible beneath quiet guidance. */
+.ar-camera-live {
+  isolation: isolate;
+}
+.ar-camera-live .ar-pairing-camera {
+  transform: none;
+}
+.ar-camera-vignette {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(3, 5, 8, 0.7), transparent 30%, transparent 60%, rgba(3, 5, 8, 0.85));
+  pointer-events: none;
+}
+.ar-camera-brand {
+  position: absolute;
+  top: max(1.5rem, env(safe-area-inset-top));
+  left: 1.5rem;
+  display: grid;
+  gap: 0.2rem;
+}
+.ar-camera-brand strong {
+  font-size: 1.2rem;
+}
+.ar-camera-brand span {
+  font-size: 0.8rem;
+  color: #e1dfeb;
+}
+.ar-camera-launch {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  text-align: center;
+  background: #14121e;
+  animation: ar-camera-arrive 250ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.ar-camera-launch > svg {
+  color: #d4c6ff;
+}
+.ar-camera-launch h1 {
+  margin: 0;
+  font-size: clamp(2rem, 8vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+.ar-camera-launch p {
+  max-width: 30rem;
+  margin: 0;
+  line-height: 1.6;
+  color: #eeebf6;
+}
+.ar-camera-launch small {
+  color: #cbc4dd;
+}
+.ar-camera-error h1 {
+  font-size: clamp(1.5rem, 6vw, 2rem);
+}
+.ar-camera-error .btn {
+  margin-top: 0.5rem;
+}
+.ar-camera-instruction {
+  position: absolute;
+  bottom: max(5rem, calc(env(safe-area-inset-bottom) + 4rem));
+  left: 1.25rem;
+  right: 1.25rem;
+  text-align: center;
+  animation: ar-camera-arrive 250ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.ar-camera-instruction > svg {
+  margin: 0 auto 0.75rem;
+}
+.ar-camera-instruction h1 {
+  margin: 0;
+  font-size: clamp(1.25rem, 5vw, 1.6rem);
+  font-weight: 650;
+  line-height: 1.25;
+}
+.ar-camera-instruction p {
+  margin: 0.65rem auto 0;
+  max-width: 25rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.ar-camera-footnote {
+  position: absolute;
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  left: 1rem;
+  right: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #e1dfeb;
+}
+.ar-camera-live .ar-qr-guide {
+  width: min(72vw, 32dvh, 23rem);
+  top: 43%;
+}
+@keyframes ar-camera-arrive {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ar-camera-launch,
+  .ar-camera-instruction {
+    animation: ar-camera-fade 150ms linear both;
+  }
+}
+@keyframes ar-camera-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
