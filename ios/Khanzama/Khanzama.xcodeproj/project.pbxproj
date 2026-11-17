@@ -1,0 +1,505 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1464FF118AF3E0E5A85C47ED /* AppClip.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8DEA42350C0811045C21D7E5 /* AppClip.framework */; };
+		190DEE7B3EB9326583EF8562 /* ViewerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E2A0F6CFC124D35D56DA79F /* ViewerModel.swift */; };
+		2B93920B84BBC2B590B7C7B6 /* ViewerURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61971D28D3C0C3A4ADB8D8FC /* ViewerURL.swift */; };
+		3AF3F24F4FBBA2049CE98CC6 /* KhanzamaClip.app in Embed App Clips */ = {isa = PBXBuildFile; fileRef = E25C47F223CF38CF40B53C00 /* KhanzamaClip.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3B5071D41530DC3E2F6A4E30 /* ViewerWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E650B848F773A98889AFAFD /* ViewerWebView.swift */; };
+		59D58093F6E38DCD4E912D64 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E6D3D9D85B4B84C52EC10D07 /* Assets.xcassets */; };
+		5D3E6D97D73EFEF56F6E0121 /* KhanzamaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECB237455B81D8C10EB9EF08 /* KhanzamaApp.swift */; };
+		734E0D6A5EE0B78250A908B3 /* ViewerRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E99132A960A16CD0587FA0 /* ViewerRoot.swift */; };
+		7A19D96BCD3C856EC256B4E0 /* KhanzamaClipApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35234E26D53F2D1E60592355 /* KhanzamaClipApp.swift */; };
+		8AB8C0762322EC19FC2B9CBA /* ViewerURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61971D28D3C0C3A4ADB8D8FC /* ViewerURL.swift */; };
+		BABAB8D7A4EF5B74FB7E1425 /* ViewerWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E650B848F773A98889AFAFD /* ViewerWebView.swift */; };
+		E3F7599C78A53B8196D0C12E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E6D3D9D85B4B84C52EC10D07 /* Assets.xcassets */; };
+		F100187B416B5D106813EF42 /* ViewerRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E99132A960A16CD0587FA0 /* ViewerRoot.swift */; };
+		F2B70EB76400FF92B44AECA2 /* ViewerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E2A0F6CFC124D35D56DA79F /* ViewerModel.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		F00AAADFBC5909771F07FA60 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 9492720BDFB6E0285B608EC6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A4127468EAB4F5BBB05A7BBC;
+			remoteInfo = KhanzamaClip;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		43FF4394287A0BEECD723FF3 /* Embed App Clips */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/AppClips";
+			dstSubfolderSpec = 16;
+			files = (
+				3AF3F24F4FBBA2049CE98CC6 /* KhanzamaClip.app in Embed App Clips */,
+			);
+			name = "Embed App Clips";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		35234E26D53F2D1E60592355 /* KhanzamaClipApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KhanzamaClipApp.swift; sourceTree = "<group>"; };
+		61971D28D3C0C3A4ADB8D8FC /* ViewerURL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerURL.swift; sourceTree = "<group>"; };
+		6428F7266444A4C436A4C03E /* KhanzamaClip.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KhanzamaClip.entitlements; sourceTree = "<group>"; };
+		7E650B848F773A98889AFAFD /* ViewerWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerWebView.swift; sourceTree = "<group>"; };
+		84E99132A960A16CD0587FA0 /* ViewerRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerRoot.swift; sourceTree = "<group>"; };
+		8DEA42350C0811045C21D7E5 /* AppClip.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppClip.framework; path = System/Library/Frameworks/AppClip.framework; sourceTree = SDKROOT; };
+		9E2A0F6CFC124D35D56DA79F /* ViewerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerModel.swift; sourceTree = "<group>"; };
+		B1127B6280E44A6B0AEF2A10 /* Khanzama.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Khanzama.entitlements; sourceTree = "<group>"; };
+		D4AD9230244BE59E30DEF862 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		D78442778E60A5FDBF5EC6AB /* Khanzama.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Khanzama.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E25C47F223CF38CF40B53C00 /* KhanzamaClip.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = KhanzamaClip.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E6D3D9D85B4B84C52EC10D07 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		ECA2FF3189DE8C064923F5B9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		ECB237455B81D8C10EB9EF08 /* KhanzamaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KhanzamaApp.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		8260387861447B34ED2D7B64 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1464FF118AF3E0E5A85C47ED /* AppClip.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		128EEEEEC9CFE75B112FE20D = {
+			isa = PBXGroup;
+			children = (
+				E6D3D9D85B4B84C52EC10D07 /* Assets.xcassets */,
+				255E533C169380669D4EA7BB /* App */,
+				6171B3D06F6EEC5DB031778D /* Clip */,
+				E667887D436232BDF8C38E30 /* Shared */,
+				B8C5D4AA2179C16438F7C157 /* Frameworks */,
+				F5F9EA23F100FFDB1A2FAEA0 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		255E533C169380669D4EA7BB /* App */ = {
+			isa = PBXGroup;
+			children = (
+				ECA2FF3189DE8C064923F5B9 /* Info.plist */,
+				B1127B6280E44A6B0AEF2A10 /* Khanzama.entitlements */,
+				ECB237455B81D8C10EB9EF08 /* KhanzamaApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		6171B3D06F6EEC5DB031778D /* Clip */ = {
+			isa = PBXGroup;
+			children = (
+				D4AD9230244BE59E30DEF862 /* Info.plist */,
+				6428F7266444A4C436A4C03E /* KhanzamaClip.entitlements */,
+				35234E26D53F2D1E60592355 /* KhanzamaClipApp.swift */,
+			);
+			path = Clip;
+			sourceTree = "<group>";
+		};
+		B8C5D4AA2179C16438F7C157 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				8DEA42350C0811045C21D7E5 /* AppClip.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		E667887D436232BDF8C38E30 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				9E2A0F6CFC124D35D56DA79F /* ViewerModel.swift */,
+				84E99132A960A16CD0587FA0 /* ViewerRoot.swift */,
+				61971D28D3C0C3A4ADB8D8FC /* ViewerURL.swift */,
+				7E650B848F773A98889AFAFD /* ViewerWebView.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		F5F9EA23F100FFDB1A2FAEA0 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D78442778E60A5FDBF5EC6AB /* Khanzama.app */,
+				E25C47F223CF38CF40B53C00 /* KhanzamaClip.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A4127468EAB4F5BBB05A7BBC /* KhanzamaClip */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7CD5FDC91CE035DE66A8DE18 /* Build configuration list for PBXNativeTarget "KhanzamaClip" */;
+			buildPhases = (
+				BB05EC5BF23D6422B39335C5 /* Sources */,
+				1CEE6AEAC122D27D0D4BA2C3 /* Resources */,
+				8260387861447B34ED2D7B64 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = KhanzamaClip;
+			packageProductDependencies = (
+			);
+			productName = KhanzamaClip;
+			productReference = E25C47F223CF38CF40B53C00 /* KhanzamaClip.app */;
+			productType = "com.apple.product-type.application.on-demand-install-capable";
+		};
+		D19F18489D701E97571754FA /* Khanzama */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BCAAECFF26F4674D47C6821B /* Build configuration list for PBXNativeTarget "Khanzama" */;
+			buildPhases = (
+				D3795BCFDB02FFA6C1A423A0 /* Sources */,
+				77C5415E835D508BB4CF064B /* Resources */,
+				43FF4394287A0BEECD723FF3 /* Embed App Clips */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				20AC6171DA5B6E259EC05544 /* PBXTargetDependency */,
+			);
+			name = Khanzama;
+			packageProductDependencies = (
+			);
+			productName = Khanzama;
+			productReference = D78442778E60A5FDBF5EC6AB /* Khanzama.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		9492720BDFB6E0285B608EC6 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					A4127468EAB4F5BBB05A7BBC = {
+						ProvisioningStyle = Automatic;
+					};
+					D19F18489D701E97571754FA = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 388555B4CFFB401E5B06A5A5 /* Build configuration list for PBXProject "Khanzama" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 128EEEEEC9CFE75B112FE20D;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = F5F9EA23F100FFDB1A2FAEA0 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D19F18489D701E97571754FA /* Khanzama */,
+				A4127468EAB4F5BBB05A7BBC /* KhanzamaClip */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1CEE6AEAC122D27D0D4BA2C3 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E3F7599C78A53B8196D0C12E /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		77C5415E835D508BB4CF064B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				59D58093F6E38DCD4E912D64 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		BB05EC5BF23D6422B39335C5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7A19D96BCD3C856EC256B4E0 /* KhanzamaClipApp.swift in Sources */,
+				F2B70EB76400FF92B44AECA2 /* ViewerModel.swift in Sources */,
+				734E0D6A5EE0B78250A908B3 /* ViewerRoot.swift in Sources */,
+				2B93920B84BBC2B590B7C7B6 /* ViewerURL.swift in Sources */,
+				BABAB8D7A4EF5B74FB7E1425 /* ViewerWebView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D3795BCFDB02FFA6C1A423A0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5D3E6D97D73EFEF56F6E0121 /* KhanzamaApp.swift in Sources */,
+				190DEE7B3EB9326583EF8562 /* ViewerModel.swift in Sources */,
+				F100187B416B5D106813EF42 /* ViewerRoot.swift in Sources */,
+				8AB8C0762322EC19FC2B9CBA /* ViewerURL.swift in Sources */,
+				3B5071D41530DC3E2F6A4E30 /* ViewerWebView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		20AC6171DA5B6E259EC05544 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A4127468EAB4F5BBB05A7BBC /* KhanzamaClip */;
+			targetProxy = F00AAADFBC5909771F07FA60 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		30A563B69CD67C11FACF54AF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				KHANZAMA_BUNDLE_ID = ru.khanzama.arphoto;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		3285DF727749CA492CB63FC0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Clip/KhanzamaClip.entitlements;
+				INFOPLIST_FILE = Clip/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(KHANZAMA_BUNDLE_ID).Clip";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		4420672884E8C30BEE2DC361 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Clip/KhanzamaClip.entitlements;
+				INFOPLIST_FILE = Clip/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(KHANZAMA_BUNDLE_ID).Clip";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5D517F15391BAF4B3324E230 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/Khanzama.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(KHANZAMA_BUNDLE_ID)";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		605B9DE8B7A201F3D9508D00 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				KHANZAMA_BUNDLE_ID = ru.khanzama.arphoto;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		A27D7F3DFDA9A80EF397085D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/Khanzama.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(KHANZAMA_BUNDLE_ID)";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		388555B4CFFB401E5B06A5A5 /* Build configuration list for PBXProject "Khanzama" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				30A563B69CD67C11FACF54AF /* Debug */,
+				605B9DE8B7A201F3D9508D00 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7CD5FDC91CE035DE66A8DE18 /* Build configuration list for PBXNativeTarget "KhanzamaClip" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4420672884E8C30BEE2DC361 /* Debug */,
+				3285DF727749CA492CB63FC0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BCAAECFF26F4674D47C6821B /* Build configuration list for PBXNativeTarget "Khanzama" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A27D7F3DFDA9A80EF397085D /* Debug */,
+				5D517F15391BAF4B3324E230 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 9492720BDFB6E0285B608EC6 /* Project object */;
+}

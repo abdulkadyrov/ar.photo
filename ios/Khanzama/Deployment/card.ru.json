@@ -1,0 +1,14 @@
+{
+  "status": "draft-not-published",
+  "locale": "ru",
+  "title": "Хан Зама",
+  "subtitle": "Оживите вашу фотографию",
+  "action": "VIEW",
+  "invocationURLPrefix": "https://khanzama.ru/ar.photo/",
+  "headerImage": {
+    "status": "required-before-submission",
+    "width": 1800,
+    "height": 1200,
+    "alpha": false
+  }
+}
