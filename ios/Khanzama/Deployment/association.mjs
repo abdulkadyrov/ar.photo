@@ -1,3 +1,5 @@
+import process from "node:process";
+import { log } from "node:console";
 import { writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
@@ -23,5 +25,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const [teamId, bundleId, output] = process.argv.slice(2);
   if (!output) throw new Error("Usage: node association.mjs TEAM_ID BUNDLE_ID OUTPUT_FILE");
   await writeFile(output, JSON.stringify(association(teamId, bundleId), null, 2) + "\n", { flag: "wx" });
-  console.log(`Created ${output}. Verify identifiers in Apple Developer before publishing.`);
+  log(`Created ${output}. Verify identifiers in Apple Developer before publishing.`);
 }
