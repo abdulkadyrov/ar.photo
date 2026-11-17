@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { useLocation, useNavigationType } from "react-router-dom";
 
 const scrollPositions = new Map<string, number>();
@@ -7,6 +7,7 @@ const maxRestoreFrames = 60;
 export function ScrollPositionManager() {
   const location = useLocation();
   const navigationType = useNavigationType();
+  const previousPath = useRef(location.pathname);
 
   useEffect(() => {
     const previousMode = window.history.scrollRestoration;
@@ -18,7 +19,10 @@ export function ScrollPositionManager() {
 
   useLayoutEffect(() => {
     const locationKey = location.key;
-    const targetY = navigationType === "POP" ? (scrollPositions.get(locationKey) ?? 0) : 0;
+    const replacesCurrentPage = navigationType === "REPLACE" && previousPath.current === location.pathname;
+    const targetY =
+      navigationType === "POP" ? (scrollPositions.get(locationKey) ?? 0) : replacesCurrentPage ? window.scrollY : 0;
+    previousPath.current = location.pathname;
     let frame = 0;
     let attempts = 0;
 
@@ -35,7 +39,7 @@ export function ScrollPositionManager() {
       window.cancelAnimationFrame(frame);
       scrollPositions.set(locationKey, window.scrollY);
     };
-  }, [location.key, navigationType]);
+  }, [location.key, location.pathname, navigationType]);
 
   return null;
 }

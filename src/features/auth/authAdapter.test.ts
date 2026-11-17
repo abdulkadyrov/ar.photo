@@ -72,6 +72,18 @@ describe("unconfigured auth adapter", () => {
 });
 
 describe("supabase explicit auth adapter", () => {
+  it("passes the entered name to the existing self-service profile bootstrap as display metadata", async () => {
+    const signUp = vi.fn().mockResolvedValue({ data: { session: null }, error: null });
+    const adapter = new SupabaseAuthAdapter({ auth: { signUp } } as unknown as SupabaseBrowserClient);
+    await adapter.signUp({ email: "owner@example.com", password: "Example123", fullName: "  Мария Кузнецова  " });
+    expect(signUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          data: { registration_source: "self_service", full_name: "Мария Кузнецова" },
+        }),
+      }),
+    );
+  });
   it("does not create an anonymous session when no login exists", async () => {
     const getSession = vi.fn().mockResolvedValue({ data: { session: null }, error: null });
     const signOut = vi.fn();

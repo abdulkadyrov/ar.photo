@@ -1,0 +1,1197 @@
+.settings-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+.settings-navigation .btn {
+  min-height: 40px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.8rem;
+}
+.account-settings-form {
+  display: grid;
+  gap: 1rem;
+  max-width: 900px;
+  margin-top: 1.25rem;
+}
+.account-settings-form h2 {
+  margin: 0 0 1rem;
+  color: var(--primary-text);
+  font-size: 1rem;
+}
+.account-settings-form > .surface-card {
+  padding: 1.1rem;
+}
+.account-settings-form > section > label,
+.account-settings-form > .surface-card > label {
+  display: block;
+  margin-top: 0.8rem;
+}
+.account-settings-form label > span {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.83rem;
+  font-weight: 550;
+}
+.account-settings-form label > small {
+  display: block;
+  margin-top: 0.2rem;
+  text-align: right;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+.account-setting-language {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.86rem;
+}
+.account-setting-language > span:last-child {
+  min-width: 40%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+}
+.settings-helper {
+  margin: 0.3rem 0 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.account-settings-form .account-notification-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 56px;
+  margin: 0;
+  padding: 0.65rem 0;
+}
+.account-notification-row + .account-notification-row {
+  border-top: 1px solid var(--line);
+}
+.account-notification-row > span {
+  margin: 0 !important;
+  min-width: 0;
+}
+.account-notification-row strong {
+  font-size: 0.85rem;
+  font-weight: 550;
+}
+.account-notification-row small {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 400;
+}
+.account-notification-row input {
+  position: relative;
+  width: 38px;
+  height: 23px;
+  flex-shrink: 0;
+  appearance: none;
+  border-radius: 999px;
+  background: #d1d0d5;
+  cursor: pointer;
+}
+.account-notification-row input:before {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fff;
+  content: "";
+}
+.account-notification-row input:checked {
+  background: var(--primary);
+}
+.account-notification-row input:checked:before {
+  left: 18px;
+}
+.account-notification-row input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+}
+.account-notification-row input:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.account-settings-link {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  padding: 1rem;
+  color: var(--primary-text);
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.account-settings-link span {
+  flex: 1;
+}
+.account-settings-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+.account-settings-actions .btn {
+  min-width: 140px;
+}
+.settings-saved,
+.security-confirmed {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #047857;
+  font-size: 0.83rem;
+}
+.package-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 1rem;
+}
+.package-summary > .surface-card {
+  padding: 1.25rem;
+}
+.package-summary h2 {
+  font-size: 1.5rem;
+}
+.package-summary dl {
+  gap: 0.8rem;
+}
+.package-summary .metric-icon {
+  width: 40px;
+  height: 40px;
+}
+.settings-usage-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  margin-top: 0.5rem;
+  background: #ebe8f1;
+}
+.team-members {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+.team-member.surface-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 1rem;
+}
+.team-member + .team-member {
+  border-top: 1px solid var(--line);
+}
+.team-member-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.team-member h2 {
+  font-size: 0.95rem;
+}
+.team-member p {
+  font-size: 0.8rem;
+}
+.team-member .btn {
+  min-height: 40px;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.75rem;
+}
+.security-password-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  max-width: 900px;
+}
+.security-password-card > div {
+  min-width: 0;
+  flex: 1;
+}
+.security-password-card h2,
+.security-factor-heading h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+.security-password-card p,
+.security-factor-heading p {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.security-password-card > .btn {
+  font-size: 0.8rem;
+}
+.security-factor-card {
+  max-width: 900px;
+}
+.security-factor-heading {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.security-factor-heading > div {
+  min-width: 0;
+  flex: 1;
+}
+.security-enabled {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: #e8f8e7;
+  color: #166534;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.75rem;
+}
+.security-confirm-form {
+  display: grid;
+  max-width: 400px;
+  gap: 0.75rem;
+  margin-top: 1.2rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1.2rem;
+}
+.security-confirm-form h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.security-confirm-form p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+.security-confirm-form label {
+  font-size: 0.8rem;
+  font-weight: 550;
+}
+.security-confirm-form input {
+  text-align: center;
+  letter-spacing: 0.6em;
+  font-size: 1.3rem;
+}
+.security-confirm-form .security-confirmed {
+  color: #047857;
+}
+@media (max-width: 639px) {
+  .settings-navigation {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+    margin-top: 1rem;
+  }
+  .settings-navigation .btn {
+    min-height: 44px;
+    padding: 0.4rem 0.6rem;
+  }
+  .account-settings-form {
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+  .account-settings-form > .surface-card {
+    padding: 0.85rem;
+  }
+  .account-settings-form h2 {
+    margin-bottom: 0.75rem;
+  }
+  .account-notification-row small {
+    display: none;
+  }
+  .account-settings-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+  .account-settings-actions .btn {
+    min-width: 0;
+  }
+  .package-summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+  .package-summary > .surface-card {
+    padding: 0.9rem;
+  }
+  .package-summary h2 {
+    font-size: 1.25rem;
+  }
+  .package-summary dl {
+    margin-top: 1rem;
+  }
+  .team-member-row {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 0.6rem;
+  }
+  .team-member-row > span:first-child {
+    width: 42px;
+    height: 42px;
+    border-radius: 9px;
+  }
+  .team-member-row > div:nth-child(3) {
+    grid-column: 2;
+  }
+  .team-member-row > div:nth-child(4),
+  .team-member-row > span:last-child {
+    grid-column: 1/-1;
+  }
+  .team-member .btn {
+    min-height: 44px;
+    flex: 1;
+  }
+  .security-password-card {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .security-password-card > .btn {
+    width: 100%;
+    min-height: 44px;
+  }
+  .security-factor-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+  }
+  .security-factor-heading > .metric-icon {
+    width: 36px;
+    height: 36px;
+  }
+  .security-factor-heading h2 {
+    font-size: 0.9rem;
+  }
+  .security-factor-heading p {
+    font-size: 0.77rem;
+  }
+  .security-enabled {
+    margin-left: 48px;
+  }
+  .security-confirm-form {
+    max-width: 100%;
+    gap: 0.7rem;
+  }
+  .security-confirm-form > .btn {
+    min-height: 44px;
+  }
+}
+
+.account-settings-form {
+  margin-top: 0;
+  gap: 12px;
+}
+.account-settings-form h2 {
+  font-weight: 650;
+  font-size: 16px;
+}
+.account-settings-form > .account-info-panel > label {
+  display: grid;
+  grid-template-columns: 145px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  margin-top: 14px;
+}
+.account-info-panel > label > span {
+  padding-top: 10px;
+  font-size: 13px;
+}
+.account-info-panel textarea {
+  min-height: 80px;
+}
+.account-info-panel > label > small {
+  grid-column: 2;
+}
+.account-settings-form .field-control {
+  border-radius: 8px;
+  min-height: 42px;
+  font-size: 14px;
+}
+.account-settings-form > .surface-card > .account-notification-row {
+  display: flex;
+  min-height: 54px;
+  margin: 0;
+}
+.account-settings-form .account-notification-row > span {
+  display: block;
+}
+.account-setting-language > span:last-child {
+  min-width: 46%;
+  padding: 9px 12px;
+}
+.account-settings-form .settings-helper {
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.account-settings-actions .btn {
+  min-height: 44px;
+}
+.package-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 24px;
+  padding: 22px;
+}
+.package-current {
+  position: relative;
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  border-right: 1px solid var(--line);
+  padding-right: 24px;
+}
+.package-current > p {
+  margin: 0;
+  color: var(--primary-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.package-current > h2 {
+  margin: 0;
+  font-size: 29px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+.package-current > span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.package-current > .inline-flex {
+  justify-self: start;
+  font-size: 11px;
+}
+.package-balances {
+  display: grid;
+  gap: 24px;
+  align-content: center;
+}
+.package-balances > div > div:first-child {
+  gap: 12px;
+}
+.package-balances > div > div:first-child > span:first-child {
+  font-size: 13px;
+}
+.package-balances > div > div:first-child > span:last-child {
+  font-size: 13px;
+  text-align: right;
+}
+.package-balances .settings-usage-track {
+  margin-left: 28px;
+}
+.package-credit-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  border-radius: 10px;
+  background: #eeeceb;
+  padding: 15px 16px;
+  font-size: 13px;
+}
+.package-credit-notice > svg {
+  flex-shrink: 0;
+}
+.package-addons {
+  margin-top: 24px;
+}
+.package-addons > h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+  font-weight: 650;
+}
+.package-addons > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.package-addons .surface-card {
+  display: flex;
+  gap: 14px;
+  padding: 18px;
+}
+.package-addons .surface-card > svg {
+  flex-shrink: 0;
+  color: var(--primary-text);
+}
+.package-addons h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+}
+.package-addons p {
+  margin: 7px 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.package-addons .btn {
+  font-size: 12px;
+  min-height: 40px;
+}
+.package-details {
+  margin-top: 20px;
+}
+.package-details > summary {
+  padding: 12px 0;
+  cursor: pointer;
+  color: var(--primary-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.team-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+  padding: 14px 16px;
+  margin-top: 0;
+}
+.team-summary strong {
+  font-size: 14px;
+}
+.team-summary > span {
+  border-radius: 6px;
+  background: #eee7ff;
+  color: var(--primary-text);
+  padding: 4px 9px;
+  font-size: 12px;
+}
+.team-summary small {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+.team-table-heading {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 110px 110px 160px;
+  gap: 12px;
+  align-items: center;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #faf9f7;
+  font-size: 12px;
+  font-weight: 600;
+}
+.team-member-row {
+  gap: 14px;
+}
+.team-member-row > span:first-child {
+  border-radius: 10px;
+  background: #eee7ff;
+  color: var(--primary-text);
+  width: 42px;
+  height: 42px;
+}
+.team-member-row > div:nth-child(3) {
+  min-width: 180px;
+  flex-direction: row-reverse;
+  justify-content: space-between;
+}
+.team-member h2 {
+  font-size: 14px;
+}
+.team-member p {
+  font-size: 12px;
+}
+.team-advanced-permissions > summary {
+  cursor: pointer;
+  color: var(--primary-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.security-factor-card h2,
+.security-password-card h2 {
+  font-weight: 650;
+}
+.security-code-input {
+  position: relative;
+  max-width: 350px;
+}
+.security-code-cells {
+  display: grid;
+  gap: 8px;
+}
+.security-code-cells > span {
+  display: grid;
+  min-height: 44px;
+  place-items: center;
+  border: 1px solid #c8c4cd;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 18px;
+  color: var(--ink);
+}
+.security-code-input .security-code-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  letter-spacing: normal;
+}
+.security-code-input:focus-within .security-code-cells > span {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+.security-confirm-form > label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.security-current-session {
+  max-width: 900px;
+  padding: 18px;
+}
+.security-current-session > div {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.security-current-session h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+}
+.security-current-session p {
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.security-current-session > p {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.security-current-session details {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.security-current-session summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+@media (max-width: 639px) {
+  .account-settings-form {
+    gap: 10px;
+  }
+  .account-settings-form > .account-info-panel > label {
+    display: block;
+    margin-top: 12px;
+  }
+  .account-info-panel > label > span {
+    padding: 0;
+    font-size: 12px;
+  }
+  .account-info-panel textarea {
+    min-height: 82px;
+  }
+  .account-settings-form h2 {
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
+  .account-settings-form > .surface-card {
+    padding: 12px;
+  }
+  .account-settings-form .field-control {
+    min-height: 44px;
+    font-size: 13px;
+  }
+  .account-setting-language {
+    font-size: 12px;
+  }
+  .account-settings-form .account-notification-row strong {
+    font-size: 12px;
+  }
+  .account-settings-form > .surface-card > .account-notification-row {
+    min-height: 46px;
+  }
+  .account-settings-link {
+    padding: 12px;
+    font-size: 12px;
+  }
+  .package-overview {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    padding: 16px;
+  }
+  .package-current {
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 0 0 15px;
+    gap: 6px;
+  }
+  .package-current > h2 {
+    font-size: 26px;
+  }
+  .package-current > .inline-flex {
+    position: absolute;
+    right: 0;
+    top: 0;
+  }
+  .package-balances {
+    gap: 20px;
+  }
+  .package-balances > div > div:first-child > span {
+    font-size: 11px !important;
+  }
+  .package-credit-notice {
+    align-items: flex-start;
+    margin-top: 16px;
+    padding: 12px;
+    font-size: 12px;
+  }
+  .package-addons {
+    margin-top: 20px;
+  }
+  .package-addons > h2 {
+    font-size: 17px;
+  }
+  .package-addons > div {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .package-addons .surface-card {
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+  }
+  .package-addons .surface-card > div {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+    align-items: center;
+    flex: 1;
+  }
+  .package-addons h3 {
+    font-size: 14px;
+  }
+  .package-addons p {
+    grid-column: 1;
+    margin: 3px 0 0;
+    font-size: 11px;
+  }
+  .package-addons .btn {
+    grid-row: 1/3;
+    grid-column: 2;
+    min-height: 44px;
+    max-width: 112px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  .team-summary {
+    gap: 10px 14px;
+    padding: 12px;
+  }
+  .team-summary strong {
+    font-size: 13px;
+  }
+  .team-summary small {
+    width: 100%;
+    margin: 0;
+  }
+  .team-table-heading {
+    display: none;
+  }
+  .team-member-row > div:nth-child(3) {
+    min-width: 0;
+    justify-content: flex-end;
+    flex-direction: row-reverse;
+  }
+  .team-member.surface-card {
+    padding: 12px;
+  }
+  .security-code-cells {
+    gap: 6px;
+  }
+  .security-current-session {
+    padding: 14px;
+  }
+  .security-current-session h2 {
+    font-size: 14px;
+  }
+  .security-current-session > p {
+    gap: 16px;
+  }
+  .security-confirm-form {
+    margin-top: 16px;
+    padding-top: 16px;
+  }
+  .security-factor-card > .security-factor-heading {
+    gap: 10px;
+  }
+}
+
+.team-table-heading {
+  grid-template-columns: minmax(180px, 1fr) 100px 110px 44px;
+}
+.team-members {
+  overflow: visible;
+}
+.team-member-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 100px 110px 44px;
+  gap: 14px;
+}
+.team-member-role {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary-text);
+}
+.team-member-state {
+  font-size: 12px;
+}
+.team-member-menu {
+  position: relative;
+  justify-self: end;
+}
+.team-member-menu[open] {
+  z-index: 20;
+}
+.team-member-menu > summary {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  list-style: none;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.team-member-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.team-member-menu > div {
+  position: absolute;
+  top: 46px;
+  right: 0;
+  display: grid;
+  width: 190px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 25px #17191f20;
+}
+.team-member-menu button {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 8px;
+  color: var(--ink);
+  font-size: 12px;
+  text-align: left;
+}
+.team-member-menu button:hover {
+  background: var(--surface);
+}
+.team-protected-label {
+  justify-self: center;
+  color: var(--muted);
+}
+.team-invitation {
+  padding: 16px;
+  border-top: 1px solid var(--line);
+}
+.team-invited-state {
+  display: inline-flex;
+  border-radius: 8px;
+  background: #eee7ff;
+  padding: 6px 9px;
+  color: var(--primary-text);
+  font-size: 11px;
+}
+.team-invitation > .team-member-row > .btn {
+  font-size: 0;
+  min-width: 44px;
+  padding: 4px;
+}
+.team-invitation > .team-member-row > .btn:after {
+  content: "×";
+  font-size: 22px;
+}
+.team-avatar {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #eee7ff;
+  color: var(--primary-text);
+  font-weight: 600;
+}
+.account-settings-form > .surface-card {
+  padding: 14px;
+}
+.account-settings-form > .account-info-panel > label {
+  margin-top: 10px;
+}
+.account-settings-form > .surface-card:not(.account-info-panel) > h2 {
+  margin-bottom: 10px;
+}
+.account-settings-form > .surface-card > .account-notification-row {
+  min-height: 48px;
+  padding: 8px 0;
+}
+.account-setting-language > span:last-child {
+  padding: 8px 12px;
+}
+.account-settings-form > .surface-card .settings-helper {
+  margin: 0 0 6px;
+}
+.security-password-card > .btn > svg {
+  display: none;
+}
+@media (max-width: 639px) {
+  .team-member-row {
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px 10px;
+  }
+  .team-member-row > span:first-child {
+    grid-column: 1;
+    grid-row: 1/3;
+  }
+  .team-member-row > div:nth-child(2) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .team-member-role {
+    grid-column: 3;
+    grid-row: 1;
+    font-size: 11px;
+  }
+  .team-member-state {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .team-member-menu,
+  .team-protected-label,
+  .team-invitation > .team-member-row > .btn {
+    grid-column: 3 !important;
+    grid-row: 2;
+    justify-self: end;
+  }
+  .team-member-state .inline-flex {
+    padding: 3px 7px;
+    font-size: 10px;
+  }
+  .team-member-row > .team-protected-label {
+    grid-column: 3;
+  }
+  .team-invitation {
+    padding: 12px;
+  }
+  .team-invitation h2 {
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .team-invitation p {
+    font-size: 10px;
+  }
+  .team-invited-state {
+    padding: 3px 7px;
+    font-size: 10px;
+  }
+  .account-settings-form > .surface-card {
+    padding: 12px;
+  }
+  .account-settings-form > .surface-card > .account-notification-row {
+    min-height: 44px;
+    padding: 7px 0;
+  }
+  .account-settings-form .settings-helper {
+    font-size: 11px;
+    line-height: 1.45;
+  }
+  .security-password-card {
+    flex-wrap: nowrap;
+  }
+  .security-password-card > .btn {
+    width: 44px;
+    flex-shrink: 0;
+    min-width: 44px;
+    padding: 8px;
+    background: transparent;
+    color: var(--ink);
+    border: 0;
+  }
+  .security-password-card > .btn > span {
+    display: none;
+  }
+  .security-password-card > .btn > svg {
+    display: block;
+  }
+  .security-factor-heading {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 6px 10px;
+  }
+  .security-factor-heading > .metric-icon {
+    grid-row: 1/3;
+  }
+  .security-factor-heading > div {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .security-factor-heading h2 {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .security-factor-heading p {
+    font-size: 11px;
+    line-height: 1.45;
+  }
+  .security-factor-heading > .security-enabled {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+    margin: 0;
+    padding: 3px 7px;
+    font-size: 10px;
+  }
+  .security-confirm-form p {
+    font-size: 12px;
+  }
+  .security-current-session > div .metric-icon {
+    width: 36px;
+    height: 36px;
+  }
+}
+.account-settings-form {
+  gap: 10px;
+}
+.account-settings-form > .surface-card {
+  padding: 12px;
+}
+.account-settings-form > .account-info-panel > label {
+  margin-top: 8px;
+}
+.package-recent-projects {
+  margin-top: 24px;
+}
+.package-recent-projects h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+}
+.package-recent-projects .text-link {
+  font-size: 12px;
+}
+.package-recent-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.package-recent-project {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  padding: 12px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.package-recent-project > span {
+  display: grid;
+  width: 64px;
+  height: 76px;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--primary-text);
+}
+.package-recent-project img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.package-recent-project > div {
+  min-width: 0;
+  flex: 1;
+}
+.package-recent-project h3 {
+  overflow: hidden;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.package-recent-project p {
+  margin: 6px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.package-recent-project small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.package-recent-project > svg {
+  display: none;
+}
+@media (max-width: 1050px) {
+  .package-recent-grid {
+    grid-template-columns: 1fr;
+  }
+  .package-recent-project > span {
+    width: 60px;
+    height: 56px;
+  }
+  .package-recent-project > svg {
+    display: block;
+    flex-shrink: 0;
+  }
+}
+@media (max-width: 639px) {
+  .package-recent-projects {
+    margin-top: 20px;
+  }
+  .package-recent-projects h2 {
+    font-size: 16px;
+  }
+  .package-recent-projects .text-link {
+    font-size: 0;
+  }
+  .package-recent-projects .text-link svg {
+    width: 18px;
+    height: 18px;
+  }
+  .package-recent-grid {
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .package-recent-project {
+    min-height: 78px;
+    padding: 10px;
+  }
+}

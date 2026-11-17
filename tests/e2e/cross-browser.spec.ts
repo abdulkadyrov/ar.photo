@@ -21,7 +21,7 @@ test("opens the protected workspace with responsive navigation", async ({ page }
   await expectNoHorizontalOverflow(page);
 });
 
-test("keeps public AR camera-explicit with a normal-video fallback", async ({ page }) => {
+test("automatically opens public AR with a normal-video fallback", async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(window, "__crossBrowserCameraRequests", { value: 0, writable: true });
     Object.defineProperty(navigator, "mediaDevices", {
@@ -36,15 +36,9 @@ test("keeps public AR camera-explicit with a normal-video fallback", async ({ pa
   });
   await page.goto("./ar/demo");
 
-  await expect(page.getByRole("button", { name: "Включить камеру" })).toBeVisible();
-  expect(
-    await page.evaluate(
-      () => (window as typeof window & { __crossBrowserCameraRequests: number }).__crossBrowserCameraRequests,
-    ),
-  ).toBe(0);
-  await page.getByRole("button", { name: "Включить камеру" }).click();
-  await expect(page.getByRole("heading", { name: "Не удалось открыть AR" })).toBeVisible();
-  await page.getByRole("button", { name: "Смотреть обычное видео" }).click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Повторить", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Смотреть видео" }).click();
   await expect(page.getByTestId("public-ar-fallback-video")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
@@ -54,9 +48,20 @@ test("renders the MFA-gated admin console without leaking layout width", async (
   await signInToDemo(page);
   await page.goto("./admin");
 
-  await expect(page.getByRole("heading", { name: "Супер-админ", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Обзор платформы", exact: true })).toBeVisible();
   await expect(page.getByText("MFA подтверждена", { exact: false })).toBeVisible();
-  await page.getByRole("button", { name: "История действий", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "История действий" })).toBeVisible();
+  if ((page.viewportSize()?.width ?? 1280) < 1024) {
+    await page.getByRole("button", { name: "Разделы", exact: true }).click();
+    await page
+      .getByRole("dialog", { name: "Разделы администрации" })
+      .getByRole("link", { name: "Журнал", exact: true })
+      .click();
+  } else {
+    await page
+      .getByRole("navigation", { name: "Разделы администрации", exact: true })
+      .getByRole("link", { name: "Журнал", exact: true })
+      .click();
+  }
+  await expect(page.getByRole("heading", { name: "История действий", level: 1 })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });

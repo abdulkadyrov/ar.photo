@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { QrCode } from "../../entities/ar-item/model";
@@ -10,6 +11,15 @@ import {
   QuickStopwatch,
 } from "./QuickStartPage";
 import { formatElapsedTime } from "./quickStartTimer";
+
+vi.mock("../../app/layout/AppShell", () => ({
+  AppShell: ({ title, children }: { title: string; children: ReactNode }) => (
+    <main>
+      <h1>{title}</h1>
+      {children}
+    </main>
+  ),
+}));
 
 const qr: QrCode = {
   account_id: "20000000-0000-4000-8000-000000000001",

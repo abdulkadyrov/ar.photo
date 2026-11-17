@@ -49,7 +49,7 @@ export interface CatalogRepository {
   restoreDeletedProject(accountId: string, projectId: string): Promise<Project>;
   uploadProjectCover(accountId: string, projectId: string, file: File): Promise<Project>;
   listProjectOptions(accountId: string): Promise<ProjectOption[]>;
-  listGroups(accountId: string, projectId: string, includeDeleted?: boolean): Promise<Group[]>;
+  listGroups(accountId: string, projectId?: string, includeDeleted?: boolean): Promise<Group[]>;
   createGroup(accountId: string, projectId: string, input: GroupInput, requestId: string): Promise<Group>;
   updateGroup(accountId: string, groupId: string, input: GroupInput): Promise<Group>;
   archiveGroup(accountId: string, groupId: string): Promise<Group>;
@@ -250,14 +250,15 @@ export class SupabaseCatalogRepository implements CatalogRepository {
     return data;
   }
 
-  async listGroups(accountId: string, projectId: string, includeDeleted = false) {
+  async listGroups(accountId: string, projectId?: string, includeDeleted = false) {
+    if (!accountId) throw new CatalogError("forbidden", "Не указан аккаунт для загрузки групп");
     let query = this.client
       .from("groups")
       .select("*")
       .eq("account_id", accountId)
-      .eq("project_id", projectId)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
+    if (projectId) query = query.eq("project_id", projectId);
     if (!includeDeleted) query = query.is("deleted_at", null);
     const { data, error } = await query;
     if (error) throw mapCatalogError(error);

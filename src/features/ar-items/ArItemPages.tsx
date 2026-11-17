@@ -4,7 +4,7 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
-  ChevronRight,
+  Pencil,
   Clipboard,
   ExternalLink,
   Expand,
@@ -15,6 +15,9 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Search,
+  Download,
+  Info,
   ScanLine,
   Share2,
   Sparkles,
@@ -34,6 +37,7 @@ import { markerAccept, prepareMediaFile, videoAccept } from "../media/mediaValid
 import { resolvePublicBaseUrl } from "../qr/qrDesign";
 import { getArItemRepository } from "./arItemRepository";
 import { analyzeMarkerFile, type MarkerQualityResult } from "./markerQuality";
+import { captureWorkspaceOrigin, rememberWorkspaceFocus, useWorkspaceBack } from "./itemNavigation";
 import { formatProcessingDuration, getProcessingTiming } from "./processingTiming";
 import "./ArItemPages.css";
 
@@ -71,22 +75,38 @@ const defaultSettings: ArItemSettings = {
 
 export function ArItemsRoute() {
   const auth = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const projectId = searchParams.get("projectId")?.trim() || undefined;
+  const location = useLocation();
+  const search = searchParams.get("q") ?? "";
+  const status = searchParams.get("status") ?? "";
+  const group = searchParams.get("groupId") ?? "";
+  const setFilter = (name: string, value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set(name, value);
+    else next.delete(name);
+    setSearchParams(next, { replace: true, state: location.state });
+  };
   const workspaceQuery = useQuery({
     queryKey: ["catalog", "workspace", auth.session!.user.id],
     queryFn: () => catalogRepository.getWorkspace(auth.session!.user.id),
   });
   const accountId = workspaceQuery.data?.accountId;
+  const goBack = useWorkspaceBack(accountId, "/projects");
+  const projectOptionsQuery = useQuery({
+    queryKey: ["catalog", "project-options", accountId],
+    queryFn: () => catalogRepository.listProjectOptions(accountId!),
+    enabled: Boolean(accountId),
+  });
   const projectQuery = useQuery({
     queryKey: ["catalog", "project", accountId, projectId],
     queryFn: () => catalogRepository.getProject(accountId!, projectId!),
     enabled: Boolean(accountId && projectId),
   });
   const groupsQuery = useQuery({
-    queryKey: ["catalog", "groups", accountId, projectId],
-    queryFn: () => catalogRepository.listGroups(accountId!, projectId!),
-    enabled: Boolean(accountId && projectId),
+    queryKey: ["catalog", "groups", accountId, projectId ?? "all"],
+    queryFn: () => catalogRepository.listGroups(accountId!, projectId),
+    enabled: Boolean(accountId),
   });
   const itemsQuery = useQuery({
     queryKey: ["ar-items", accountId, projectId ?? "all"],
@@ -116,7 +136,8 @@ export function ArItemsRoute() {
     workspaceQuery.isPending ||
     itemsQuery.isPending ||
     assetsQuery.isPending ||
-    (projectId && (projectQuery.isPending || groupsQuery.isPending))
+    groupsQuery.isPending ||
+    (projectId && projectQuery.isPending)
   ) {
     return <ItemsLoading />;
   }
@@ -127,33 +148,105 @@ export function ArItemsRoute() {
     ? `${groups.length === 1 ? groups[0].name : `${groups.length} групп`} · ${itemsQuery.data.length} AR-работ`
     : `${itemsQuery.data.length} AR-работ`;
 
+  const filteredItems = itemsQuery.data.filter(
+    (item) =>
+      item.title.toLocaleLowerCase("ru-RU").includes(search.trim().toLocaleLowerCase("ru-RU")) &&
+      (!status || item.status === status) &&
+      (!group || item.group_id === group),
+  );
+
   return (
     <AppShell
-      title={projectQuery.data?.name ?? "AR-работы"}
-      description={contextLabel}
+      title="AR-работы"
+      description={projectQuery.data ? `Проект: ${projectQuery.data.name} · ${contextLabel}` : contextLabel}
       compactMobile
       showDescriptionOnMobile
       actions={
         <>
           {projectId ? (
-            <Link className="btn btn-quiet ar-items-back" to="/projects">
-              <ArrowLeft size={17} /> <span>Проекты</span>
-            </Link>
+            <button className="btn btn-quiet ar-items-back" type="button" onClick={goBack}>
+              <ArrowLeft size={17} /> <span>Назад</span>
+            </button>
           ) : null}
           <Link
             className="btn btn-primary ar-items-create"
             to={projectId ? `/items/new?projectId=${encodeURIComponent(projectId)}` : "/items/new"}
+            state={captureWorkspaceOrigin(location, accountId)}
           >
-            <Plus size={17} /> <span>Новая AR-работа</span>
+            <Plus size={17} /> <span>Добавить фото</span>
           </Link>
         </>
       }
     >
+      <section className="ar-item-filters" aria-label="Фильтры AR-работ">
+        <label className="ar-item-search">
+          <span className="sr-only">Поиск по названию</span>
+          <Search size={18} aria-hidden="true" />
+          <Input value={search} onValueChange={(value) => setFilter("q", value)} placeholder="Найти AR-работу" />
+        </label>
+        <Select
+          label="Проект"
+          value={projectId ?? ""}
+          onChange={(event) => {
+            const next = new URLSearchParams(searchParams);
+            if (event.target.value) next.set("projectId", event.target.value);
+            else next.delete("projectId");
+            next.delete("groupId");
+            setSearchParams(next, { replace: true, state: location.state });
+          }}
+          options={[
+            { label: "Все проекты", value: "" },
+            ...(projectOptionsQuery.data ?? []).map((entry) => ({ label: entry.name, value: entry.id })),
+          ]}
+        />
+        <Select
+          label="Группа"
+          value={group}
+          onChange={(event) => setFilter("groupId", event.target.value)}
+          options={[
+            { label: "Все группы", value: "" },
+            ...groups.map((entry) => {
+              const projectName = !projectId
+                ? projectOptionsQuery.data?.find((project) => project.id === entry.project_id)?.name
+                : undefined;
+              return { label: projectName ? `${projectName} · ${entry.name}` : entry.name, value: entry.id };
+            }),
+          ]}
+        />
+        <Select
+          label="Статус"
+          value={status}
+          onChange={(event) => setFilter("status", event.target.value)}
+          options={[
+            { label: "Все статусы", value: "" },
+            ...Object.entries(statusLabels).map(([value, label]) => ({ label, value })),
+          ]}
+        />
+      </section>
       {itemsQuery.data.length ? (
         <section className="ar-items-grid" aria-label="Список AR-работ">
-          {itemsQuery.data.map((item) => {
+          <div className="ar-items-table-head" aria-hidden="true">
+            <span>
+              <i>Фото</i>Название
+            </span>
+            <span>Группа</span>
+            <span>Статус</span>
+            <span>Действия</span>
+          </div>
+          {filteredItems.length === 0 ? (
+            <Panel className="text-sm text-muted">По выбранным условиям работ нет. Измените поиск или фильтры.</Panel>
+          ) : null}
+          {filteredItems.map((item) => {
             const marker = assetsQuery.data.find((asset) => asset.id === item.marker_asset_id);
-            return <ArItemCard groupName={groupById.get(item.group_id)} item={item} marker={marker} key={item.id} />;
+            return (
+              <ArItemCard
+                accountId={accountId}
+                groupName={groupById.get(item.group_id)}
+                item={item}
+                marker={marker}
+                key={item.id}
+              />
+            );
           })}
         </section>
       ) : (
@@ -179,21 +272,27 @@ export function ArItemDetailRoute() {
   const queryClient = useQueryClient();
   const { itemId = "" } = useParams();
   const location = useLocation();
-  const navigate = useNavigate();
   const [notice, setNotice] = useState<string | null>(null);
   const [completionBusy, setCompletionBusy] = useState(false);
   const [completionError, setCompletionError] = useState("");
   const completionAttempt = useRef("");
+  const detailQr = useRef<SVGSVGElement>(null);
   const workspaceQuery = useQuery({
     queryKey: ["catalog", "workspace", auth.session!.user.id],
     queryFn: () => catalogRepository.getWorkspace(auth.session!.user.id),
   });
   const accountId = workspaceQuery.data?.accountId;
+  const goBack = useWorkspaceBack(accountId, "/items");
   const itemQuery = useQuery({
     queryKey: ["ar-item", accountId, itemId],
     queryFn: () => arItemRepository.getItem(accountId!, itemId),
     enabled: Boolean(accountId && itemId),
     refetchInterval: (query) => (query.state.data?.status === "processing" ? 3_000 : false),
+  });
+  const projectDetailQuery = useQuery({
+    queryKey: ["catalog", "project", accountId, itemQuery.data?.project_id],
+    queryFn: () => catalogRepository.getProject(accountId!, itemQuery.data!.project_id),
+    enabled: Boolean(accountId && itemQuery.data?.project_id),
   });
   const assetsQuery = useQuery({
     queryKey: ["media-assets", accountId, itemQuery.data?.project_id],
@@ -261,7 +360,6 @@ export function ArItemDetailRoute() {
   const video = assetsQuery.data.find((asset) => asset.id === item.video_asset_id);
   const qrCode = qrQuery.data;
   const detailJobs = jobsQuery.data.filter((job) => jobRevision(job) === item.version);
-  const canReturnToItems = Boolean((location.state as { fromArItems?: unknown } | null)?.fromArItems);
   const copyPublicUrl = async () => {
     if (!qrCode) return;
     try {
@@ -310,38 +408,76 @@ export function ArItemDetailRoute() {
   return (
     <AppShell
       title={item.title}
+      description={[
+        projectDetailQuery.data?.name ? `Проект: ${projectDetailQuery.data.name}` : "",
+        `Создано: ${formatArItemDate(item.created_at)}`,
+      ]
+        .filter(Boolean)
+        .join(" · ")}
+      showDescriptionOnMobile
       compactMobile
       actions={
-        canReturnToItems ? (
-          <button
-            className="btn btn-quiet ar-items-back"
-            aria-label="Вернуться к AR-работам"
-            onClick={() => navigate(-1)}
-            type="button"
-          >
-            <ArrowLeft size={17} /> <span>AR-работы</span>
-          </button>
-        ) : (
-          <Link className="btn btn-quiet ar-items-back" to={`/items?projectId=${encodeURIComponent(item.project_id)}`}>
-            <ArrowLeft size={17} /> <span>AR-работы</span>
-          </Link>
-        )
+        <button
+          className="btn btn-quiet ar-items-back"
+          aria-label="Вернуться к AR-работам"
+          type="button"
+          onClick={goBack}
+        >
+          <ArrowLeft size={17} />
+          <span>Назад</span>
+        </button>
       }
     >
-      <main className="ar-item-detail">
+      <div className="ar-item-toolbar" aria-label="Действия AR-работы">
+        <Link
+          id="ar-item-edit"
+          className="btn btn-primary"
+          to={`/items/${item.id}/edit`}
+          state={captureWorkspaceOrigin(location, accountId)}
+          onClick={() => rememberWorkspaceFocus(location.key, "ar-item-edit")}
+        >
+          Изменить работу
+        </Link>
+        <Link
+          id="ar-item-qr"
+          className="btn btn-quiet"
+          to={`/items/${item.id}/qr`}
+          state={captureWorkspaceOrigin(location, accountId)}
+          onClick={() => rememberWorkspaceFocus(location.key, "ar-item-qr")}
+        >
+          QR и публикация
+        </Link>
+      </div>
+      <div className="ar-item-status-strip">
+        <ItemStatus status={item.status} />
+        <ProcessingTimer item={item} jobs={detailJobs} />
+        <span>Фото и видео для AR-просмотра</span>
+      </div>
+      <div className="ar-item-detail">
         <section className="ar-item-media-section" aria-labelledby="ar-item-photo-title">
-          <h2 id="ar-item-photo-title">Фото</h2>
+          <h2 id="ar-item-photo-title">
+            <ImageIcon size={18} /> Фото <span className="font-normal text-muted">(основа AR)</span>
+          </h2>
           <SignedMedia asset={marker} kind="image" label="Фотография-маркер" />
         </section>
         <section className="ar-item-media-section" aria-labelledby="ar-item-video-title">
-          <h2 id="ar-item-video-title">Видео</h2>
-          <SignedMedia asset={video} kind="video" label="Видео AR-работы" />
+          <h2 id="ar-item-video-title">
+            <Play size={18} /> Видео <span className="font-normal text-muted">(AR-контент)</span>
+          </h2>
+          <SignedMedia asset={video} posterAsset={marker} kind="video" label="Видео AR-работы" />
         </section>
         <section className="ar-item-publication" aria-labelledby="ar-item-qr-title">
           <div className="ar-item-qr-summary">
             <div className="ar-item-qr-code">
               {qrCode ? (
-                <QRCodeSVG value={qrCode.public_url} size={220} level="H" marginSize={2} title={`QR: ${item.title}`} />
+                <QRCodeSVG
+                  ref={detailQr}
+                  value={qrCode.public_url}
+                  size={220}
+                  level="H"
+                  marginSize={2}
+                  title={`QR: ${item.title}`}
+                />
               ) : (
                 <ScanLine aria-hidden="true" size={36} />
               )}
@@ -349,34 +485,54 @@ export function ArItemDetailRoute() {
             <div>
               <h2 id="ar-item-qr-title">QR-код</h2>
               <p>{qrCode ? "Для открытия работы в AR" : "Появится после публикации"}</p>
-              <ProcessingTimer item={item} jobs={detailJobs} />
             </div>
           </div>
-          <label htmlFor="ar-item-public-url">Публичная ссылка</label>
-          <div className="ar-item-public-link">
-            <p id="ar-item-public-url" title={qrCode?.public_url}>
-              {qrCode?.public_url ?? "Ссылка ещё не создана"}
-            </p>
-            <button disabled={!qrCode} aria-label="Копировать публичную ссылку" onClick={() => void copyPublicUrl()}>
-              <Clipboard size={18} />
-            </button>
-          </div>
-          <div className="ar-item-public-actions">
-            <button disabled={!qrCode} onClick={() => void copyPublicUrl()} type="button">
-              <Clipboard size={16} /> Копировать
-            </button>
-            <button disabled={!qrCode} onClick={() => void sharePublicUrl()} type="button">
-              <Share2 size={16} /> Поделиться
-            </button>
-            {qrCode ? (
-              <a href={qrCode.public_url} target="_blank" rel="noreferrer" aria-label="Открыть публичную ссылку">
-                <ExternalLink size={16} /> Открыть
-              </a>
-            ) : (
-              <span aria-disabled="true">
-                <ExternalLink size={16} /> Открыть
-              </span>
-            )}
+          <div className="ar-item-share">
+            <label htmlFor="ar-item-public-url">Публичная ссылка</label>
+            <div className="ar-item-public-link">
+              <p id="ar-item-public-url" title={qrCode?.public_url}>
+                {qrCode?.public_url ?? "Ссылка ещё не создана"}
+              </p>
+              <button disabled={!qrCode} aria-label="Копировать публичную ссылку" onClick={() => void copyPublicUrl()}>
+                <Clipboard size={18} />
+              </button>
+            </div>
+            <div className="ar-item-public-actions">
+              <button disabled={!qrCode} onClick={() => void copyPublicUrl()} type="button">
+                <Clipboard size={16} /> Копировать
+              </button>
+              <button disabled={!qrCode} onClick={() => void sharePublicUrl()} type="button">
+                <Share2 size={16} /> Поделиться
+              </button>
+              <button
+                type="button"
+                disabled={!qrCode}
+                onClick={() => {
+                  if (!detailQr.current) return;
+                  const url = URL.createObjectURL(
+                    new Blob([new XMLSerializer().serializeToString(detailQr.current)], {
+                      type: "image/svg+xml;charset=utf-8",
+                    }),
+                  );
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = `${item.title}-qr.svg`;
+                  link.click();
+                  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+                }}
+              >
+                <Download size={16} /> Скачать QR
+              </button>
+              {qrCode ? (
+                <a href={qrCode.public_url} target="_blank" rel="noreferrer" aria-label="Открыть публичную ссылку">
+                  <ExternalLink size={16} /> Открыть
+                </a>
+              ) : (
+                <span aria-disabled="true">
+                  <ExternalLink size={16} /> Открыть
+                </span>
+              )}
+            </div>
           </div>
           {!qrCode && item.status === "processing" ? (
             <div
@@ -414,7 +570,30 @@ export function ArItemDetailRoute() {
             </div>
           ) : null}
         </section>
-      </main>
+        <section className="ar-item-metadata">
+          <h2>
+            <Info size={18} /> Детали работы
+          </h2>
+          <dl>
+            <div>
+              <dt>Название</dt>
+              <dd>{item.title}</dd>
+            </div>
+            <div>
+              <dt>Проект</dt>
+              <dd>{projectDetailQuery.data?.name ?? "—"}</dd>
+            </div>
+            <div>
+              <dt>Фото</dt>
+              <dd>{marker ? `${marker.mime_type.split("/")[1]?.toUpperCase()} · ${assetMeta(marker)}` : "—"}</dd>
+            </div>
+            <div>
+              <dt>Видео</dt>
+              <dd>{video ? `${video.mime_type.split("/")[1]?.toUpperCase()} · ${assetMeta(video)}` : "—"}</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
       {notice ? (
         <div className="fixed bottom-24 right-5 z-50 lg:bottom-6">
           <Toast
@@ -428,27 +607,83 @@ export function ArItemDetailRoute() {
   );
 }
 
-function ArItemCard({ item, marker, groupName }: { item: ArItem; marker?: MediaAsset; groupName?: string }) {
+function ArItemCard({
+  accountId,
+  item,
+  marker,
+  groupName,
+}: {
+  accountId?: string;
+  item: ArItem;
+  marker?: MediaAsset;
+  groupName?: string;
+}) {
+  const location = useLocation();
+  const forwardState = captureWorkspaceOrigin(location, accountId);
   const previewQuery = useAssetUrl(marker);
   return (
     <article className="ar-item-card">
-      <Link to={`/items/${item.id}`} state={{ fromArItems: true }} aria-label={`Открыть AR-работу «${item.title}»`}>
+      <Link
+        id={`ar-item-preview-${item.id}`}
+        to={`/items/${item.id}`}
+        state={forwardState}
+        aria-label={`Открыть AR-работу «${item.title}»`}
+        onClick={() => rememberWorkspaceFocus(location.key, `ar-item-preview-${item.id}`)}
+      >
         <div className="ar-item-card-preview">
-          {previewQuery.data ? <img src={previewQuery.data} alt="" /> : <ImageIcon size={26} aria-hidden="true" />}
+          {previewQuery.data ? (
+            <img src={previewQuery.data} alt="" loading="lazy" />
+          ) : (
+            <ImageIcon size={26} aria-hidden="true" />
+          )}
         </div>
-        {groupName ? <span className="ar-item-card-group">{groupName}</span> : null}
         <div className="ar-item-card-copy">
           <h2>{item.title}</h2>
+          <p className="ar-item-card-meta">AR-фото{marker ? ` · ${formatAssetBytes(marker.size_bytes)}` : ""}</p>
           <time dateTime={item.updated_at}>{formatArItemDate(item.updated_at)}</time>
         </div>
-        <ChevronRight size={22} aria-hidden="true" />
       </Link>
+      <span className="ar-item-card-group">{groupName ?? "—"}</span>
+      <div className="ar-item-card-status">
+        <ItemStatus status={item.status} />
+      </div>
+      <div className="ar-item-card-actions">
+        <Link
+          id={`ar-item-open-${item.id}`}
+          className="btn btn-primary"
+          to={`/items/${item.id}`}
+          state={forwardState}
+          onClick={() => rememberWorkspaceFocus(location.key, `ar-item-open-${item.id}`)}
+        >
+          <ExternalLink size={15} /> Открыть
+        </Link>
+        <Link
+          id={`ar-item-edit-${item.id}`}
+          className="btn btn-quiet"
+          to={`/items/${item.id}/edit`}
+          state={forwardState}
+          onClick={() => rememberWorkspaceFocus(location.key, `ar-item-edit-${item.id}`)}
+        >
+          <Pencil size={15} /> Изменить
+        </Link>
+      </div>
     </article>
   );
 }
 
-function SignedMedia({ asset, kind, label }: { asset?: MediaAsset; kind: "image" | "video"; label: string }) {
+function SignedMedia({
+  asset,
+  posterAsset,
+  kind,
+  label,
+}: {
+  asset?: MediaAsset;
+  posterAsset?: MediaAsset;
+  kind: "image" | "video";
+  label: string;
+}) {
   const urlQuery = useAssetUrl(asset);
+  const posterQuery = useAssetUrl(posterAsset);
   const [viewing, setViewing] = useState(false);
   const inlineVideo = useRef<HTMLVideoElement>(null);
   const [playbackTime, setPlaybackTime] = useState(0);
@@ -469,6 +704,7 @@ function SignedMedia({ asset, kind, label }: { asset?: MediaAsset; kind: "image"
             ref={inlineVideo}
             className="ar-item-media-preview"
             src={urlQuery.data}
+            poster={posterQuery.data}
             controls
             playsInline
             preload="metadata"
@@ -632,6 +868,7 @@ function ArItemWizard() {
     queryFn: () => catalogRepository.getWorkspace(auth.session!.user.id),
   });
   const accountId = workspaceQuery.data?.accountId;
+  const goBack = useWorkspaceBack(accountId, routeItemId ? `/items/${routeItemId}` : "/items");
   const projectsQuery = useQuery({
     queryKey: ["catalog", "project-options", accountId],
     queryFn: () => catalogRepository.listProjectOptions(accountId!),
@@ -677,8 +914,9 @@ function ArItemWizard() {
       audioDefault: item.audio_default as "muted" | "user_enabled",
       fallbackEnabled: item.fallback_enabled,
     });
-    if (["processing", "ready", "published", "failed"].includes(item.status)) setStep(4);
-  }, [itemQuery.data]);
+    if (["processing", "ready", "failed"].includes(item.status)) setStep(4);
+    else if (routeItemId) setStep(3);
+  }, [itemQuery.data, routeItemId]);
 
   const assets = assetsQuery.data ?? [];
   const markers = assets.filter((asset) => asset.kind === "marker");
@@ -693,11 +931,11 @@ function ArItemWizard() {
 
   useEffect(() => {
     const item = itemQuery.data;
-    if (!item?.video_asset_id || item.video_asset_id === videoAssetId) return;
+    if (step !== 4 || !item?.video_asset_id || item.video_asset_id === videoAssetId) return;
     if (item.status !== "ready" && item.status !== "published") return;
     setVideoAssetId(item.video_asset_id);
     void queryClient.invalidateQueries({ queryKey: ["media", "assets", accountId, item.project_id, item.group_id] });
-  }, [accountId, itemQuery.data, queryClient, videoAssetId]);
+  }, [accountId, itemQuery.data, queryClient, step, videoAssetId]);
 
   const showError = (error: unknown) =>
     setNotice({ title: "Действие не выполнено", message: readableError(error), tone: "error" });
@@ -721,7 +959,13 @@ function ArItemWizard() {
           });
       if (!currentItemId) {
         setCurrentItemId(saved.id);
-        navigate(`/items/${saved.id}/edit`, { replace: true, state: { resumeStep: 3 } });
+        navigate(`/items/${saved.id}/edit`, {
+          replace: true,
+          state: {
+            ...(typeof location.state === "object" && location.state !== null ? location.state : {}),
+            resumeStep: 3,
+          },
+        });
       }
       await queryClient.invalidateQueries({ queryKey: ["ar-items"] });
       return true;
@@ -807,7 +1051,7 @@ function ArItemWizard() {
   const publishCurrentItem = async () => {
     if (!accountId || !currentItemId) return;
     if (currentItem?.status === "published") {
-      navigate(`/items/${currentItemId}/qr`);
+      navigate(`/items/${currentItemId}/qr`, { replace: true, state: location.state });
       return;
     }
     setBusy(true);
@@ -818,7 +1062,7 @@ function ArItemWizard() {
         queryClient.invalidateQueries({ queryKey: ["ar-item", "qr", accountId, currentItemId] }),
         queryClient.invalidateQueries({ queryKey: ["ar-items"] }),
       ]);
-      navigate(`/items/${currentItemId}/qr`);
+      navigate(`/items/${currentItemId}/qr`, { replace: true, state: location.state });
     } catch (error) {
       showError(error);
     } finally {
@@ -840,13 +1084,13 @@ function ArItemWizard() {
           queryClient.invalidateQueries({ queryKey: ["ar-item", "qr", accountId, currentItemId] }),
           queryClient.invalidateQueries({ queryKey: ["ar-items"] }),
         ]);
-        navigate(`/items/${currentItemId}/qr`);
+        navigate(`/items/${currentItemId}/qr`, { replace: true, state: location.state });
       })
       .catch((error: unknown) =>
         setNotice({ title: "QR не создался автоматически", message: readableError(error), tone: "error" }),
       )
       .finally(() => setBusy(false));
-  }, [accountId, currentItem, currentItemId, navigate, queryClient]);
+  }, [accountId, currentItem, currentItemId, location.state, navigate, queryClient]);
 
   const next = async () => {
     if (step === 1) {
@@ -877,32 +1121,163 @@ function ArItemWizard() {
     );
   }
 
+  const editing = Boolean(routeItemId) && step !== 4;
+  if (editing && currentItem)
+    return (
+      <AppShell
+        title="Редактирование AR-фото"
+        actions={
+          <button className="btn btn-quiet workspace-back-action" type="button" onClick={goBack}>
+            <ArrowLeft size={17} /> Назад
+          </button>
+        }
+      >
+        <div className="ar-work-editor">
+          <Panel className="ar-editor-identity">
+            <MediaThumb asset={selectedMarker} />
+            <div>
+              <h2>{currentItem.title}</h2>
+              <dl>
+                <div>
+                  <dt>Проект:</dt>
+                  <dd>{projectsQuery.data?.find((project) => project.id === projectId)?.name ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt>Группа:</dt>
+                  <dd>{groupsQuery.data?.find((group) => group.id === groupId)?.name ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt>Создано:</dt>
+                  <dd>{formatArItemDate(currentItem.created_at)}</dd>
+                </div>
+              </dl>
+            </div>
+            <ItemStatus status={currentItem.status} />
+          </Panel>
+          <div className="ar-editor-note">
+            <Info size={19} />
+            <div>
+              <strong>Вы редактируете существующее AR-фото. Это не расходует дополнительное добавление.</strong>
+              <p>После сохранения изменённые материалы будут подготовлены. Публичная ссылка сохранится.</p>
+            </div>
+          </div>
+          <Panel className="ar-editor-materials">
+            <h2>Материалы</h2>
+            <div className="ar-editor-media-grid">
+              <section>
+                <h3>Фото (основа)</h3>
+                <MediaStep
+                  compact
+                  kind="marker"
+                  assets={markers}
+                  selectedId={markerAssetId}
+                  uploadState={uploadState}
+                  onSelect={(id) => {
+                    setMarkerAssetId(id);
+                    setQuality(null);
+                  }}
+                  onUpload={(file) => void uploadFile(file, "marker")}
+                />
+              </section>
+              <section>
+                <h3>Видео (AR-слой)</h3>
+                <MediaStep
+                  compact
+                  kind="video"
+                  assets={videos}
+                  selectedId={videoAssetId}
+                  uploadState={uploadState}
+                  onSelect={setVideoAssetId}
+                  onUpload={(file) => void uploadFile(file, "video")}
+                />
+              </section>
+            </div>
+          </Panel>
+          <Panel className="ar-editor-information">
+            <h2>Основная информация</h2>
+            <Field label="Название AR-фото *">
+              <Input value={title} onValueChange={setTitle} maxLength={160} />
+            </Field>
+
+            <details>
+              <summary>
+                Настройки воспроизведения <span>Автозапуск, зацикливание, звук</span>
+              </summary>
+              <SettingsStep settings={settings} onChange={setSettings} />
+              <details>
+                <summary>Описание (необязательно)</summary>
+                <textarea
+                  className="field-control"
+                  value={description}
+                  maxLength={2000}
+                  onChange={(event) => setDescription(event.target.value)}
+                />
+              </details>
+            </details>
+          </Panel>
+          <Panel className="ar-editor-footer">
+            <div>
+              <span>Текущий статус:</span> <ItemStatus status={currentItem.status} />
+            </div>
+            <div>
+              <button className="btn btn-quiet" type="button" disabled={busy} onClick={goBack}>
+                Отмена
+              </button>
+              <Button
+                disabled={busy || Boolean(uploadState) || !markerAssetId || !videoAssetId}
+                onClick={() =>
+                  void (async () => {
+                    if (await saveDescription()) await startProcessing();
+                  })()
+                }
+              >
+                {busy ? <LoaderCircle size={16} className="animate-spin" /> : null}Сохранить изменения
+              </Button>
+            </div>
+          </Panel>
+        </div>
+        {notice ? (
+          <div className="fixed bottom-24 right-5 z-50 lg:bottom-6">
+            <Toast {...notice} onDismiss={() => setNotice(null)} />
+          </div>
+        ) : null}
+      </AppShell>
+    );
   const canGoBack = step > 1 && step < 4;
   const nextLabel = step === 3 ? "Обработать и продолжить" : "Продолжить";
 
   return (
     <AppShell
-      eyebrow="AR Item Workflow"
-      title={currentItem?.title || "Новая AR-работа"}
-      description="Четыре шага: выберите проект, добавьте данные, загрузите фото и видео, затем опубликуйте."
+      title={editing ? "Редактирование AR-фото" : currentItem?.title || "Новое AR-фото"}
+      description={editing ? currentItem?.title : "Выберите проект, добавьте фото и видео и опубликуйте работу."}
       actions={
-        <Link className="btn btn-quiet" to="/items">
-          <ArrowLeft size={17} /> AR-работы
-        </Link>
+        <button className="btn btn-quiet workspace-back-action" type="button" onClick={goBack}>
+          <ArrowLeft size={17} /> Назад
+        </button>
       }
     >
-      <WizardProgress current={step} />
+      {editing ? (
+        <p className="mt-4 rounded-xl bg-primary/10 px-4 py-3 text-sm text-primary-text">
+          Вы редактируете существующее AR-фото. Его изменение не расходует дополнительное добавление.
+        </p>
+      ) : (
+        <WizardProgress current={step} />
+      )}
       <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_340px]">
         <Panel>
-          <div className="mb-6 flex items-start justify-between gap-4 border-b border-line pb-5">
+          <div className="mb-4 flex items-start justify-between gap-4 border-b border-line pb-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Шаг {step} из 4</p>
-              <h2 className="mt-2 text-2xl font-semibold">{wizardSteps[step - 1]}</h2>
+              {!editing ? (
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Шаг {step} из 4</p>
+              ) : null}
+              <h2 className="mt-2 text-2xl font-semibold">
+                {editing ? "Материалы и информация" : wizardSteps[step - 1]}
+              </h2>
             </div>
             {currentItem ? <ItemStatus status={currentItem.status} /> : null}
           </div>
 
-          {step === 1 ? (
+          {step === 1 && !editing ? (
             <div className="grid gap-5 sm:grid-cols-2">
               <Select
                 label="Проект"
@@ -935,14 +1310,14 @@ function ArItemWizard() {
             </div>
           ) : null}
 
-          {step === 2 ? (
+          {step === 2 || editing ? (
             <div className="grid gap-5">
               <Field label="Название">
                 <Input placeholder="Например, Портрет Алексея" value={title} onValueChange={setTitle} maxLength={160} />
               </Field>
               <Field label="Описание">
                 <textarea
-                  className="field-control min-h-28 resize-y"
+                  className="field-control min-h-20 resize-y"
                   maxLength={2000}
                   placeholder="Что происходит в видео и для кого эта работа"
                   value={description}
@@ -952,8 +1327,8 @@ function ArItemWizard() {
             </div>
           ) : null}
 
-          {step === 3 ? (
-            <div className="grid gap-8">
+          {step === 3 || editing ? (
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <section>
                 <h3 className="mb-3 text-lg font-semibold">Фотография</h3>
                 <MediaStep
@@ -968,7 +1343,7 @@ function ArItemWizard() {
                   onUpload={(file) => void uploadFile(file, "marker")}
                 />
               </section>
-              <section className="border-t border-line pt-7">
+              <section>
                 <h3 className="mb-3 text-lg font-semibold">Видео</h3>
                 <MediaStep
                   kind="video"
@@ -979,10 +1354,12 @@ function ArItemWizard() {
                   onUpload={(file) => void uploadFile(file, "video")}
                 />
               </section>
-              <section className="border-t border-line pt-7">
-                <h3 className="mb-3 text-lg font-semibold">Поведение ожившего фото</h3>
-                <SettingsStep settings={settings} onChange={setSettings} />
-              </section>
+              <details className="rounded-xl border border-line p-4 sm:col-span-2">
+                <summary className="cursor-pointer text-sm font-semibold">Настройки воспроизведения</summary>
+                <div className="mt-4">
+                  <SettingsStep settings={settings} onChange={setSettings} />
+                </div>
+              </details>
             </div>
           ) : null}
 
@@ -1028,7 +1405,23 @@ function ArItemWizard() {
             </div>
           ) : null}
 
-          {step < 4 ? (
+          {editing ? (
+            <div className="mt-5 flex flex-wrap justify-end gap-3 border-t border-line pt-4">
+              <button className="btn btn-quiet" type="button" onClick={goBack}>
+                Отмена
+              </button>
+              <Button
+                disabled={busy || Boolean(uploadState) || !markerAssetId || !videoAssetId}
+                onClick={() =>
+                  void (async () => {
+                    if (await saveDescription()) await startProcessing();
+                  })()
+                }
+              >
+                {busy ? <LoaderCircle size={16} className="animate-spin" /> : <Check size={16} />} Сохранить изменения
+              </Button>
+            </div>
+          ) : step < 4 ? (
             <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
               <Button variant="quiet" disabled={!canGoBack || busy} onClick={() => setStep((current) => current - 1)}>
                 <ArrowLeft size={16} /> Назад
@@ -1084,7 +1477,15 @@ function WizardProgress({ current }: { current: number }) {
   );
 }
 
+function MediaThumb({ asset }: { asset?: MediaAsset }) {
+  const query = useAssetUrl(asset);
+  return (
+    <span className="ar-media-thumb">{query.data ? <img src={query.data} alt="" /> : <ImageIcon size={22} />}</span>
+  );
+}
+
 function MediaStep({
+  compact = false,
   kind,
   assets,
   selectedId,
@@ -1092,6 +1493,7 @@ function MediaStep({
   onSelect,
   onUpload,
 }: {
+  compact?: boolean;
   kind: "marker" | "video";
   assets: MediaAsset[];
   selectedId: string;
@@ -1100,57 +1502,72 @@ function MediaStep({
   onUpload: (file?: File) => void;
 }) {
   const marker = kind === "marker";
+  const selected = assets.find((asset) => asset.id === selectedId);
   return (
-    <div>
-      <div className="rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-5 text-center">
-        <span className="metric-icon mx-auto">{marker ? <ImageIcon size={22} /> : <FileVideo2 size={22} />}</span>
-        <h3 className="mt-3 font-semibold">
-          {marker ? "Фото любого расширения до 25 МБ" : "Видео любого расширения до 500 МБ"}
-        </h3>
-        <p className="mt-1 text-xs text-muted">
-          {marker
-            ? "Фото будет безопасно декодировано и подготовлено как AR-маркер."
-            : "Видео автоматически преобразуется в формат, совместимый с телефонами."}
-        </p>
-        <label className="btn btn-ghost mt-4 cursor-pointer">
-          <Upload size={16} /> {uploadState?.kind === kind ? `Загрузка ${uploadState.progress}%` : "Выбрать файл"}
-          <input
-            className="hidden"
-            type="file"
-            accept={marker ? markerAccept : videoAccept}
-            disabled={Boolean(uploadState)}
-            onChange={(event) => onUpload(event.currentTarget.files?.[0])}
+    <div className={compact ? "ar-edit-media-picker" : undefined}>
+      {selected ? (
+        <div className="mb-3">
+          <SignedMedia
+            asset={selected}
+            kind={marker ? "image" : "video"}
+            label={marker ? "Фото для AR" : "Видео для AR"}
           />
-        </label>
-      </div>
-      <div className="mt-5 grid gap-3">
-        {assets.map((asset) => (
-          <label
-            key={asset.id}
-            className={`flex cursor-pointer items-center gap-4 rounded-2xl border p-4 ${asset.id === selectedId ? "border-primary bg-primary/10" : "border-line bg-white/[0.02]"}`}
-          >
-            <input
-              type="radio"
-              name={`${kind}-asset`}
-              checked={asset.id === selectedId}
-              onChange={() => onSelect(asset.id)}
-            />
-            <span className="metric-icon">{marker ? <ImageIcon size={18} /> : <Play size={18} />}</span>
-            <span className="min-w-0 flex-1">
-              <strong className="block truncate text-sm">
-                {asset.original_file_name ?? `${kind} v${asset.version}`}
-              </strong>
-              <span className="mt-1 block text-xs text-muted">{assetMeta(asset)}</span>
-            </span>
-            <span className="text-xs font-semibold text-primary">v{asset.version}</span>
-          </label>
-        ))}
-        {!assets.length ? (
-          <p className="rounded-xl border border-line p-4 text-sm text-muted">
-            Подходящих файлов в этой группе пока нет.
+        </div>
+      ) : null}
+      <details open={!selected} className="rounded-xl border border-line p-3">
+        <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-primary">
+          {selected ? (marker ? "Заменить фото" : "Заменить видео") : marker ? "Добавить фото" : "Добавить видео"}
+        </summary>
+        <div className="rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-5 text-center">
+          <span className="metric-icon mx-auto">{marker ? <ImageIcon size={22} /> : <FileVideo2 size={22} />}</span>
+          <h3 className="mt-3 font-semibold">
+            {marker ? "Фото любого расширения до 25 МБ" : "Видео любого расширения до 500 МБ"}
+          </h3>
+          <p className="mt-1 text-xs text-muted">
+            {marker
+              ? "Фото будет безопасно декодировано и подготовлено как AR-маркер."
+              : "Видео автоматически преобразуется в формат, совместимый с телефонами."}
           </p>
-        ) : null}
-      </div>
+          <label className="btn btn-ghost mt-4 cursor-pointer">
+            <Upload size={16} /> {uploadState?.kind === kind ? `Загрузка ${uploadState.progress}%` : "Выбрать файл"}
+            <input
+              className="hidden"
+              type="file"
+              accept={marker ? markerAccept : videoAccept}
+              disabled={Boolean(uploadState)}
+              onChange={(event) => onUpload(event.currentTarget.files?.[0])}
+            />
+          </label>
+        </div>
+        <div className="mt-5 grid gap-3">
+          {assets.map((asset) => (
+            <label
+              key={asset.id}
+              className={`flex cursor-pointer items-center gap-4 rounded-2xl border p-4 ${asset.id === selectedId ? "border-primary bg-primary/10" : "border-line bg-white/[0.02]"}`}
+            >
+              <input
+                type="radio"
+                name={`${kind}-asset`}
+                checked={asset.id === selectedId}
+                onChange={() => onSelect(asset.id)}
+              />
+              <span className="metric-icon">{marker ? <ImageIcon size={18} /> : <Play size={18} />}</span>
+              <span className="min-w-0 flex-1">
+                <strong className="block truncate text-sm">
+                  {asset.original_file_name ?? `${kind} v${asset.version}`}
+                </strong>
+                <span className="mt-1 block text-xs text-muted">{assetMeta(asset)}</span>
+              </span>
+              <span className="text-xs font-semibold text-primary">v{asset.version}</span>
+            </label>
+          ))}
+          {!assets.length ? (
+            <p className="rounded-xl border border-line p-4 text-sm text-muted">
+              Подходящих файлов в этой группе пока нет.
+            </p>
+          ) : null}
+        </div>
+      </details>
     </div>
   );
 }
@@ -1193,8 +1610,8 @@ function SettingsStep({ settings, onChange }: { settings: ArItemSettings; onChan
         ]}
       />
       <div className="rounded-xl border border-line bg-white/[0.025] p-4 text-sm leading-6 text-muted">
-        Перед запуском будут созданы задания анализа маркера, проверки кодеков, компиляции `.mind` и WebP-превью. Если
-        телефону недоступно преобразование, сервер дополнительно подготовит H.264/AAC.
+        Проверим фотографию и автоматически подготовим видео для просмотра на телефоне. Ход обработки будет виден на
+        странице работы.
       </div>
     </div>
   );
@@ -1396,7 +1813,7 @@ function ItemStatus({ status }: { status: keyof typeof statusLabels }) {
   const failed = status === "failed";
   return (
     <span
-      className={`rounded-full px-3 py-1 text-xs font-semibold ${ready ? "bg-emerald-400/15 text-emerald-300" : failed ? "bg-red-400/15 text-red-300" : "bg-primary/15 text-primary"}`}
+      className={`rounded-full px-3 py-1 text-xs font-semibold ${ready ? "bg-emerald-50 text-emerald-800" : failed ? "bg-red-50 text-red-800" : "bg-primary/15 text-primary"}`}
     >
       {statusLabels[status]}
     </span>
@@ -1417,16 +1834,22 @@ function ItemsLoading() {
   );
 }
 
+function formatAssetBytes(bytes: number) {
+  return bytes >= 1024 * 1024
+    ? `${(bytes / (1024 * 1024)).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} МБ`
+    : `${Math.max(1, Math.round(bytes / 1024))} КБ`;
+}
+
 function assetMeta(asset: MediaAsset) {
   const metadata =
     typeof asset.metadata === "object" && asset.metadata && !Array.isArray(asset.metadata) ? asset.metadata : {};
   const width = Number(metadata.width);
   const height = Number(metadata.height);
   const duration = Number(metadata.durationSeconds);
-  const size = `${(asset.size_bytes / 1024 / 1024).toFixed(1)} МБ`;
-  return Number.isFinite(duration)
+  const size = formatAssetBytes(asset.size_bytes);
+  return Number.isFinite(duration) && duration > 0
     ? `${duration.toFixed(1)} сек · ${size}`
-    : Number.isFinite(width) && Number.isFinite(height)
+    : Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0
       ? `${width}×${height} · ${size}`
       : size;
 }

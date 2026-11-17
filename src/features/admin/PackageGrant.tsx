@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button, Input, Select } from "../../shared/ui";
+import { Button, Input, Modal, Select } from "../../shared/ui";
 import { getAdminRepository } from "./adminRepository";
 import type { AdminAccountDetail, AdminPlan } from "./adminSchemas";
 import { packageSummary } from "./planPresentation";
@@ -16,15 +16,25 @@ export function PackageGrant({
   onSuccess: () => Promise<void>;
 }) {
   const [planId, setPlanId] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [choosing, setChoosing] = useState(true);
   const [previewNow, setPreviewNow] = useState(() => Date.now());
   const [reason, setReason] = useState("");
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const product = plans.find((p) => p.id === planId);
   const mutation = useMutation({
-    mutationFn: () => repository.applyPackage(detail.account.id, planId, requestId, reason),
+    mutationFn: () =>
+      repository.applyPackage(
+        detail.account.id,
+        planId,
+        requestId,
+        `Назначение пакета «${product?.name ?? planId}» администратором${reason.trim() ? `: ${reason.trim()}` : ""}`,
+      ),
     onSuccess: async () => {
       setRequestId(crypto.randomUUID());
       setPlanId("");
+      setChoosing(true);
+      setConfirming(false);
       setReason("");
       await onSuccess();
     },
@@ -41,50 +51,108 @@ export function PackageGrant({
             ).toLocaleDateString("ru-RU")
           : "—";
   return (
-    <section className="mt-6 grid gap-4 border-t border-line pt-5">
-      <h3 className="text-lg font-semibold">Назначить тариф или дополнительный пакет</h3>
-      <p className="text-sm text-muted">
-        Пакет прибавляет фото к оставшимся добавлениям. Время прибавляется к текущему окончанию; если срок истёк — к
-        сегодняшнему дню. Деньги автоматически не списываются.
-      </p>
-      <Select
-        label="Тариф или пакет"
-        disabled={mutation.isPending}
-        value={planId}
-        onChange={(e) => {
-          setPlanId(e.target.value);
-          setPreviewNow(Date.now());
-          setRequestId(crypto.randomUUID());
-          mutation.reset();
-        }}
-        options={[
-          { value: "", label: "Выберите пакет" },
-          ...plans.filter((p) => p.isActive).map((p) => ({ value: p.id, label: `${p.name} · ${packageSummary(p)}` })),
-        ]}
-      />
-      {product ? (
-        <div className="rounded-xl border border-line p-4 text-sm">
-          <p>{packageSummary(product)}</p>
-          <p className="mt-2">Окончание после назначения: {expires}</p>
+    <>
+      <section className="admin-package-grant">
+        <div className={`admin-package-picker ${product && !choosing ? "is-chosen" : ""}`}>
+          <Select
+            label="Тариф или пакет"
+            disabled={mutation.isPending}
+            value={planId}
+            onChange={(e) => {
+              setPlanId(e.target.value);
+              setChoosing(false);
+              setPreviewNow(Date.now());
+              setRequestId(crypto.randomUUID());
+              mutation.reset();
+            }}
+            options={[
+              { value: "", label: "Выберите пакет" },
+              ...plans
+                .filter((p) => p.isActive)
+                .map((p) => ({ value: p.id, label: `${p.name} · ${packageSummary(p)}` })),
+            ]}
+          />
         </div>
-      ) : null}
-      <label className="grid gap-2 text-sm font-semibold">
-        Причина назначения (от 10 символов)
-        <Input value={reason} onValueChange={setReason} disabled={mutation.isPending} />
-      </label>
-      <Button disabled={!product || reason.trim().length < 10 || mutation.isPending} onClick={() => mutation.mutate()}>
-        {mutation.isPending ? "Применяем…" : "Подтвердить и начислить пакет"}
-      </Button>
-      {mutation.error ? (
-        <p role="alert" className="text-sm text-rose-700">
-          {mutation.error.message}
+        {product ? (
+          <div className="admin-package-preview">
+            <div className="admin-card-top">
+              <strong>{product.name}</strong>
+              <Button
+                type="button"
+                variant="quiet"
+                className="admin-change-package"
+                onClick={() => setChoosing((value) => !value)}
+              >
+                Сменить
+              </Button>
+            </div>
+            <p>{packageSummary(product)}</p>
+            <p className="mt-2">Окончание после назначения: {expires}</p>
+          </div>
+        ) : null}
+        <p className="admin-payment-note">Оплата не списывается автоматически.</p>
+        <Button type="button" disabled={!product || mutation.isPending} onClick={() => setConfirming(true)}>
+          {mutation.isPending ? "Применяем…" : "Проверить начисление"}
+        </Button>
+        <details className="admin-data-notes admin-package-options">
+          <summary>Комментарий и правила начисления</summary>
+          <p>
+            Фото прибавляются к оставшимся добавлениям. Срок продлевается от текущего окончания, а если он истёк — от
+            сегодняшнего дня.
+          </p>
+          <label className="grid gap-2 text-sm font-semibold">
+            Комментарий к назначению (необязательно)
+            <Input value={reason} onValueChange={setReason} disabled={mutation.isPending} />
+          </label>
+        </details>
+
+        {mutation.error ? (
+          <p role="alert" className="text-sm text-rose-700">
+            {mutation.error.message}
+          </p>
+        ) : null}
+        {mutation.isSuccess ? (
+          <p role="status" className="text-sm text-emerald-700">
+            Пакет начислен. Срок и добавления обновлены.
+          </p>
+        ) : null}
+      </section>
+      <Modal
+        open={confirming && Boolean(product)}
+        title="Подтвердите назначение пакета"
+        onClose={() => {
+          if (!mutation.isPending) setConfirming(false);
+        }}
+        actions={
+          <Button disabled={mutation.isPending || !product} onClick={() => mutation.mutate()}>
+            {mutation.isPending ? "Начисляем…" : "Подтвердить и начислить пакет"}
+          </Button>
+        }
+      >
+        <p className="text-sm">
+          Назначить пакет «{product?.name}» аккаунту «{detail.account.name}»?
         </p>
-      ) : null}
-      {mutation.isSuccess ? (
-        <p role="status" className="text-sm text-emerald-700">
-          Пакет начислен. Срок и добавления обновлены.
+        {product ? (
+          <div className="admin-editor-preview mt-4">
+            <p>{packageSummary(product)}</p>
+            <p>
+              Текущий срок:{" "}
+              {detail.subscription.expiresAt
+                ? new Date(detail.subscription.expiresAt).toLocaleDateString("ru-RU")
+                : "Без окончания"}
+            </p>
+            <p>После назначения: {expires}</p>
+          </div>
+        ) : null}
+        <p className="mt-3 text-sm text-muted">
+          Добавления прибавятся к текущему остатку. Деньги автоматически не списываются.
         </p>
-      ) : null}
-    </section>
+        {mutation.error ? (
+          <p role="alert" className="mt-3 text-sm text-rose-700">
+            {mutation.error.message}
+          </p>
+        ) : null}
+      </Modal>
+    </>
   );
 }

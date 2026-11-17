@@ -1316,6 +1316,14 @@ export type Database = {
         Args: { p_limit?: number; p_search: string };
         Returns: Json;
       };
+      admin_update_account_profile: {
+        Args: { p_target_account_id: string; p_name: string; p_timezone: string; p_reason: string };
+        Returns: Json;
+      };
+      admin_update_user_profile: {
+        Args: { p_target_account_id: string; p_target_user_id: string; p_full_name: string; p_reason: string };
+        Returns: Json;
+      };
       admin_set_account_status: {
         Args: {
           p_reason: string;

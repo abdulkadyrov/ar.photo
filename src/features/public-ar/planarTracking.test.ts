@@ -145,6 +145,44 @@ describe("four-corner planar tracking", () => {
     expect(outputError / rawError).toBeLessThan(0.72);
   });
 
+  it.each([15, 30, 60])("damps small shared camera-coordinate jitter at %i Hz", (fps) => {
+    const filter = createCornerFilter();
+    filter.sample(tilted, 0);
+    let rawEnergy = 0;
+    let filteredEnergy = 0;
+    for (let frame = 1; frame <= 180; frame++) {
+      // A homography solve can move every corner by a few camera pixels,
+      // even when the printed photo itself is stationary.
+      const dx = Math.sin(frame * 2.1) * 0.0028;
+      const dy = Math.cos(frame * 2.4) * 0.0018;
+      const noisy = tilted.map((p) => ({ x: p.x + dx, y: p.y + dy })) as Quad;
+      const actual = filter.sample(noisy, (frame * 1000) / fps)!;
+      expect(actual).not.toBeNull();
+      if (frame > 15) {
+        rawEnergy += error(noisy, tilted) ** 2;
+        filteredEnergy += error(actual, tilted) ** 2;
+      }
+    }
+    expect(Math.sqrt(filteredEnergy / rawEnergy)).toBeLessThan(fps === 15 ? 0.65 : 0.55);
+  });
+
+  it.each([15, 30, 60])("keeps slow camera motion responsive and settles after stopping at %i Hz", (fps) => {
+    const filter = createCornerFilter();
+    filter.sample(tilted, 0);
+    let expected = tilted;
+    for (let frame = 1; frame <= fps * 2; frame++) {
+      expected = tilted.map((p) => ({ x: p.x + (frame / fps) * 0.06, y: p.y + (frame / fps) * 0.02 })) as Quad;
+      const actual = filter.sample(expected, (frame * 1000) / fps)!;
+      expect(actual).not.toBeNull();
+      expect(error(actual, expected)).toBeLessThan(3);
+    }
+    let actual = expected;
+    for (let frame = 1; frame <= fps / 2; frame++) {
+      actual = filter.sample(expected, 2000 + (frame * 1000) / fps)!;
+    }
+    expect(error(actual, expected)).toBeLessThan(0.2);
+  });
+
   it("rejects a single corner slipping while the other three stay in place", () => {
     const filter = createCornerFilter();
     filter.sample(tilted, 0);

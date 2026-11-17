@@ -1,5 +1,7 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { File } from "lucide-react";
+import { PublicDocument } from "../../shared/ui/PublicDocument";
 import { ProtectedRoute } from "../../features/auth/AuthProvider";
 import { useAuth } from "../../features/auth/authContext";
 import { RouteErrorBoundary } from "../../shared/errors/RouteErrorBoundary";
@@ -21,6 +23,9 @@ const ProjectsRoute = lazy(() =>
 );
 const ProjectDetailsRoute = lazy(() =>
   import("../../features/catalog/CatalogPages").then((module) => ({ default: module.ProjectDetailsRoute })),
+);
+const ProjectEditRoute = lazy(() =>
+  import("../../features/catalog/CatalogPages").then((module) => ({ default: module.ProjectEditRoute })),
 );
 const GroupsRoute = lazy(() =>
   import("../../features/catalog/CatalogPages").then((module) => ({ default: module.GroupsRoute })),
@@ -75,6 +80,9 @@ const ResetPasswordRoute = lazy(() =>
 const UpdatePasswordRoute = lazy(() =>
   import("../../features/auth/AuthPages").then((module) => ({ default: module.UpdatePasswordRoute })),
 );
+const MfaVerificationRoute = lazy(() =>
+  import("../../features/auth/AuthPages").then((module) => ({ default: module.MfaVerificationRoute })),
+);
 const SettingsRoute = lazy(() =>
   import("../../features/settings/SettingsPages").then((module) => ({ default: module.SettingsRoute })),
 );
@@ -124,10 +132,12 @@ function RoutedContent() {
           <Route path="/reset-password" element={<ResetPasswordRoute />} />
           <Route path="/recover-access" element={<UpdatePasswordRoute recovery />} />
           <Route path="/update-password" element={<Protected element={<UpdatePasswordRoute />} />} />
+          <Route path="/mfa" element={<Protected element={<MfaVerificationRoute />} />} />
           <Route path="/dashboard" element={<Protected element={<DashboardRoute />} />} />
           <Route path="/create" element={<Protected element={<QuickStartRoute />} />} />
           <Route path="/projects" element={<Protected element={<ProjectsRoute />} />} />
           <Route path="/projects/:projectId" element={<Protected element={<ProjectDetailsRoute />} />} />
+          <Route path="/projects/:projectId/edit" element={<Protected element={<ProjectEditRoute />} />} />
           <Route path="/groups" element={<Protected element={<GroupsRoute />} />} />
           <Route path="/media" element={<Protected element={<MediaUploadRoute />} />} />
           <Route path="/items" element={<Protected element={<ArItemsRoute />} />} />
@@ -140,7 +150,7 @@ function RoutedContent() {
           <Route path="/admin" element={<Protected element={<AdminRoute />} />} />
           <Route path="/support" element={<Protected element={<SupportRoute />} />} />
           <Route path="/profile" element={<Protected element={<ProfileRoute />} />} />
-          <Route path="/camera" element={<Protected element={<ArCameraEntryRoute />} />} />
+          <Route path="/camera" element={<ArCameraEntryRoute />} />
           <Route path="/settings" element={<Protected element={<SettingsRoute />} />} />
           <Route path="/settings/subscription" element={<Protected element={<SubscriptionRoute />} />} />
           <Route path="/settings/team" element={<Protected element={<TeamRoute />} />} />
@@ -192,14 +202,36 @@ function RouteLoading() {
 }
 
 function RouteNotFound() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from;
+  const safeOrigin =
+    from &&
+    /^\/(dashboard|projects|groups|items|qr-codes|profile|settings|support|camera)(?:[/?#]|$)/.test(from) &&
+    !from.includes("\\")
+      ? from
+      : "/";
   return (
-    <main className="grid min-h-screen place-items-center bg-background px-5 text-ink">
-      <div className="max-w-md rounded-card border border-line bg-card p-5 text-center shadow-soft">
-        <h1 className="text-2xl font-semibold">Страница не найдена</h1>
-        <a className="mt-4 inline-flex font-semibold text-primary" href={`${import.meta.env.BASE_URL}`}>
-          Вернуться на главную
-        </a>
-      </div>
-    </main>
+    <PublicDocument>
+      <section className="public-not-found-card">
+        <div className="public-not-found-symbol" aria-hidden="true">
+          <File size={74} strokeWidth={1.5} />
+          <span>404</span>
+        </div>
+        <h1>Страница не найдена</h1>
+        <p>Возможно, ссылка изменилась, была удалена или введён неверный адрес.</p>
+        <div className="public-not-found-actions">
+          <Link className="btn btn-primary" to="/">
+            На главную
+          </Link>
+          <button className="btn btn-ghost" type="button" onClick={() => navigate(safeOrigin, { replace: true })}>
+            Назад
+          </button>
+        </div>
+        <p className="public-not-found-support">
+          Нужна помощь? Обратитесь в <Link to="/support">поддержку KHANZAMA</Link>.
+        </p>
+      </section>
+    </PublicDocument>
   );
 }

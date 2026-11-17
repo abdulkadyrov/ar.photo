@@ -132,9 +132,17 @@ export class DemoCatalogRepository implements CatalogRepository {
     return this.setDemoCover("project", projectId, file) as Promise<Project>;
   }
 
-  async listGroups(_accountId: string, projectId: string, includeDeleted = false) {
-    return this.state()
-      .groups.filter((group) => group.project_id === projectId && (includeDeleted || !group.deleted_at))
+  async listGroups(accountId: string, projectId?: string, includeDeleted = false) {
+    const state = this.state();
+    if (!accountId || accountId !== state.workspace.accountId)
+      throw new CatalogError("forbidden", "Аккаунт недоступен");
+    return state.groups
+      .filter(
+        (group) =>
+          group.account_id === accountId &&
+          (!projectId || group.project_id === projectId) &&
+          (includeDeleted || !group.deleted_at),
+      )
       .sort((left, right) => left.sort_order - right.sort_order || left.created_at.localeCompare(right.created_at));
   }
 

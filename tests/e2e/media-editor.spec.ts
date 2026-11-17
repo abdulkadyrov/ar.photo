@@ -43,9 +43,7 @@ for (const width of [390, 1280]) {
     expect(
       await dialog
         .locator(".media-timeline-section")
-        .evaluate(
-          (el) => el.getBoundingClientRect().right <= document.querySelector("dialog")!.getBoundingClientRect().right,
-        ),
+        .evaluate((el) => el.getBoundingClientRect().right <= el.closest("dialog")!.getBoundingClientRect().right),
     ).toBe(true);
     await dialog.getByRole("button", { name: /^Фрагмент 2/ }).click();
     await dialog.getByRole("button", { name: "Удалить фрагмент 2" }).click();
@@ -83,6 +81,7 @@ for (const viewport of [
     await page.getByRole("link", { name: "Создать AR-фото" }).first().click();
     await page.getByLabel("Выбрать фотографию-маркер").setInputFiles("public/test-assets/test.jpg");
     await page.getByLabel("Выбрать видео", { exact: true }).setInputFiles("test-assets/fixtures/h264-aac.mp4");
+    await page.locator("summary").filter({ hasText: "Дополнительные настройки" }).click();
     const comparison = page.getByRole("slider", { name: "Линия сравнения фото и видео" });
     await comparison.fill("75");
     await expect(page.locator(".media-comparison-divider")).toHaveAttribute("style", "left: 75%;");

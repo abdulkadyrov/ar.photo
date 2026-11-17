@@ -44,7 +44,6 @@ test("hands the first QR camera stream to real AR tracking without a page reload
     });
   }, qr);
   await page.goto("./ar/demo");
-  await page.getByRole("button", { name: "Включить камеру", exact: true }).click();
   await expect(page.getByText("Фото найдено", { exact: true })).toBeVisible({ timeout: 60_000 });
   const camera = await page.locator(".ar-viewer-stage > video").evaluate((video) => {
     const rect = video.getBoundingClientRect();

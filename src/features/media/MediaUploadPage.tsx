@@ -1,11 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, CircleAlert, FileImage, Film, LoaderCircle, Pause, RefreshCw, Trash2, UploadCloud } from "lucide-react";
+import {
+  Check,
+  Eye,
+  List,
+  Grid2X2,
+  Search,
+  CircleAlert,
+  FileImage,
+  Film,
+  LoaderCircle,
+  Pause,
+  RefreshCw,
+  Trash2,
+  UploadCloud,
+} from "lucide-react";
+import { useLocation, useSearchParams } from "react-router-dom";
+import "./MediaUploadPage.css";
 import type { MediaAsset, PreparedMedia } from "../../entities/media/model";
 import { AppShell } from "../../app/layout/AppShell";
 import { useAuth } from "../auth/authContext";
 import { getCatalogRepository } from "../catalog/catalogRepository";
-import { Button, ErrorState, FileDropzone, Panel, Select, Skeleton, Toast } from "../../shared/ui";
+import { Button, ErrorState, FileDropzone, Input, Modal, Panel, Select, Skeleton, Toast } from "../../shared/ui";
 import { getMediaRepository, MediaRepositoryError } from "./mediaRepository";
 import { classifyMediaFile, mediaAccept, prepareUnclassifiedMediaFile } from "./mediaValidation";
 import {
@@ -42,6 +58,21 @@ export function MediaUploadRoute() {
   const auth = useAuth();
   const queryClient = useQueryClient();
   const [selectedProjectId, setSelectedProjectId] = useState("");
+  const location = useLocation();
+  const [params, setParams] = useSearchParams();
+  const libraryProjectId = params.get("projectId") ?? "";
+  const search = params.get("q") ?? "";
+  const fileKind = params.get("type") ?? "";
+  const status = params.get("status") ?? "";
+  const sort = params.get("sort") ?? "newest";
+  const layout = params.get("layout") ?? "list";
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const setFilter = (name: string, value: string) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(name, value);
+    else next.delete(name);
+    setParams(next, { replace: true, state: location.state });
+  };
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [notice, setNotice] = useState<{ title: string; message?: string; tone: "success" | "error" }>();
@@ -71,9 +102,9 @@ export function MediaUploadRoute() {
     ? selectedGroupId
     : (groupsQuery.data?.[0]?.id ?? "");
   const assetsQuery = useQuery({
-    queryKey: ["media", "assets", accountId, projectId, groupId],
-    queryFn: () => mediaRepository.listAssets(accountId!, projectId, groupId || undefined),
-    enabled: Boolean(accountId && projectId && groupId),
+    queryKey: ["media", "assets", accountId, libraryProjectId || "all"],
+    queryFn: () => mediaRepository.listAssets(accountId!, libraryProjectId || undefined),
+    enabled: Boolean(accountId),
   });
 
   useEffect(() => {
@@ -294,121 +325,207 @@ export function MediaUploadRoute() {
   ).length;
   const uploadDisabled = !workspace.canWrite || !projectId || !groupId;
 
+  const visibleAssets = (assetsQuery.data ?? [])
+    .filter(
+      (asset) =>
+        (!fileKind || (fileKind === "video" ? asset.kind === "video" : asset.kind !== "video")) &&
+        (!status || status === "ready") &&
+        (asset.original_file_name ?? "").toLocaleLowerCase("ru-RU").includes(search.trim().toLocaleLowerCase("ru-RU")),
+    )
+    .sort((left, right) => (sort === "oldest" ? 1 : -1) * left.created_at.localeCompare(right.created_at));
+  const visibleQueue = queue.filter(
+    (item) =>
+      (!libraryProjectId || item.projectId === libraryProjectId) &&
+      (!status ||
+        (status === "failed"
+          ? item.status === "failed"
+          : status === "uploading"
+            ? item.status === "uploading" || item.status === "validating"
+            : item.status === "completed")),
+  );
   return (
     <AppShell
-      eyebrow={workspace.accountName}
-      title="Медиа"
-      description="Проверяем файлы в браузере, загружаем частями и сохраняем только после серверной верификации."
+      title="Медиа и загрузки"
+      description="Моя медиатека: фото и видео для проектов AR-фото"
+      showDescriptionOnMobile
       actions={
-        readyCount ? (
-          <Button disabled={uploadDisabled} icon={<UploadCloud size={17} />} onClick={() => void uploadReady()}>
-            Загрузить готовые · {readyCount}
-          </Button>
-        ) : undefined
+        <Button
+          disabled={!workspace.canWrite}
+          icon={<UploadCloud size={17} />}
+          onClick={() => setUploadOpen((open) => !open)}
+        >
+          Загрузить файлы
+        </Button>
       }
     >
-      {auth.mode === "demo" ? (
-        <div className="mt-6 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
-          Демо-режим: очередь работает локально. В online-режиме те же действия используют приватный Supabase Storage.
-        </div>
-      ) : null}
-
-      <section className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.8fr)]">
-        <Panel>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Select
-              disabled={projectsQuery.isPending || !projectsQuery.data?.length}
-              label="Проект"
-              onChange={(event) => {
-                setSelectedProjectId(event.target.value);
-                setSelectedGroupId("");
-              }}
-              options={(projectsQuery.data ?? []).map((project) => ({ label: project.name, value: project.id }))}
-              value={projectId}
-            />
-            <Select
-              disabled={groupsQuery.isPending || !groupsQuery.data?.length}
-              label="Группа"
-              onChange={(event) => setSelectedGroupId(event.target.value)}
-              options={(groupsQuery.data ?? []).map((group) => ({ label: group.name, value: group.id }))}
-              value={groupId}
-            />
-          </div>
-
-          {!projectsQuery.isPending && !projectsQuery.data?.length ? (
-            <p className="mt-4 rounded-xl border border-line bg-white/[0.025] p-4 text-sm text-muted">
-              Сначала создайте активный проект и группу в разделе «Проекты».
-            </p>
-          ) : null}
-          {projectId && !groupsQuery.isPending && !groupsQuery.data?.length ? (
-            <p className="mt-4 rounded-xl border border-line bg-white/[0.025] p-4 text-sm text-muted">
-              В выбранном проекте пока нет активной группы.
-            </p>
-          ) : null}
-
-          <div className="mt-5">
+      <div className="media-library">
+        {uploadOpen ? (
+          <Panel className="media-upload-panel">
+            <h2>Загрузить фото и видео</h2>
+            <div className="media-upload-destination">
+              <Select
+                label="Проект загрузки"
+                value={projectId}
+                disabled={projectsQuery.isPending || !projectsQuery.data?.length}
+                onChange={(event) => {
+                  setSelectedProjectId(event.target.value);
+                  setSelectedGroupId("");
+                }}
+                options={(projectsQuery.data ?? []).map((project) => ({ label: project.name, value: project.id }))}
+              />
+              <Select
+                label="Группа загрузки"
+                value={groupId}
+                disabled={groupsQuery.isPending || !groupsQuery.data?.length}
+                onChange={(event) => setSelectedGroupId(event.target.value)}
+                options={(groupsQuery.data ?? []).map((group) => ({ label: group.name, value: group.id }))}
+              />
+            </div>
+            {!projectId || !groupId ? (
+              <p className="text-sm text-muted">Сначала создайте проект и группу в разделе «Проекты».</p>
+            ) : null}
             <FileDropzone
               accept={mediaAccept}
               disabled={uploadDisabled}
-              hint="Фото любого расширения нормализуются и очищаются от EXIF. Видео автоматически преобразуются в MP4/H.264."
+              hint="Фото и видео будут автоматически подготовлены перед загрузкой."
               onPick={addFiles}
             />
-          </div>
-
-          {queue.length ? (
-            <div className="mt-5 grid gap-3" aria-label="Очередь загрузки">
-              {queue.map((item) => (
-                <UploadQueueCard
-                  key={item.id}
-                  item={item}
-                  onCancel={() => controllers.current.get(item.id)?.abort()}
-                  onRemove={() => removeItem(item)}
-                  onRetry={() => retryItem(item)}
-                  onUpload={() => void uploadItem(item)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="mt-6 text-center text-sm text-muted">
-              Очередь пуста. Файлы не покидают браузер до успешной проверки.
-            </div>
-          )}
-          <p className="mt-4 text-xs leading-5 text-muted">
-            Подготовленные файлы сохраняются в IndexedDB этого устройства. После перезагрузки очередь можно продолжить;
-            после успешной загрузки локальная копия удаляется.
-          </p>
+            {readyCount ? (
+              <Button disabled={uploadDisabled} icon={<UploadCloud size={17} />} onClick={() => void uploadReady()}>
+                Загрузить готовые · {readyCount}
+              </Button>
+            ) : null}
+            <p className="media-upload-help">
+              Загрузку можно продолжить после перезагрузки страницы.
+              {auth.mode === "demo" ? " Демо: файлы сохраняются только в этом браузере." : ""}
+            </p>
+          </Panel>
+        ) : null}
+        <Panel className="media-library-filters">
+          <Select
+            label="Проект"
+            value={libraryProjectId}
+            onChange={(event) => setFilter("projectId", event.target.value)}
+            options={[
+              { label: "Все проекты", value: "" },
+              ...(projectsQuery.data ?? []).map((project) => ({ label: project.name, value: project.id })),
+            ]}
+          />
+          <Select
+            label="Тип файла"
+            value={fileKind}
+            onChange={(event) => setFilter("type", event.target.value)}
+            options={[
+              { label: "Все файлы", value: "" },
+              { label: "Фото", value: "image" },
+              { label: "Видео", value: "video" },
+            ]}
+          />
+          <Select
+            label="Статус"
+            value={status}
+            onChange={(event) => setFilter("status", event.target.value)}
+            options={[
+              { label: "Все статусы", value: "" },
+              { label: "Готово", value: "ready" },
+              { label: "Загружается", value: "uploading" },
+              { label: "Ошибка загрузки", value: "failed" },
+            ]}
+          />
+          <label className="media-library-search">
+            <span className="sr-only">Поиск по названию</span>
+            <Search size={17} />
+            <Input
+              value={search}
+              onValueChange={(value) => setFilter("q", value)}
+              placeholder="Поиск по названию файла…"
+            />
+          </label>
         </Panel>
-
-        <Panel>
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold">Загруженные файлы</h2>
-              <p className="mt-1 text-xs text-muted">Текущий проект и группа</p>
-            </div>
-            <span className="rounded-full bg-primary/15 px-2.5 py-1 text-xs font-semibold text-primary">
-              {assetsQuery.data?.length ?? 0}
-            </span>
+        <div className="media-library-heading">
+          <h2>Файлы ({visibleAssets.length})</h2>
+          <div>
+            <Select
+              label="Порядок файлов"
+              aria-label="Порядок файлов"
+              value={sort}
+              onChange={(event) => setFilter("sort", event.target.value)}
+              options={[
+                { label: "Сначала новые", value: "newest" },
+                { label: "Сначала старые", value: "oldest" },
+              ]}
+            />
+            <button
+              type="button"
+              aria-label="Список файлов"
+              aria-pressed={layout !== "grid"}
+              onClick={() => setFilter("layout", "list")}
+            >
+              <List size={18} />
+            </button>
+            <button
+              type="button"
+              aria-label="Сетка файлов"
+              aria-pressed={layout === "grid"}
+              onClick={() => setFilter("layout", "grid")}
+            >
+              <Grid2X2 size={18} />
+            </button>
           </div>
-          {assetsQuery.isPending ? (
-            <div className="mt-5 grid gap-3">
-              <Skeleton className="h-16 rounded-xl" />
-              <Skeleton className="h-16 rounded-xl" />
+        </div>
+        {visibleQueue.length ? (
+          <div className="media-queue-list" aria-label="Очередь загрузки">
+            {visibleQueue.map((item) => (
+              <UploadQueueCard
+                key={item.id}
+                item={item}
+                onCancel={() => controllers.current.get(item.id)?.abort()}
+                onRemove={() => removeItem(item)}
+                onRetry={() => retryItem(item)}
+                onUpload={() => void uploadItem(item)}
+              />
+            ))}
+          </div>
+        ) : null}
+        {assetsQuery.isPending ? (
+          <Skeleton className="h-64 rounded-xl" />
+        ) : assetsQuery.error ? (
+          <ErrorState
+            text={readableError(assetsQuery.error)}
+            action={<Button onClick={() => void assetsQuery.refetch()}>Повторить</Button>}
+          />
+        ) : visibleAssets.length ? (
+          <section
+            className={`media-library-files ${layout === "grid" ? "media-library-grid" : ""}`}
+            aria-label="Загруженные файлы"
+          >
+            <div className="media-library-table-head" aria-hidden="true">
+              <span>Файл</span>
+              <span>Проект</span>
+              <span>Размер</span>
+              <span>Статус</span>
+              <span>Действие</span>
             </div>
-          ) : assetsQuery.error ? (
-            <p className="mt-5 text-sm text-rose-300">{readableError(assetsQuery.error)}</p>
-          ) : assetsQuery.data?.length ? (
-            <div className="mt-5 grid gap-2">
-              {assetsQuery.data.map((asset) => (
-                <AssetRow key={asset.id} asset={asset} />
-              ))}
-            </div>
-          ) : (
-            <div className="mt-5 rounded-xl border border-dashed border-line p-5 text-center text-sm text-muted">
-              Проверенные файлы появятся здесь после финализации.
-            </div>
-          )}
-        </Panel>
-      </section>
+            {visibleAssets.map((asset) => (
+              <AssetRow
+                key={asset.id}
+                asset={asset}
+                projectName={projectsQuery.data?.find((project) => project.id === asset.project_id)?.name}
+              />
+            ))}
+          </section>
+        ) : (
+          <Panel className="media-library-empty">
+            <FileImage size={30} />
+            <h2>{(assetsQuery.data?.length ?? 0) ? "Файлы не найдены" : "В медиатеке пока нет файлов"}</h2>
+            <p>
+              {(assetsQuery.data?.length ?? 0)
+                ? "Измените поиск или фильтры."
+                : "Добавьте фото и видео для своих AR-работ."}
+            </p>
+          </Panel>
+        )}
+      </div>
 
       {notice ? (
         <div className="fixed bottom-24 right-5 z-50 lg:bottom-6">
@@ -559,21 +676,67 @@ function MetadataLine({ prepared }: { prepared: PreparedMedia }) {
   return <p className="mt-2 text-[11px] leading-5 text-muted">{details}</p>;
 }
 
-function AssetRow({ asset }: { asset: MediaAsset }) {
+function AssetRow({ asset, projectName }: { asset: MediaAsset; projectName?: string }) {
   const isVideo = asset.kind === "video";
+  const [viewing, setViewing] = useState(false);
+  const urlQuery = useQuery({
+    queryKey: ["media-preview", asset.id, asset.version],
+    queryFn: () => mediaRepository.getAssetUrl(asset),
+    staleTime: 8 * 60_000,
+  });
+  const name = asset.original_file_name ?? (isVideo ? "Видео" : "Фото");
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-line bg-white/[0.025] p-3">
-      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-        {isVideo ? <Film size={18} /> : <FileImage size={18} />}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">{asset.original_file_name ?? (isVideo ? "Видео" : "Маркер")}</p>
-        <p className="mt-1 text-[11px] text-muted">
-          v{asset.version} · {formatBytes(asset.size_bytes)} · {new Date(asset.created_at).toLocaleDateString("ru-RU")}
-        </p>
+    <>
+      <div className="media-asset-row">
+        <div className="media-asset-main">
+          <span className="media-asset-thumbnail">
+            {urlQuery.data ? (
+              isVideo ? (
+                <video src={urlQuery.data} muted playsInline preload="metadata" />
+              ) : (
+                <img src={urlQuery.data} alt="" loading="lazy" />
+              )
+            ) : isVideo ? (
+              <Film size={22} />
+            ) : (
+              <FileImage size={22} />
+            )}
+          </span>
+          <div>
+            <h3 title={name}>{name}</h3>
+            <p>
+              {isVideo ? "Видео" : "Фото"} · {asset.mime_type.split("/")[1]?.toUpperCase()}
+            </p>
+            <p className="media-asset-mobile-meta">
+              {projectName ?? "—"} · {formatBytes(asset.size_bytes)}
+            </p>
+          </div>
+        </div>
+        <span className="media-asset-project">{projectName ?? "—"}</span>
+        <span className="media-asset-size">{formatBytes(asset.size_bytes)}</span>
+        <span className="media-asset-status">
+          <Check size={13} /> Готово
+        </span>
+        <Button
+          variant="quiet"
+          aria-label={`Просмотр ${name}`}
+          disabled={!urlQuery.data}
+          onClick={() => setViewing(true)}
+        >
+          <Eye size={16} />
+          <span>Просмотр</span>
+        </Button>
       </div>
-      <Check className="text-emerald-300" size={16} />
-    </div>
+      <Modal open={viewing} title={name} onClose={() => setViewing(false)}>
+        {viewing && urlQuery.data ? (
+          isVideo ? (
+            <video src={urlQuery.data} controls playsInline className="max-h-[65dvh] w-full rounded-lg" />
+          ) : (
+            <img src={urlQuery.data} alt={name} className="max-h-[65dvh] w-full rounded-lg object-contain" />
+          )
+        ) : null}
+      </Modal>
+    </>
   );
 }
 

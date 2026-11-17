@@ -6,6 +6,8 @@ import {
   Eye,
   Play,
   RefreshCw,
+  ArrowRight,
+  Plus,
   ScanLine,
   ShieldCheck,
   Smartphone,
@@ -13,6 +15,11 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { getArItemRepository } from "../ar-items/arItemRepository";
+import { captureWorkspaceOrigin } from "../ar-items/itemNavigation";
+import type { ArItem } from "../../entities/ar-item/model";
+import "./AnalyticsPage.css";
 import { AppShell } from "../../app/layout/AppShell";
 import { Button, ErrorState, MetricCard, Panel, Select, Skeleton } from "../../shared/ui";
 import { useAuth } from "../auth/authContext";
@@ -22,6 +29,7 @@ import { getAnalyticsRepository } from "./analyticsRepository";
 
 const analyticsRepository = getAnalyticsRepository();
 const catalogRepository = getCatalogRepository();
+const arItemRepository = getArItemRepository();
 const scopeLabels = { account: "Аккаунт", project: "Проект", group: "Группа", item: "AR-работа" } as const;
 const dimensionLabels: Record<string, string> = {
   mobile: "Телефон",
@@ -65,6 +73,11 @@ export function AnalyticsRoute() {
     queryFn: () => catalogRepository.getWorkspace(auth.session!.user.id),
   });
   const workspace = workspaceQuery.data;
+  const itemsQuery = useQuery({
+    queryKey: ["ar-items", workspace?.accountId],
+    queryFn: () => arItemRepository.listItems(workspace!.accountId),
+    enabled: Boolean(workspace),
+  });
   const scopesQuery = useQuery({
     queryKey: ["analytics", "scopes", workspace?.accountId],
     queryFn: () => analyticsRepository.listScopes(workspace!.accountId, workspace!.accountName),
@@ -93,20 +106,29 @@ export function AnalyticsRoute() {
   return (
     <AppShell
       eyebrow={workspace.accountName}
-      title="Аналитика"
-      description="Просмотры, распознавание маркеров и вовлечённость по аккаунту, проектам, группам и AR-работам."
+      title="Статистика моих работ"
+      description="Просмотры и взаимодействия с моими AR-фото"
+      compactMobile
       actions={
-        <Button
-          variant="quiet"
-          icon={<RefreshCw size={17} />}
-          disabled={summaryQuery.isFetching}
-          onClick={() => void summaryQuery.refetch()}
-        >
-          Обновить
-        </Button>
+        <>
+          <Button
+            variant="quiet"
+            icon={<RefreshCw size={17} />}
+            disabled={summaryQuery.isFetching}
+            onClick={() => void summaryQuery.refetch()}
+          >
+            Обновить
+          </Button>
+          {workspace.canWrite ? (
+            <Link className="btn btn-primary" to="/create">
+              <Plus size={17} />
+              Создать AR-фото
+            </Link>
+          ) : null}
+        </>
       }
     >
-      <Panel className="mt-6">
+      <Panel className="analytics-filters mt-5">
         <div className="grid gap-4 lg:grid-cols-[minmax(240px,1.3fr)_220px]">
           <Select
             label="Раздел"
@@ -138,8 +160,27 @@ export function AnalyticsRoute() {
             <DateInput label="По дату" value={customTo} onChange={setCustomTo} />
           </div>
         ) : null}
+        <Button
+          type="button"
+          className="analytics-filter-apply"
+          disabled={summaryQuery.isFetching || !range}
+          onClick={() => void summaryQuery.refetch()}
+        >
+          Применить
+        </Button>
+        <Button
+          type="button"
+          className="analytics-filter-reset"
+          variant="ghost"
+          onClick={() => {
+            setPreset("30");
+            setSelectedScopeKey("");
+          }}
+        >
+          Сбросить
+        </Button>
         {!range ? (
-          <p className="mt-4 text-sm text-rose-300" role="alert">
+          <p className="mt-4 text-sm text-rose-700" role="alert">
             Начальная дата должна быть раньше конечной, максимальный период — 366 дней.
           </p>
         ) : null}
@@ -160,64 +201,61 @@ export function AnalyticsRoute() {
           />
         </div>
       ) : summaryQuery.data ? (
-        <AnalyticsDashboard data={summaryQuery.data} />
+        <AnalyticsDashboard
+          data={summaryQuery.data}
+          works={
+            range ? (
+              <AnalyticsWorkList
+                items={itemsQuery.data ?? []}
+                loading={itemsQuery.isPending}
+                error={itemsQuery.error}
+                accountId={workspace.accountId}
+                range={range}
+                scope={scope}
+                scopes={scopes}
+                onRetry={() => void itemsQuery.refetch()}
+              />
+            ) : null
+          }
+        />
       ) : null}
     </AppShell>
   );
 }
 
-function AnalyticsDashboard({ data }: { data: AnalyticsSummary }) {
+function AnalyticsDashboard({ data, works }: { data: AnalyticsSummary; works: ReactNode }) {
   const summary = data.summary;
   return (
     <>
-      <section
-        className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6"
-        aria-label="Ключевые показатели"
-      >
-        <MetricCard
-          icon={<Eye size={20} />}
-          label="Сессии"
-          value={formatNumber(summary.uniqueSessions)}
-          hint={`${formatNumber(summary.pageOpens)} открытий`}
-        />
-        <MetricCard
-          icon={<ScanLine size={20} />}
-          label="Распознавания"
-          value={formatNumber(summary.markerDetections)}
-          hint={`${formatRate(summary.detectionRate)} от открытий`}
-        />
-        <MetricCard
-          icon={<Play size={20} />}
-          label="Запуски видео"
-          value={formatNumber(summary.playbackStarts)}
-          hint={`${formatRate(summary.playbackRate)} после маркера`}
-        />
-        <MetricCard
-          icon={<CircleCheck size={20} />}
-          label="Досмотры"
-          value={formatNumber(summary.completions)}
-          hint={`${formatRate(summary.completionRate)} от запусков`}
-        />
-        <MetricCard
-          icon={<Timer size={20} />}
-          label="Средний просмотр"
-          value={formatDuration(summary.averageWatchSeconds)}
-          hint="На одну сессию"
-        />
-        <MetricCard
-          icon={<TriangleAlert size={20} />}
-          label="Ошибки"
-          value={formatNumber(summary.errors)}
-          hint={`${formatNumber(summary.cameraStarts)} запусков камеры`}
-        />
+      <section className="analytics-metrics mt-5" aria-label="Ключевые показатели">
+        <article className="analytics-stat">
+          <Eye size={22} />
+          <div>
+            <span>Открытия страниц</span>
+            <strong>{formatNumber(summary.pageOpens)}</strong>
+          </div>
+        </article>
+        <article className="analytics-stat">
+          <ScanLine size={22} />
+          <div>
+            <span>Запуски AR</span>
+            <strong>{formatNumber(summary.cameraStarts)}</strong>
+          </div>
+        </article>
+        <article className="analytics-stat">
+          <Play size={22} />
+          <div>
+            <span>Просмотры видео</span>
+            <strong>{formatNumber(summary.playbackStarts)}</strong>
+          </div>
+        </article>
       </section>
 
-      <section className="mt-6 grid gap-5 2xl:grid-cols-[1.6fr_0.8fr]">
+      <section className="analytics-chart-grid mt-5">
         <Panel>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Динамика</p>
-              <h2 className="mt-2 text-2xl font-semibold">Активность просмотров</h2>
+              <h2 className="mt-1 text-lg font-semibold">Динамика активности</h2>
             </div>
             <span className="rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">
               {data.scope.name}
@@ -225,6 +263,11 @@ function AnalyticsDashboard({ data }: { data: AnalyticsSummary }) {
           </div>
           <AnalyticsChart series={data.series} />
         </Panel>
+      </section>
+
+      {works}
+      <details className="analytics-details mt-5">
+        <summary>Подробнее о просмотрах и устройствах</summary>
         <Panel>
           <div className="flex items-center gap-3">
             <span className="metric-icon">
@@ -237,51 +280,212 @@ function AnalyticsDashboard({ data }: { data: AnalyticsSummary }) {
           </div>
           <Funnel summary={summary} />
         </Panel>
-      </section>
 
-      <section className="mt-5 grid gap-5 lg:grid-cols-2 2xl:grid-cols-4">
-        <BreakdownPanel icon={<Smartphone size={19} />} title="Устройства" rows={data.devices} />
-        <BreakdownPanel icon={<BarChart3 size={19} />} title="Браузеры" rows={data.browsers} />
-        <BreakdownPanel icon={<Activity size={19} />} title="Операционные системы" rows={data.operatingSystems} />
-        <BreakdownPanel
-          icon={<TriangleAlert size={19} />}
-          title="Причины ошибок"
-          rows={data.errors.map((row) => ({ name: row.code, count: row.count }))}
-          errors
-        />
-      </section>
-
-      <Panel className="mt-5 border-primary/25">
-        <div className="flex items-start gap-3">
-          <span className="metric-icon">
-            <ShieldCheck size={20} />
-          </span>
-          <div>
-            <h2 className="font-semibold">Приватность по умолчанию</h2>
-            <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
-              Отчёт строится только по агрегатам. AR Photo не сохраняет IP-адреса, полный User-Agent, кадры камеры,
-              персональные данные зрителя или подписанные ссылки на медиа. Токен сессии хранится как солёный SHA‑256.
-            </p>
+        <section className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            icon={<CircleCheck size={20} />}
+            label="Досмотры"
+            value={formatNumber(summary.completions)}
+            hint={`${formatRate(summary.completionRate)} от запусков`}
+          />
+          <MetricCard
+            icon={<Timer size={20} />}
+            label="Средний просмотр"
+            value={formatDuration(summary.averageWatchSeconds)}
+            hint="На одну сессию"
+          />
+          <MetricCard
+            icon={<TriangleAlert size={20} />}
+            label="Ошибки"
+            value={formatNumber(summary.errors)}
+            hint="За выбранный период"
+          />
+        </section>
+        <section className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <BreakdownPanel icon={<Smartphone size={19} />} title="Устройства" rows={data.devices} />
+          <BreakdownPanel icon={<BarChart3 size={19} />} title="Браузеры" rows={data.browsers} />
+          <BreakdownPanel icon={<Activity size={19} />} title="Операционные системы" rows={data.operatingSystems} />
+          <BreakdownPanel
+            icon={<TriangleAlert size={19} />}
+            title="Причины ошибок"
+            rows={data.errors.map((row) => ({ name: row.code, count: row.count }))}
+            errors
+          />
+        </section>
+        <Panel className="analytics-privacy mt-5 border-primary/25">
+          <div className="flex items-start gap-3">
+            <span className="metric-icon">
+              <ShieldCheck size={20} />
+            </span>
+            <div>
+              <h2 className="font-semibold">Приватность по умолчанию</h2>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-muted">
+                Отчёт строится только по агрегатам. AR Photo не сохраняет IP-адреса, полный User-Agent, кадры камеры,
+                персональные данные зрителя или подписанные ссылки на медиа. Токен сессии хранится как солёный SHA‑256.
+              </p>
+            </div>
           </div>
-        </div>
-      </Panel>
+        </Panel>
+      </details>
     </>
+  );
+}
+
+function AnalyticsWorkList({
+  items,
+  loading,
+  error,
+  accountId,
+  range,
+  scope,
+  scopes,
+  onRetry,
+}: {
+  items: ArItem[];
+  loading: boolean;
+  error: unknown;
+  accountId: string;
+  range: { from: string; to: string };
+  scope: AnalyticsScopeOption | null | undefined;
+  scopes: AnalyticsScopeOption[];
+  onRetry: () => void;
+}) {
+  const [page, setPage] = useState(1);
+  const visible = items.filter(
+    (item) =>
+      !scope ||
+      scope.type === "account" ||
+      (scope.type === "project" && item.project_id === scope.id) ||
+      (scope.type === "group" && item.group_id === scope.id) ||
+      (scope.type === "item" && item.id === scope.id),
+  );
+  const safePage = Math.min(page, Math.max(1, Math.ceil(visible.length / 6)));
+  return (
+    <section className="analytics-works mt-5">
+      <div className="section-heading-row">
+        <h2>Мои работы</h2>
+        <Link className="text-link" to="/items">
+          Все AR-фото <ArrowRight size={16} />
+        </Link>
+      </div>
+      {loading ? (
+        <Skeleton className="mt-4 h-32" />
+      ) : error ? (
+        <ErrorState text="Не удалось загрузить работы." action={<Button onClick={onRetry}>Повторить</Button>} />
+      ) : visible.length ? (
+        <>
+          <div className="analytics-work-table">
+            <div className="analytics-work-table-heading">
+              <span>Работа</span>
+              <span>Открытия</span>
+              <span>Запуски AR</span>
+              <span>Видео</span>
+              <span />
+            </div>
+            {visible.slice((safePage - 1) * 6, safePage * 6).map((item) => (
+              <AnalyticsWorkRow
+                key={item.id}
+                item={item}
+                projectName={
+                  scopes.find((option) => option.type === "project" && option.id === item.project_id)?.name ?? ""
+                }
+                accountId={accountId}
+                range={range}
+              />
+            ))}
+          </div>
+          {visible.length > 6 ? (
+            <div className="analytics-pagination">
+              <Button variant="quiet" disabled={safePage === 1} onClick={() => setPage(safePage - 1)}>
+                Назад
+              </Button>
+              <span>
+                {safePage} / {Math.ceil(visible.length / 6)}
+              </span>
+              <Button variant="quiet" disabled={safePage * 6 >= visible.length} onClick={() => setPage(safePage + 1)}>
+                Далее
+              </Button>
+            </div>
+          ) : null}
+        </>
+      ) : (
+        <Panel className="mt-4">
+          <p className="text-sm text-muted">В выбранном разделе пока нет AR-фото.</p>
+        </Panel>
+      )}
+    </section>
+  );
+}
+function AnalyticsWorkRow({
+  item,
+  projectName,
+  accountId,
+  range,
+}: {
+  item: ArItem;
+  projectName: string;
+  accountId: string;
+  range: { from: string; to: string };
+}) {
+  const location = useLocation();
+  const summary = useQuery({
+    queryKey: ["analytics", "summary", accountId, "item", item.id, range.from, range.to],
+    queryFn: () => analyticsRepository.getSummary(accountId, { scopeType: "item", scopeId: item.id, ...range }),
+    staleTime: 60_000,
+  });
+  const preview = useQuery({
+    queryKey: ["catalog", "cover", "markers-private", item.marker_image_path],
+    queryFn: () => catalogRepository.getCoverUrl(item.marker_image_path, "markers-private"),
+    enabled: Boolean(item.marker_image_path),
+    staleTime: 8 * 60_000,
+  });
+  const stat = summary.data?.summary;
+  return (
+    <article className="analytics-work-row">
+      <div className="analytics-work-name">
+        {preview.data ? (
+          <img alt="" src={preview.data} loading="lazy" />
+        ) : (
+          <span className="analytics-work-placeholder">
+            <Play size={20} />
+          </span>
+        )}
+        <div>
+          <strong>{item.title}</strong>
+          <span className="analytics-project-name">{projectName}</span>
+          <span className="analytics-mobile-views">
+            {stat
+              ? `${formatNumber(stat.playbackStarts)} просмотров`
+              : summary.error
+                ? "Статистика недоступна"
+                : "Загружаем статистику…"}
+          </span>
+        </div>
+      </div>
+      <span aria-label="Открытия страниц">
+        {stat ? formatNumber(stat.pageOpens) : summary.error ? "Недоступно" : "…"}
+      </span>
+      <span aria-label="Запуски AR">{stat ? formatNumber(stat.cameraStarts) : "—"}</span>
+      <span aria-label="Просмотры видео">{stat ? formatNumber(stat.playbackStarts) : "—"}</span>
+      <Link className="btn btn-ghost" state={captureWorkspaceOrigin(location, accountId)} to={`/items/${item.id}`}>
+        Открыть <ArrowRight size={15} />
+      </Link>
+    </article>
   );
 }
 
 function AnalyticsChart({ series }: { series: AnalyticsSummary["series"] }) {
   const width = 760;
   const height = 250;
-  const inset = 30;
+  const inset = 40;
   const maximum = Math.max(
     1,
     ...series.flatMap((day) => [day.sessions, day.detections, day.playbacks, day.completions]),
   );
   const colors = {
     sessions: "#8b7cff",
-    detections: "#22d3ee",
-    playbacks: "#34d399",
-    completions: "#f59e0b",
+    detections: "#9c85ff",
+    playbacks: "#5c2dff",
   } as const;
   const points = (key: keyof typeof colors) =>
     series
@@ -302,28 +506,26 @@ function AnalyticsChart({ series }: { series: AnalyticsSummary["series"] }) {
           </span>
         ))}
       </div>
-      <div
-        className="mt-4 overflow-hidden rounded-2xl border border-line bg-black/10 p-2"
-        data-testid="analytics-chart"
-      >
+      <div className="analytics-chart mt-4" data-testid="analytics-chart">
         <svg
           className="h-auto w-full"
           viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
           role="img"
           aria-label={`График активности за ${series.length} дней`}
         >
           <title>Динамика AR-просмотров</title>
-          {[0.25, 0.5, 0.75].map((position) => (
-            <line
-              key={position}
-              x1={inset}
-              x2={width - inset}
-              y1={height * position}
-              y2={height * position}
-              stroke="rgba(148,163,184,0.14)"
-              strokeDasharray="5 7"
-            />
-          ))}
+          {[0, 0.25, 0.5, 0.75, 1].map((position) => {
+            const y = height - inset - position * (height - inset * 2);
+            return (
+              <g key={position}>
+                <line x1={inset} x2={width - inset} y1={y} y2={y} stroke="#e7e4e9" />
+                <text x={inset - 8} y={y + 4} textAnchor="end" fill="#666471" fontSize="11">
+                  {Math.round(maximum * position)}
+                </text>
+              </g>
+            );
+          })}
           {Object.keys(colors).map((key) => (
             <polyline
               key={key}
@@ -372,11 +574,8 @@ function Funnel({ summary }: { summary: AnalyticsSummary["summary"] }) {
               <span className="text-muted">{label}</span>
               <strong>{formatNumber(value)}</strong>
             </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-white/[0.05]">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-primary to-cyan-400"
-                style={{ width: `${width}%` }}
-              />
+            <div className="h-2.5 overflow-hidden rounded-full bg-stone-100">
+              <div className="h-full rounded-full bg-primary" style={{ width: `${width}%` }} />
             </div>
           </div>
         );
@@ -415,7 +614,7 @@ function BreakdownPanel({
                   </span>
                   <strong>{formatNumber(row.count)}</strong>
                 </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.05]">
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-100">
                   <div className="h-full rounded-full bg-primary" style={{ width: `${ratio}%` }} />
                 </div>
               </div>

@@ -3,6 +3,13 @@ import { useMemo, useState } from "react";
 import { AppShell } from "../../app/layout/AppShell";
 import { Button, Input, Panel, Toast } from "../../shared/ui";
 import { useAuth } from "../auth/authContext";
+import "./SupportPage.css";
+
+const configuredEmail: unknown = import.meta.env.VITE_SUPPORT_EMAIL;
+const supportEmail =
+  typeof configuredEmail === "string" && /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(configuredEmail.trim())
+    ? configuredEmail.trim()
+    : null;
 
 const faq = [
   [
@@ -15,7 +22,7 @@ const faq = [
   ],
   [
     "Почему видео не появляется на фотографии?",
-    "Фотография должна целиком попадать в кадр, быть достаточно освещённой и без сильных бликов. Для первого открытия публичного проекта сначала отсканируйте его QR-код внутри AR Photo.",
+    "Фотография должна целиком попадать в кадр, быть достаточно освещённой и без сильных бликов. Для открытия работы перейдите по её QR-коду, а затем наведите камеру на фотографию.",
   ],
   [
     "Почему нет звука?",
@@ -23,11 +30,11 @@ const faq = [
   ],
   [
     "Нужно ли каждый раз сканировать QR-код?",
-    "Нет. После первого pairing проект сохраняется в локальном хранилище браузера. Повторная загрузка нужна только после обновления проекта или очистки данных сайта.",
+    "Нет. После первого открытия работы проект сохраняется в локальном хранилище браузера. Повторная загрузка нужна только после обновления проекта или очистки данных сайта.",
   ],
   [
     "Как работает подписка?",
-    "Срок и доступные лимиты показаны в разделе «Настройки → Тариф». Публичные QR продолжают работать согласно условиям вашего тарифа.",
+    "Срок и доступные лимиты показаны в разделе «Мой пакет». Публичные QR продолжают работать согласно условиям вашего тарифа.",
   ],
 ] as const;
 
@@ -37,6 +44,7 @@ export function SupportRoute() {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [mailto, setMailto] = useState("");
+  const [error, setError] = useState("");
   const [notice, setNotice] = useState<"diagnostic" | "message" | null>(null);
   const visibleFaq = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase("ru");
@@ -52,30 +60,50 @@ export function SupportRoute() {
       `Browser: ${navigator.userAgent}`,
       `Time: ${new Date().toISOString()}`,
     ].join("\n");
-    await navigator.clipboard.writeText(diagnostic);
-    setNotice("diagnostic");
+    try {
+      await navigator.clipboard.writeText(diagnostic);
+      setError("");
+      setNotice("diagnostic");
+    } catch {
+      setError("Не удалось скопировать диагностику. Разрешите доступ к буферу обмена и повторите.");
+    }
   };
 
   const prepareMessage = (event: React.FormEvent) => {
     event.preventDefault();
+    if (!supportEmail) return;
     const body = `${message.trim()}\n\nАккаунт: ${auth.session?.user.email ?? "не указан"}`;
-    setMailto(`mailto:support@ar.photo?subject=${encodeURIComponent(subject.trim())}&body=${encodeURIComponent(body)}`);
+    setMailto(`mailto:${supportEmail}?subject=${encodeURIComponent(subject.trim())}&body=${encodeURIComponent(body)}`);
     setNotice("message");
   };
 
   return (
     <AppShell
-      eyebrow="Мы рядом"
       title="Поддержка"
-      description="Быстрые ответы по созданию, QR-кодам и AR-камере. Если ответа нет — подготовьте сообщение для команды."
+      description="Помощь по проектам, AR-фото и QR-кодам"
+      compactMobile
       actions={
         <Button variant="quiet" icon={<Clipboard size={17} />} onClick={() => void copyDiagnostics()}>
           Скопировать диагностику
         </Button>
       }
     >
+      {error ? (
+        <p className="mt-4 text-sm text-rose-700" role="alert">
+          {error}
+        </p>
+      ) : null}
       <div className="support-grid">
         <section aria-labelledby="support-faq-title">
+          <Panel className="support-correspondence">
+            <h2>Мои обращения</h2>
+            <p>
+              {supportEmail
+                ? "История обращений и ответы остаются в вашей почте."
+                : "Сервис обращений пока не подключён. Ответы на частые вопросы — ниже."}
+            </p>
+            <span>Внутренние запросы и чат поддержки пока не подключены.</span>
+          </Panel>
           <div className="section-heading-row">
             <div>
               <p className="section-kicker">База знаний</p>
@@ -114,44 +142,48 @@ export function SupportRoute() {
             <Headphones size={24} />
           </span>
           <p className="section-kicker">Связаться с нами</p>
-          <h2>Написать в поддержку</h2>
+          <h2>{supportEmail ? "Написать в поддержку" : "Контакты поддержки пока не настроены"}</h2>
           <p className="support-contact-intro">
-            Опишите, на каком шаге возникла проблема. Не отправляйте пароль, токены или приватные ссылки.
+            {supportEmail
+              ? "Опишите проблему — подготовим письмо для отправки из вашей почты."
+              : "Скопируйте диагностику, чтобы передать её администратору удобным для вас способом."}
           </p>
-          <form onSubmit={prepareMessage} className="support-form">
-            <label>
-              <span>Ваш email</span>
-              <input className="field-control" value={auth.session?.user.email ?? ""} readOnly />
-            </label>
-            <label>
-              <span>Тема</span>
-              <input
-                className="field-control"
-                required
-                minLength={3}
-                maxLength={120}
-                value={subject}
-                onChange={(event) => setSubject(event.target.value)}
-                placeholder="Например, не открывается камера"
-              />
-            </label>
-            <label>
-              <span>Сообщение</span>
-              <textarea
-                className="field-control"
-                required
-                minLength={10}
-                maxLength={3000}
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                placeholder="Опишите проблему и модель телефона"
-              />
-            </label>
-            <Button full icon={<Send size={17} />}>
-              Подготовить письмо
-            </Button>
-          </form>
-          {mailto ? (
+          {supportEmail ? (
+            <form onSubmit={prepareMessage} className="support-form">
+              <label>
+                <span>Ваш email</span>
+                <input className="field-control" value={auth.session?.user.email ?? ""} readOnly />
+              </label>
+              <label>
+                <span>Тема</span>
+                <input
+                  className="field-control"
+                  required
+                  minLength={3}
+                  maxLength={120}
+                  value={subject}
+                  onChange={(event) => setSubject(event.target.value)}
+                  placeholder="Например, не открывается камера"
+                />
+              </label>
+              <label>
+                <span>Сообщение</span>
+                <textarea
+                  className="field-control"
+                  required
+                  minLength={10}
+                  maxLength={3000}
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  placeholder="Опишите проблему и модель телефона"
+                />
+              </label>
+              <Button full icon={<Send size={17} />}>
+                Подготовить письмо
+              </Button>
+            </form>
+          ) : null}
+          {supportEmail && mailto ? (
             <a className="btn btn-ghost mt-3 w-full" href={mailto}>
               <Mail size={17} /> Открыть почтовое приложение
             </a>

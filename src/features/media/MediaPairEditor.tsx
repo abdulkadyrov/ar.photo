@@ -70,12 +70,18 @@ function useMediaInfo(file: File | undefined, kind: "marker" | "video") {
 }
 
 export function MediaPairEditor({
+  compact = false,
+  actionTargets,
+  comparisonTarget,
   markerFile,
   videoFile,
   value,
   onChange,
   disabled,
 }: {
+  compact?: boolean;
+  actionTargets?: { marker: HTMLElement | null; video: HTMLElement | null };
+  comparisonTarget?: HTMLElement | null;
   markerFile?: File;
   videoFile?: File;
   value: PairEdits;
@@ -92,6 +98,26 @@ export function MediaPairEditor({
   const va = video.info && editedAspect(video.info, value.video?.crop);
   const mismatch = ma && va && aspectsDiffer(ma, va);
   const active = editing === "marker" ? marker.info : video.info;
+  const markerAction = (
+    <button
+      type="button"
+      aria-label="Кадрировать фото"
+      disabled={disabled || !marker.info}
+      onClick={() => setEditing("marker")}
+    >
+      <Crop size={18} /> Кадрировать фото
+    </button>
+  );
+  const videoAction = (
+    <button
+      type="button"
+      aria-label="Кадр и монтаж видео"
+      disabled={disabled || !video.info}
+      onClick={() => setEditing("video")}
+    >
+      <Scissors size={18} /> Кадр и монтаж видео
+    </button>
+  );
   return (
     <div className="media-pair-editor">
       {mismatch ? (
@@ -106,12 +132,8 @@ export function MediaPairEditor({
         <p className="media-ratio-match">Фото и видео совпадают по пропорциям</p>
       ) : null}
       <div className="media-edit-actions">
-        <button type="button" disabled={disabled || !marker.info} onClick={() => setEditing("marker")}>
-          <Crop size={18} /> Кадрировать фото
-        </button>
-        <button type="button" disabled={disabled || !video.info} onClick={() => setEditing("video")}>
-          <Scissors size={18} /> Кадр и монтаж видео
-        </button>
+        {actionTargets?.marker ? createPortal(markerAction, actionTargets.marker) : markerAction}
+        {actionTargets?.video ? createPortal(videoAction, actionTargets.video) : videoAction}
         {value.markerCrop && markerFile ? (
           <button
             type="button"
@@ -139,13 +161,37 @@ export function MediaPairEditor({
         ) : null}
       </div>
       {marker.info && video.info ? (
-        <MediaComparison
-          key={`${marker.info.url}-${video.info.url}`}
-          photo={marker.info}
-          video={video.info}
-          edits={value}
-          editing={!!editing}
-        />
+        comparisonTarget ? (
+          createPortal(
+            <MediaComparison
+              key={`${marker.info.url}-${video.info.url}`}
+              photo={marker.info}
+              video={video.info}
+              edits={value}
+              editing={!!editing}
+            />,
+            comparisonTarget,
+          )
+        ) : compact ? (
+          <details className="media-comparison-disclosure">
+            <summary>Сравнение фото и видео</summary>{" "}
+            <MediaComparison
+              key={`${marker.info.url}-${video.info.url}`}
+              photo={marker.info}
+              video={video.info}
+              edits={value}
+              editing={!!editing}
+            />
+          </details>
+        ) : (
+          <MediaComparison
+            key={`${marker.info.url}-${video.info.url}`}
+            photo={marker.info}
+            video={video.info}
+            edits={value}
+            editing={!!editing}
+          />
+        )
       ) : null}
       <div className="media-edit-summary">
         {marker.info ? (

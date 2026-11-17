@@ -1,0 +1,28 @@
+name: iOS App Clip
+on:
+  pull_request:
+    paths: ["ios/**", ".github/workflows/ios-app-clip.yml"]
+  push:
+    branches: ["main"]
+    paths: ["ios/**", ".github/workflows/ios-app-clip.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Test domain association generator
+        run: node --test ios/Khanzama/Deployment/association.test.mjs
+      - name: Test invocation routes
+        run: |
+          swiftc ios/Khanzama/Shared/ViewerURL.swift ios/Khanzama/Tests/main.swift -o /tmp/khanzama-url-tests
+          /tmp/khanzama-url-tests
+      - name: Build full app and embedded clip without signing
+        run: |
+          xcodebuild -project ios/Khanzama/Khanzama.xcodeproj -scheme Khanzama -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/khanzama-derived CODE_SIGNING_ALLOWED=NO build
+      - name: Build clip scheme without signing
+        run: |
+          xcodebuild -project ios/Khanzama/Khanzama.xcodeproj -scheme KhanzamaClip -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/khanzama-derived CODE_SIGNING_ALLOWED=NO build

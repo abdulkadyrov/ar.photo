@@ -14,10 +14,10 @@ export default {
         line: "var(--line)",
       },
       borderRadius: {
-        card: "20px",
+        card: "10px",
       },
       boxShadow: {
-        soft: "0 18px 60px rgba(32, 35, 42, 0.10)",
+        soft: "none",
       },
     },
   },

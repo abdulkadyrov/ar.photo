@@ -25,6 +25,7 @@ import { useEffect, useId, useMemo, useRef, useState, type DragEvent } from "rea
 import { createPortal } from "react-dom";
 import { QRCodeSVG } from "qrcode.react";
 import type { ArItem, QrCode as QrCodeRecord } from "../../entities/ar-item/model";
+import { AppShell } from "../../app/layout/AppShell";
 import { Button, Input } from "../../shared/ui";
 import { getArItemRepository } from "../ar-items/arItemRepository";
 import { useAuth } from "../auth/authContext";
@@ -83,6 +84,15 @@ function QuickCreatePage({ userId }: { userId: string }) {
   const restoredAttempt = useMemo(() => getPendingQuickStart(userId), [userId]);
   const [title, setTitle] = useState(restoredAttempt?.title ?? "");
   const [edits, setEdits] = useState<PairEdits>({});
+  const [markerActionTarget, setMarkerActionTarget] = useState<HTMLSpanElement | null>(null);
+  const [videoActionTarget, setVideoActionTarget] = useState<HTMLSpanElement | null>(null);
+  const [comparisonTarget, setComparisonTarget] = useState<HTMLElement | null>(null);
+  const [playback, setPlayback] = useState({
+    autoplay: true,
+    loopVideo: true,
+    audioEnabled: true,
+    fallbackEnabled: true,
+  });
   const [markerFile, setMarkerFile] = useState<File>();
   const [videoFile, setVideoFile] = useState<File>();
   const [additionalPairs, setAdditionalPairs] = useState<QuickMediaPair[]>([]);
@@ -257,11 +267,11 @@ function QuickCreatePage({ userId }: { userId: string }) {
         await arItemRepository.prepare(workspace.accountId, item.id, {
           markerAssetId: marker.id,
           videoAssetId: video.id,
-          autoplay: true,
-          loopVideo: true,
+          autoplay: playback.autoplay,
+          loopVideo: playback.loopVideo,
           markerLostBehavior: "pause_hide",
-          audioDefault: "user_enabled",
-          fallbackEnabled: true,
+          audioDefault: playback.audioEnabled ? "user_enabled" : "muted",
+          fallbackEnabled: playback.fallbackEnabled,
         });
         createdItemIds.push(item.id);
         try {
@@ -395,17 +405,20 @@ function QuickCreatePage({ userId }: { userId: string }) {
     <QuickShell
       currentStep={visibleStage === "form" ? 1 : 2}
       eyebrow={visibleStage === "form" ? "Новый AR-момент" : "Обработка запущена"}
-      title={visibleStage === "form" ? "Оживите фотографию" : "Создаём ваше AR-фото"}
+      title={visibleStage === "form" ? "Новое AR-фото" : "Создаём ваше AR-фото"}
       description={
         visibleStage === "form"
-          ? "Добавьте фотографию и видео — обработку и QR-код мы подготовим автоматически."
+          ? "Загрузите снимок и видео, настройте пару и опубликуйте."
           : "Можно оставить страницу открытой или вернуться позже — незавершённая работа восстановится автоматически."
       }
     >
       <section className="quick-create-card" aria-label="Создание AR-фото">
         <label className="quick-title-field">
-          <span>Название</span>
+          <span>
+            Название <b className="text-rose-700">*</b>
+          </span>
           <Input
+            aria-label="Название"
             value={title}
             onValueChange={setTitle}
             placeholder="Например, Наш семейный момент"
@@ -426,6 +439,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
               <MediaPicker
                 key={`marker-${pickerVersion}`}
                 kind="marker"
+                onActionMount={setMarkerActionTarget}
                 file={markerFile}
                 previewUrl={markerPreview}
                 disabled={processing || Boolean(itemId)}
@@ -440,6 +454,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
               <MediaPicker
                 key={`video-${pickerVersion}`}
                 kind="video"
+                onActionMount={setVideoActionTarget}
                 file={videoFile}
                 previewUrl={videoPreview}
                 disabled={processing || Boolean(itemId)}
@@ -450,6 +465,9 @@ function QuickCreatePage({ userId }: { userId: string }) {
               />
             </div>
             <MediaPairEditor
+              compact
+              actionTargets={{ marker: markerActionTarget, video: videoActionTarget }}
+              comparisonTarget={comparisonTarget}
               markerFile={markerFile}
               videoFile={videoFile}
               value={edits}
@@ -463,6 +481,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
               key={pair.id}
               index={index + 2}
               pair={pair}
+              comparisonTarget={comparisonTarget}
               disabled={processing || Boolean(itemId)}
               onChange={(nextPair) =>
                 setAdditionalPairs((current) =>
@@ -489,6 +508,32 @@ function QuickCreatePage({ userId }: { userId: string }) {
           </button>
         ) : null}
 
+        <details className="quick-playback-settings">
+          <summary>
+            Дополнительные настройки <span>Автозапуск, звук и повтор</span>
+          </summary>
+          <div>
+            {(
+              [
+                { key: "autoplay", label: "Автозапуск видео" },
+                { key: "loopVideo", label: "Повторять видео" },
+                { key: "audioEnabled", label: "Звук после нажатия" },
+                { key: "fallbackEnabled", label: "Разрешить обычный просмотр видео" },
+              ] as const
+            ).map(({ key, label }) => (
+              <label key={key}>
+                <input
+                  type="checkbox"
+                  checked={playback[key]}
+                  disabled={processing}
+                  onChange={(event) => setPlayback((current) => ({ ...current, [key]: event.target.checked }))}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+          <section className="quick-comparison-target" ref={setComparisonTarget} />
+        </details>
         {startedAt ? <QuickStopwatch elapsedSeconds={elapsedSeconds} running={!finishedAt} /> : null}
         {visibleStage !== "form" && visibleStage !== "error" ? <ProgressStatus step={progressStep} /> : null}
         {visibleStage === "error" ? (
@@ -502,6 +547,12 @@ function QuickCreatePage({ userId }: { userId: string }) {
           </div>
         ) : null}
 
+        <p className="quick-credit-note">
+          Создание каждого AR-фото расходует одно добавление.{" "}
+          {additionalPairs.length
+            ? `В этом QR будет ${additionalPairs.length + 1} AR-фото.`
+            : "Удаление работы не возвращает добавление."}
+        </p>
         <div className="quick-form-actions">
           {visibleStage === "error" && itemId ? (
             <Button full onClick={() => void retryProcessing()}>
@@ -510,7 +561,7 @@ function QuickCreatePage({ userId }: { userId: string }) {
           ) : (
             <Button full disabled={!canSubmit} onClick={() => void submit()}>
               {processing ? <LoaderCircle className="animate-spin" size={19} /> : <Sparkles size={19} />}
-              {processing ? "Создаём AR…" : "Оживить фото"}
+              {processing ? "Создаём AR…" : "Подготовить и опубликовать"}
             </Button>
           )}
           <Button full variant="quiet" disabled={processing} onClick={reset}>
@@ -530,16 +581,20 @@ function QuickCreatePage({ userId }: { userId: string }) {
 export function AdditionalArPhotoPair({
   index,
   pair,
+  comparisonTarget,
   disabled,
   onChange,
   onRemove,
 }: {
   index: number;
   pair: QuickMediaPair;
+  comparisonTarget?: HTMLElement | null;
   disabled: boolean;
   onChange(pair: QuickMediaPair): void;
   onRemove(): void;
 }) {
+  const [markerActionTarget, setMarkerActionTarget] = useState<HTMLSpanElement | null>(null);
+  const [videoActionTarget, setVideoActionTarget] = useState<HTMLSpanElement | null>(null);
   const markerPreview = useObjectUrl(pair.markerFile);
   const videoPreview = useObjectUrl(pair.videoFile);
   const headingId = useId();
@@ -557,6 +612,7 @@ export function AdditionalArPhotoPair({
       <div className="quick-media-pair">
         <MediaPicker
           kind="marker"
+          onActionMount={setMarkerActionTarget}
           file={pair.markerFile}
           previewUrl={markerPreview}
           disabled={disabled}
@@ -567,6 +623,7 @@ export function AdditionalArPhotoPair({
         </span>
         <MediaPicker
           kind="video"
+          onActionMount={setVideoActionTarget}
           file={pair.videoFile}
           previewUrl={videoPreview}
           disabled={disabled}
@@ -574,6 +631,9 @@ export function AdditionalArPhotoPair({
         />
       </div>
       <MediaPairEditor
+        compact
+        actionTargets={{ marker: markerActionTarget, video: videoActionTarget }}
+        comparisonTarget={comparisonTarget}
         markerFile={pair.markerFile}
         videoFile={pair.videoFile}
         value={pair.edits ?? {}}
@@ -586,12 +646,14 @@ export function AdditionalArPhotoPair({
 
 export function MediaPicker({
   kind,
+  onActionMount,
   file,
   previewUrl,
   disabled,
   onPick,
 }: {
   kind: "marker" | "video";
+  onActionMount?: (element: HTMLSpanElement | null) => void;
   file?: File;
   previewUrl?: string;
   disabled: boolean;
@@ -599,6 +661,7 @@ export function MediaPicker({
 }) {
   const marker = kind === "marker";
   const inputId = useId();
+  const fileInput = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [pickerError, setPickerError] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -661,6 +724,7 @@ export function MediaPicker({
         </span>
 
         <span className="quick-media-preview">
+          <span className="quick-media-editor-actions" ref={onActionMount} />
           {previewUrl ? (
             <button
               aria-label={`Просмотреть ${marker ? "фотографию" : "видео"} ${file?.name ?? ""}`}
@@ -676,6 +740,11 @@ export function MediaPicker({
                   muted
                   playsInline
                   preload="metadata"
+                  onLoadedMetadata={(event) => {
+                    const preview = event.currentTarget;
+                    if (Number.isFinite(preview.duration) && preview.duration > 0)
+                      preview.currentTime = Math.min(0.01, preview.duration / 2);
+                  }}
                   aria-label={`Предпросмотр видео ${file?.name ?? ""}`}
                 />
               )}
@@ -684,16 +753,22 @@ export function MediaPicker({
               </span>
             </button>
           ) : (
-            <label className="quick-media-select-surface" htmlFor={disabled ? undefined : inputId}>
+            <button
+              className="quick-media-select-surface"
+              type="button"
+              disabled={disabled}
+              aria-label={marker ? "Добавить фотографию" : "Добавить видео"}
+              onClick={() => fileInput.current?.click()}
+            >
               <span className="quick-media-empty">
                 <span className="quick-media-icon">{marker ? <ImagePlus size={29} /> : <FileVideo2 size={29} />}</span>
                 <strong>{marker ? "Выберите фотографию" : "Выберите видео"}</strong>
                 <span>{marker ? "JPG, PNG или WebP" : "MP4, MOV, AVI и другие видеоформаты"}</span>
               </span>
               <span className="quick-pick-file">
-                <Upload size={16} /> Добавить файл
+                <Upload size={16} /> {marker ? "Добавить фотографию" : "Добавить видео"}
               </span>
-            </label>
+            </button>
           )}
 
           {file ? (
@@ -726,6 +801,7 @@ export function MediaPicker({
           </span>
         ) : null}
         <input
+          ref={fileInput}
           id={inputId}
           aria-label={marker ? "Выбрать фотографию-маркер" : "Выбрать видео"}
           className="sr-only"
@@ -1021,22 +1097,12 @@ function QuickShell({
   children: React.ReactNode;
 }) {
   return (
-    <main className="quick-flow">
-      <QuickHeader />
-      <div className="quick-flow-content">
-        <QuickStepper currentStep={currentStep} />
-        <header className="quick-page-heading">
-          <span>{eyebrow}</span>
-          <h1>{title}</h1>
-          <p>{description}</p>
-        </header>
+    <AppShell eyebrow={eyebrow} title={title} description={description} compactMobile showDescriptionOnMobile>
+      <div className="quick-workspace">
+        {currentStep > 1 ? <QuickStepper currentStep={currentStep} /> : null}
         {children}
       </div>
-      <footer className="quick-footer">
-        <span>AR Photo · личный кабинет</span>
-        <span>Фото превращается в воспоминание, которое можно услышать</span>
-      </footer>
-    </main>
+    </AppShell>
   );
 }
 

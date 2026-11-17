@@ -107,3 +107,19 @@ promoted to fast following after confirmation; alternating corner noise stays da
 Regression tests cover 30/60 Hz approach with noisy corners and retain the existing
 quiet-camera, fast-sweep, perspective, outlier and reacquisition checks. Physical
 Safari camera acceptance remains required; synthetic tests do not replace it.
+
+### Small shared-coordinate jitter (2026-11-17)
+
+The coherent-motion cutoff now stays at 3 Hz through 0.6% of the target diagonal
+and ramps to the existing 35 Hz cutoff by 1.2% (previously 0.2–0.4%). A few pixels
+of shared homography noise therefore no longer immediately disable smoothing.
+Homography estimation, perspective deformation, jump rejection, the 120 ms stale
+limit, reacquisition, camera/QR flow and playback behavior are unchanged.
+
+A deterministic stationary-target test with approximately 2–3 camera-pixel
+coordinate noise measures filtered/raw RMS ratios of 0.596 / 0.333 / 0.172 at
+15 / 30 / 60 observations per second (before: 0.995 / 0.988 / 0.939).
+The slow-pan regression stays below 3 camera pixels of lag and settles below
+0.2 pixels within half a second after stopping. These are synthetic filter
+measurements, not measurements of physical iPhone tracking. Existing approach,
+perspective, fast-motion, outlier and reacquisition tests remain required.

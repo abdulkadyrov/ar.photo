@@ -16,6 +16,58 @@ describe("demo catalog repository", () => {
     };
   });
 
+  it("lists own groups across projects without exposing foreign or deleted rows", async () => {
+    const repository = createDemoCatalogRepository(store);
+    const workspace = await repository.getWorkspace("demo-user");
+    const firstProject = await repository.createProject(
+      workspace.accountId,
+      { name: "Первый", description: "", category: "other" },
+      "all-project-a",
+    );
+    const secondProject = await repository.createProject(
+      workspace.accountId,
+      { name: "Второй", description: "", category: "other" },
+      "all-project-b",
+    );
+    const first = await repository.createGroup(
+      workspace.accountId,
+      firstProject.id,
+      { name: "Первая", description: "" },
+      "all-group-a",
+    );
+    const second = await repository.createGroup(
+      workspace.accountId,
+      secondProject.id,
+      { name: "Вторая", description: "" },
+      "all-group-b",
+    );
+    const deleted = await repository.createGroup(
+      workspace.accountId,
+      secondProject.id,
+      { name: "Удалённая", description: "" },
+      "all-group-deleted",
+    );
+    await repository.softDeleteGroup(workspace.accountId, deleted.id);
+    const persisted = store.read()!;
+    persisted.groups.push({
+      ...first,
+      id: "foreign-group",
+      account_id: "foreign-account",
+      project_id: "foreign-project",
+    });
+    store.write(persisted);
+    expect((await repository.listGroups(workspace.accountId)).map((group) => group.id)).toEqual([first.id, second.id]);
+    expect((await repository.listGroups(workspace.accountId, secondProject.id)).map((group) => group.id)).toEqual([
+      second.id,
+    ]);
+    expect((await repository.listGroups(workspace.accountId, undefined, true)).map((group) => group.id)).toEqual([
+      first.id,
+      second.id,
+      deleted.id,
+    ]);
+    await expect(repository.listGroups("foreign-account")).rejects.toMatchObject({ code: "forbidden" });
+  });
+
   it("keeps project creation idempotent", async () => {
     const repository = createDemoCatalogRepository(store);
     const workspace = await repository.getWorkspace("demo-user");

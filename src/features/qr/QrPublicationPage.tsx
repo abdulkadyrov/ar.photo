@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Clipboard,
@@ -10,15 +10,22 @@ import {
   RefreshCw,
   Share2,
   Unlink,
+  MoreHorizontal,
+  Plus,
+  ImageIcon,
+  Search,
+  Pencil,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
+import { captureWorkspaceOrigin, rememberWorkspaceFocus, useWorkspaceBack } from "../ar-items/itemNavigation";
 import { AppShell } from "../../app/layout/AppShell";
-import type { QrStylePreset } from "../../entities/ar-item/model";
+import type { ArItem, MediaAsset, QrStylePreset } from "../../entities/ar-item/model";
 import { Button, ErrorState, Modal, Panel, Select, Skeleton, Toast } from "../../shared/ui";
 import { useAuth } from "../auth/authContext";
 import { getCatalogRepository } from "../catalog/catalogRepository";
+import { getMediaRepository } from "../media/mediaRepository";
 import { getArItemRepository } from "../ar-items/arItemRepository";
 import { clearPendingQuickStart, getPendingQuickStart } from "../quick-start/quickStartRepository";
 import { brandLogoDataUrl, parseQrStyle, qrDownloadName, qrStylePresets, resolvePublicBaseUrl } from "./qrDesign";
@@ -26,12 +33,25 @@ import "./QrPublicationPage.css";
 
 const catalogRepository = getCatalogRepository();
 const arItemRepository = getArItemRepository();
-const printSizes = [30, 40, 50];
+const mediaRepository = getMediaRepository();
+const printSizes = [30, 40, 50, 60];
 
 type PublicationAction = "publish" | "unpublish" | "rotate" | { style: QrStylePreset };
 
 export function QrCodesRoute() {
   const auth = useAuth();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const search = searchParams.get("q") ?? "";
+  const status = searchParams.get("status") ?? "";
+  const projectId = searchParams.get("projectId") ?? "";
+  const selectedIds = (searchParams.get("selected") ?? "").split(",").filter(Boolean);
+  const setFilter = (name: string, value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set(name, value);
+    else next.delete(name);
+    setSearchParams(next, { replace: true, state: location.state });
+  };
   const workspaceQuery = useQuery({
     queryKey: ["catalog", "workspace", auth.session!.user.id],
     queryFn: () => catalogRepository.getWorkspace(auth.session!.user.id),
@@ -42,51 +62,174 @@ export function QrCodesRoute() {
     enabled: Boolean(workspaceQuery.data?.accountId),
   });
 
+  const projectsQuery = useQuery({
+    queryKey: ["catalog", "project-options", workspaceQuery.data?.accountId],
+    queryFn: () => catalogRepository.listProjectOptions(workspaceQuery.data!.accountId),
+    enabled: Boolean(workspaceQuery.data?.accountId),
+  });
+  const groupsQuery = useQuery({
+    queryKey: ["catalog", "groups", workspaceQuery.data?.accountId, "all"],
+    queryFn: () => catalogRepository.listGroups(workspaceQuery.data!.accountId),
+    enabled: Boolean(workspaceQuery.data?.accountId),
+  });
+  const assetsQuery = useQuery({
+    queryKey: ["media-assets", workspaceQuery.data?.accountId, "all"],
+    queryFn: () => mediaRepository.listAssets(workspaceQuery.data!.accountId),
+    enabled: Boolean(workspaceQuery.data?.accountId),
+  });
+  useWorkspaceBack(workspaceQuery.data?.accountId, "/items");
+  const selectedItems = (itemsQuery.data ?? []).filter(
+    (item) => item.status === "published" && selectedIds.includes(item.id),
+  );
+  const printQueries = useQueries({
+    queries: selectedItems.map((item) => ({
+      queryKey: ["ar-item", "qr", workspaceQuery.data?.accountId, item.id],
+      queryFn: () => arItemRepository.getQrCode(workspaceQuery.data!.accountId, item.id),
+      enabled: Boolean(workspaceQuery.data?.accountId),
+    })),
+  });
+  const printable =
+    printQueries.length > 0 && printQueries.every((query) => Boolean(query.data) && !query.isPending && !query.error);
   if (workspaceQuery.isPending || itemsQuery.isPending) return <QrLoading title="QR-коды" />;
   if (workspaceQuery.error || itemsQuery.error) {
     return <QrError title="QR-коды" error={workspaceQuery.error ?? itemsQuery.error} />;
   }
 
-  const items = itemsQuery.data.filter((item) => item.status === "ready" || item.status === "published");
+  const items = itemsQuery.data.filter(
+    (item) =>
+      (item.status === "ready" || item.status === "published") &&
+      (!status || item.status === status) &&
+      (!projectId || item.project_id === projectId) &&
+      item.title.toLocaleLowerCase("ru-RU").includes(search.trim().toLocaleLowerCase("ru-RU")),
+  );
   return (
     <AppShell
       eyebrow={workspaceQuery.data.accountName}
       title="QR-коды"
-      description="Публикуйте готовые AR-работы, проверяйте публичную ссылку и скачивайте QR для печати."
+      description="QR-коды для просмотра ваших живых фото в дополненной реальности."
+      showDescriptionOnMobile
+      actions={
+        <Link
+          className="btn btn-primary qr-list-create"
+          to="/create"
+          state={captureWorkspaceOrigin(location, workspaceQuery.data.accountId)}
+        >
+          <Plus size={17} /> Создать AR-фото
+        </Link>
+      }
     >
+      <div className="qr-list-filters">
+        <label className="qr-list-search">
+          <span className="sr-only">Поиск по названию</span>
+          <Search size={17} />
+          <input
+            className="field-control"
+            placeholder="Найти QR-код"
+            value={search}
+            onChange={(event) => setFilter("q", event.target.value)}
+          />
+        </label>
+        <Select
+          label="Проект"
+          value={projectId}
+          onChange={(event) => setFilter("projectId", event.target.value)}
+          options={[
+            { label: "Все проекты", value: "" },
+            ...(projectsQuery.data ?? []).map((entry) => ({ label: entry.name, value: entry.id })),
+          ]}
+        />
+        <Select
+          label="Статус"
+          value={status}
+          onChange={(event) => setFilter("status", event.target.value)}
+          options={[
+            { label: "Все статусы", value: "" },
+            { label: "Опубликовано", value: "published" },
+            { label: "Готово к публикации", value: "ready" },
+          ]}
+        />
+      </div>
+      <div className="qr-list-selection" data-print-hide>
+        <label>
+          <input
+            type="checkbox"
+            aria-label="Выбрать все опубликованные QR"
+            checked={
+              items.filter((item) => item.status === "published").length > 0 &&
+              items.filter((item) => item.status === "published").every((item) => selectedIds.includes(item.id))
+            }
+            onChange={(event) =>
+              setFilter(
+                "selected",
+                event.target.checked
+                  ? items
+                      .filter((item) => item.status === "published")
+                      .map((item) => item.id)
+                      .join(",")
+                  : "",
+              )
+            }
+          />
+          <span>Выбрано: {selectedItems.length}</span>
+        </label>
+        <Button disabled={!printable} onClick={() => window.print()}>
+          <Printer size={16} /> Печать выбранных
+        </Button>
+        <span className="qr-list-total">Всего QR-кодов: {items.length}</span>
+      </div>
+      <div className="qr-print-batch" data-print-root>
+        {selectedItems.map((item, index) =>
+          printQueries[index]?.data ? (
+            <figure key={item.id}>
+              <QRCodeSVG
+                value={printQueries[index].data!.public_url}
+                size={220}
+                level="H"
+                marginSize={4}
+                title={item.title}
+              />
+              <figcaption>
+                <strong>{item.title}</strong>
+                <p>KHANZAMA · AR-живое фото</p>
+              </figcaption>
+            </figure>
+          ) : null,
+        )}
+      </div>
       {items.length ? (
-        <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Готовые AR-публикации">
+        <section className="qr-list-table" aria-label="Готовые AR-публикации">
+          <div className="qr-list-table-heading" aria-hidden="true">
+            <span />
+            <span>QR-код</span>
+            <span>Работа</span>
+            <span>Проект / группа</span>
+            <span>Статус</span>
+            <span>Обновлено</span>
+            <span>Действия</span>
+          </div>
           {items.map((item) => (
-            <Panel key={item.id} className="flex flex-col">
-              <div className="flex items-start justify-between gap-3">
-                <span className="metric-icon">
-                  <QrCode size={20} />
-                </span>
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                    item.status === "published" ? "bg-emerald-400/15 text-emerald-300" : "bg-white/5 text-muted"
-                  }`}
-                >
-                  {item.status === "published" ? "Опубликовано" : "Готово"}
-                </span>
-              </div>
-              <h2 className="mt-5 text-xl font-semibold">{item.title}</h2>
-              <p className="mt-2 flex-1 text-sm leading-6 text-muted">
-                {item.status === "published"
-                  ? "Публичный viewer активен; QR можно скачать повторно."
-                  : "Processing завершён; публикация ещё не активна."}
-              </p>
-              <Link className="btn btn-ghost mt-5" to={`/items/${item.id}/qr`}>
-                {item.status === "published" ? "Открыть QR" : "Опубликовать"}
-              </Link>
-            </Panel>
+            <QrListRow
+              key={item.id}
+              item={item}
+              accountId={workspaceQuery.data.accountId}
+              marker={assetsQuery.data?.find((asset) => asset.id === item.marker_asset_id)}
+              groupName={groupsQuery.data?.find((group) => group.id === item.group_id)?.name}
+              projectName={projectsQuery.data?.find((project) => project.id === item.project_id)?.name}
+              checked={selectedIds.includes(item.id)}
+              onCheck={(checked) =>
+                setFilter(
+                  "selected",
+                  (checked ? [...selectedIds, item.id] : selectedIds.filter((id) => id !== item.id)).join(","),
+                )
+              }
+            />
           ))}
         </section>
       ) : (
         <Panel className="mt-6 text-center">
           <QrCode className="mx-auto text-muted" size={36} />
-          <h2 className="mt-4 text-xl font-semibold">Нет готовых AR-работ</h2>
-          <p className="mt-2 text-sm text-muted">Завершите processing и техническую проверку в мастере.</p>
+          <h2 className="mt-4 text-xl font-semibold">Нет подходящих AR-работ</h2>
+          <p className="mt-2 text-sm text-muted">Завершите обработку AR-работы, чтобы подготовить QR-код.</p>
           <Link className="btn btn-primary mt-5" to="/items">
             Перейти к AR-работам
           </Link>
@@ -96,13 +239,155 @@ export function QrCodesRoute() {
   );
 }
 
+function QrListRow({
+  accountId,
+  item,
+  marker,
+  projectName,
+  groupName,
+  checked,
+  onCheck,
+}: {
+  accountId: string;
+  item: ArItem;
+  marker?: MediaAsset;
+  projectName?: string;
+  groupName?: string;
+  checked: boolean;
+  onCheck(checked: boolean): void;
+}) {
+  const location = useLocation();
+  const svg = useRef<SVGSVGElement>(null);
+  const qrQuery = useQuery({
+    queryKey: ["ar-item", "qr", accountId, item.id],
+    queryFn: () => arItemRepository.getQrCode(accountId, item.id),
+  });
+  const markerQuery = useQuery({
+    queryKey: ["media-preview", marker?.id, marker?.version],
+    queryFn: () => mediaRepository.getAssetUrl(marker!),
+    enabled: Boolean(marker),
+    staleTime: 8 * 60_000,
+  });
+  const forward = captureWorkspaceOrigin(location, accountId);
+  return (
+    <article className="qr-list-row">
+      <input
+        type="checkbox"
+        aria-label={`Выбрать QR ${item.title}`}
+        disabled={item.status !== "published"}
+        checked={checked}
+        onChange={(event) => onCheck(event.target.checked)}
+      />
+      <span className="qr-list-code">
+        {qrQuery.data ? (
+          <QRCodeSVG ref={svg} value={qrQuery.data.public_url} size={56} level="M" title={`QR: ${item.title}`} />
+        ) : (
+          <QrCode size={24} />
+        )}
+      </span>
+      <div className="qr-list-work">
+        <span className="qr-list-photo">
+          {markerQuery.data ? <img src={markerQuery.data} alt="" /> : <ImageIcon size={18} />}
+        </span>
+        <div>
+          <h2 title={item.title}>{item.title}</h2>
+          <p>Живое фото (AR)</p>
+          <span className="qr-list-mobile-project">{groupName ?? projectName ?? "—"}</span>
+        </div>
+      </div>
+      <span className="qr-list-project">{groupName ?? projectName ?? "—"}</span>
+      <span className={`qr-list-status ${item.status === "published" ? "qr-list-status-live" : ""}`}>
+        {item.status === "published" ? "Активен" : "Готово"}
+      </span>
+      <time className="qr-list-date" dateTime={item.updated_at}>
+        {new Date(item.updated_at).toLocaleDateString("ru-RU")}
+        <span>{new Date(item.updated_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span>
+      </time>
+      <div className="qr-list-actions">
+        <Link
+          id={`qr-list-open-${item.id}`}
+          className="btn btn-primary"
+          aria-label="Открыть QR"
+          to={`/items/${item.id}/qr`}
+          state={forward}
+          onClick={() => rememberWorkspaceFocus(location.key, `qr-list-open-${item.id}`)}
+        >
+          <ExternalLink size={15} />
+          Открыть
+        </Link>
+        <Button
+          variant="quiet"
+          disabled={!qrQuery.data}
+          onClick={() => {
+            if (svg.current)
+              downloadBlob(
+                new Blob([new XMLSerializer().serializeToString(svg.current)], { type: "image/svg+xml;charset=utf-8" }),
+                qrDownloadName(item.title, qrQuery.data!.version, "svg"),
+              );
+          }}
+        >
+          <Download size={15} /> Скачать
+        </Button>
+        <details className="qr-list-more">
+          <summary aria-label={`Действия ${item.title}`}>
+            <MoreHorizontal size={18} />
+          </summary>
+          <div>
+            <Link to={`/items/${item.id}`} state={forward}>
+              Открыть работу
+            </Link>
+            <Link to={`/items/${item.id}/edit`} state={forward}>
+              Изменить работу
+            </Link>
+          </div>
+        </details>
+      </div>
+    </article>
+  );
+}
+
+function QrIdentityThumbnail({ accountId, item }: { accountId: string; item: ArItem }) {
+  const assets = useQuery({
+    queryKey: ["media-assets", accountId, item.project_id],
+    queryFn: () => mediaRepository.listAssets(accountId, item.project_id),
+  });
+  const marker = assets.data?.find((asset) => asset.id === item.marker_asset_id);
+  const url = useQuery({
+    queryKey: ["media-preview", marker?.id, marker?.version],
+    queryFn: () => mediaRepository.getAssetUrl(marker!),
+    enabled: Boolean(marker),
+    staleTime: 8 * 60_000,
+  });
+  return (
+    <span className="qr-identity-photo">{url.data ? <img src={url.data} alt="" /> : <ImageIcon size={22} />}</span>
+  );
+}
+
 export function QrPublicationRoute() {
   const auth = useAuth();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { itemId = "" } = useParams();
   const queryClient = useQueryClient();
+  const [defaultPrintOpen, setDefaultPrintOpen] = useState(() => window.matchMedia("(min-width: 700px)").matches);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 700px)");
+    const update = () => setDefaultPrintOpen(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  const printOpen = searchParams.get("print") === "expanded" || (!searchParams.has("print") && defaultPrintOpen);
   const [confirmation, setConfirmation] = useState<"unpublish" | "rotate" | null>(null);
   const [confirmationText, setConfirmationText] = useState("");
-  const [printSize, setPrintSize] = useState("40");
+  const requestedSize = searchParams.get("size") ?? "60";
+  const printSize = printSizes.some((size) => String(size) === requestedSize) ? requestedSize : "60";
+  const printCaption = searchParams.get("caption");
+  const setPrintOption = (name: string, value: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (value !== null) next.set(name, value);
+    else next.delete(name);
+    setSearchParams(next, { replace: true, state: location.state });
+  };
   const [notice, setNotice] = useState<{ title: string; message?: string; tone: "success" | "error" } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -114,6 +399,7 @@ export function QrPublicationRoute() {
     queryFn: () => catalogRepository.getWorkspace(auth.session!.user.id),
   });
   const accountId = workspaceQuery.data?.accountId;
+  const goBack = useWorkspaceBack(accountId, `/items/${itemId}`);
   const itemQuery = useQuery({
     queryKey: ["ar-item", accountId, itemId],
     queryFn: () => arItemRepository.getItem(accountId!, itemId),
@@ -243,14 +529,31 @@ export function QrPublicationRoute() {
 
   return (
     <AppShell
-      title={item.title}
+      title="QR и публикация"
       actions={
-        <Link className="btn btn-quiet qr-back-link" to={`/items?projectId=${encodeURIComponent(item.project_id)}`}>
-          <ArrowLeft size={17} /> <span>AR-работы</span>
-        </Link>
+        <button className="btn btn-quiet qr-back-link" type="button" onClick={goBack}>
+          <ArrowLeft size={17} /> <span>Назад</span>
+        </button>
       }
     >
       <div className="qr-publication-page">
+        <Panel className="qr-identity-strip">
+          <QrIdentityThumbnail accountId={accountId!} item={item} />
+          <div>
+            <h2>{item.title}</h2>
+            <span className={`qr-status-pill ${item.status === "published" ? "qr-status-published" : ""}`}>
+              {item.status === "published" ? "Опубликовано" : item.status === "ready" ? "Готово" : "Подготовка"}
+            </span>
+          </div>
+          <Link
+            className="btn btn-quiet"
+            to={`/items/${itemId}/edit`}
+            state={captureWorkspaceOrigin(location, accountId)}
+          >
+            <Pencil size={16} />
+            <span>Изменить работу</span>
+          </Link>
+        </Panel>
         {item.status === "ready" ? (
           <Panel className="qr-publish-card">
             <span className="qr-status-pill">Готово</span>
@@ -267,11 +570,7 @@ export function QrPublicationRoute() {
         {item.status === "published" && qrCode ? (
           <>
             <Panel className="qr-primary-card">
-              <div className="qr-card-status-row">
-                <span className="qr-status-pill qr-status-published">Опубликовано</span>
-                <span className="qr-version">QR v{qrCode.version}</span>
-              </div>
-
+              <h2 className="qr-card-heading">QR-код работы</h2>
               <div className="qr-print-content" data-print-root>
                 <div
                   className="qr-code-frame"
@@ -318,11 +617,12 @@ export function QrPublicationRoute() {
                     aria-hidden="true"
                   />
                 </div>
-                <h2>{item.title}</h2>
-                <p>Наведите камеру на QR, затем — на фотографию.</p>
+                <h2>{printCaption ?? item.title}</h2>
+                <p className="qr-print-brand">KHANZAMA</p>
               </div>
-
-              <div className="qr-link-block" data-print-hide>
+            </Panel>
+            <Panel className="qr-link-card" data-print-hide>
+              <div className="qr-link-block">
                 <label htmlFor="public-qr-url">Публичная ссылка</label>
                 <div className="qr-link-field">
                   <p id="public-qr-url" title={qrCode.public_url} data-testid="public-qr-url">
@@ -331,36 +631,65 @@ export function QrPublicationRoute() {
                   <button aria-label="Копировать публичную ссылку" onClick={() => void copyPublicUrl()}>
                     <Clipboard size={18} />
                   </button>
-                  <button aria-label="Поделиться публичной ссылкой" onClick={() => void sharePublicUrl()}>
-                    <Share2 size={18} />
-                  </button>
                 </div>
               </div>
-
-              <Button
-                className="qr-open-button"
-                full
-                onClick={() => window.open(qrCode.public_url, "_blank", "noopener,noreferrer")}
-                data-print-hide
-              >
-                <ExternalLink size={18} /> Открыть AR
-              </Button>
+              <div className="qr-link-actions">
+                <Button variant="quiet" onClick={() => void copyPublicUrl()} aria-label="Копировать ссылку">
+                  <Clipboard size={16} />
+                  <span>Копировать</span>
+                </Button>
+                <Button variant="quiet" onClick={() => void sharePublicUrl()} aria-label="Поделиться ссылкой">
+                  <Share2 size={16} />
+                  <span>Поделиться</span>
+                </Button>
+                <Button
+                  className="qr-open-button"
+                  onClick={() => window.open(qrCode.public_url, "_blank", "noopener,noreferrer")}
+                >
+                  <ExternalLink size={17} /> Открыть AR
+                </Button>
+              </div>
             </Panel>
 
-            <details className="qr-extra-card" data-print-hide>
-              <summary>Дополнительно</summary>
+            <details className="qr-extra-card" data-print-hide open={printOpen}>
+              <summary
+                onClick={(event) => {
+                  event.preventDefault();
+                  setPrintOption("print", printOpen ? "collapsed" : "expanded");
+                }}
+              >
+                Печать и оформление QR
+              </summary>
               <div className="qr-extra-content">
                 <section>
-                  <h2>Скачать QR</h2>
+                  <h2>Печать QR-кода</h2>
+                  <div className="qr-print-fields">
+                    {" "}
+                    <label className="grid gap-2 text-sm font-medium">
+                      Подпись для печати
+                      <input
+                        className="field-control"
+                        value={printCaption ?? item.title}
+                        maxLength={160}
+                        onChange={(event) => setPrintOption("caption", event.target.value)}
+                      />
+                    </label>
+                    <Select
+                      label="Размер печати"
+                      value={printSize}
+                      onChange={(event) => setPrintOption("size", event.target.value)}
+                      options={printSizes.map((size) => ({ label: `${size} × ${size} мм`, value: String(size) }))}
+                    />
+                  </div>
                   <div className="qr-download-actions">
                     <Button variant="ghost" onClick={downloadSvg}>
                       <Download size={16} /> SVG
                     </Button>
                     <Button variant="ghost" onClick={downloadPng}>
-                      <Download size={16} /> PNG
+                      <Download size={16} /> Скачать PNG
                     </Button>
                     <Button variant="ghost" onClick={() => window.print()}>
-                      <Printer size={16} /> Печать
+                      <Printer size={16} /> Печать / PDF
                     </Button>
                   </div>
                 </section>
@@ -379,23 +708,17 @@ export function QrPublicationRoute() {
                       </button>
                     ))}
                   </div>
-                  <Select
-                    label="Размер печати"
-                    value={printSize}
-                    onChange={(event) => setPrintSize(event.target.value)}
-                    options={printSizes.map((size) => ({ label: `${size} × ${size} мм`, value: String(size) }))}
-                  />
                 </section>
 
-                <section className="qr-publication-actions">
-                  <h2>Управление публикацией</h2>
+                <details className="qr-publication-actions">
+                  <summary className="cursor-pointer py-3 text-sm font-semibold">Управление публикацией</summary>
                   <Button variant="quiet" disabled={mutation.isPending} onClick={() => setConfirmation("rotate")}>
                     <RefreshCw size={16} /> Обновить публичную ссылку
                   </Button>
                   <Button variant="danger" disabled={mutation.isPending} onClick={() => setConfirmation("unpublish")}>
                     <Unlink size={16} /> Отключить публикацию
                   </Button>
-                </section>
+                </details>
               </div>
             </details>
           </>
@@ -405,7 +728,7 @@ export function QrPublicationRoute() {
       <Modal
         open={confirmation === "unpublish"}
         title="Отключить публикацию?"
-        description="Публичный viewer сразу перестанет открываться. QR metadata сохранится для повторной публикации."
+        description="Публичный viewer сразу перестанет открываться. Данные QR сохранятся для повторной публикации."
         onClose={() => setConfirmation(null)}
         actions={
           <Button variant="danger" disabled={mutation.isPending} onClick={() => mutation.mutate("unpublish")}>

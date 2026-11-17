@@ -17,6 +17,20 @@ describe("demo settings repository", () => {
     repository = new DemoSettingsRepository(store, () => new Date("2026-08-03T10:00:00.000Z"));
   });
 
+  it("persists own studio settings and denies another account or a read-only member", async () => {
+    const accountId = "20000000-0000-4000-8000-000000000001";
+    const initial = await repository.getAccountSettings(accountId);
+    await repository.updateAccountSettings(accountId, { ...initial, name: "Новая студия", description: "Описание" });
+    expect((await repository.getAccountSettings(accountId)).name).toBe("Новая студия");
+    expect((await repository.getEntitlements(accountId)).accountName).toBe("Новая студия");
+    await expect(repository.updateAccountSettings("20000000-0000-4000-8000-000000000099", initial)).rejects.toThrow(
+      "Аккаунт недоступен",
+    );
+    state!.entitlements.memberRole = "viewer";
+    await expect(repository.updateAccountSettings(accountId, initial)).rejects.toThrow("владелец или менеджер");
+    expect((await repository.getAccountSettings(accountId)).name).toBe("Новая студия");
+  });
+
   it("creates and revokes an invitation while synchronizing usage", async () => {
     const entitlements = await repository.getEntitlements("20000000-0000-4000-8000-000000000001");
     const result = await repository.inviteMember(entitlements.accountId, {

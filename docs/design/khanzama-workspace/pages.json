@@ -1,0 +1,403 @@
+[
+  {
+    "id": "admin-overview",
+    "group": "admin",
+    "title": "Обзор платформы",
+    "brief": "Ключевые показатели, регистрации, очередь и переходы к проблемам.",
+    "image": "pages/admin/admin-overview.png",
+    "status": "generated"
+  },
+  {
+    "id": "admin-accounts",
+    "group": "admin",
+    "title": "Аккаунты",
+    "brief": "Поиск, пакеты, срок, статус, открытие без причины.",
+    "image": "pages/admin/admin-accounts.png",
+    "status": "generated",
+    "sourceFile": "exec-6e9f9e8b-d713-4b19-8c8d-15e2cce779a3.png"
+  },
+  {
+    "id": "admin-account-detail",
+    "group": "admin",
+    "title": "Карточка аккаунта",
+    "brief": "Владелец, команда, пакет, работы и история выбранного аккаунта.",
+    "image": "pages/admin/admin-account-detail.png",
+    "status": "generated"
+  },
+  {
+    "id": "admin-account-edit",
+    "group": "admin",
+    "title": "Редактирование аккаунта",
+    "brief": "Название, владелец, статус и внутренние разрешения; сохранить/отмена.",
+    "image": "pages/admin/admin-account-edit.png",
+    "status": "generated"
+  },
+  {
+    "id": "admin-users",
+    "group": "admin",
+    "title": "Пользователи платформы",
+    "brief": "Поиск, аккаунт, роль, последний вход, открытие профиля.",
+    "image": "pages/admin/admin-users.png",
+    "status": "generated",
+    "sourceFile": "exec-6d1b4bb7-cbe6-436e-8f69-8685fc5a648f.png"
+  },
+  {
+    "id": "admin-user-detail",
+    "group": "admin",
+    "title": "Карточка пользователя",
+    "brief": "Профиль, аккаунты, роль, входы и управление доступом.",
+    "image": "pages/admin/admin-user-detail.png",
+    "status": "generated"
+  },
+  {
+    "id": "admin-subscriptions",
+    "group": "admin",
+    "title": "Подписки",
+    "brief": "Срок, остаток фото, продление, назначение пакета; без списания денег автоматически.",
+    "image": "pages/admin/admin-subscriptions.png",
+    "status": "generated"
+  },
+  {
+    "id": "admin-plans",
+    "group": "admin",
+    "title": "Тарифы и дополнения",
+    "brief": "Каталог базовых пакетов, добавлений фото и продлений.",
+    "image": "pages/admin/admin-plans.png",
+    "status": "generated"
+  },
+  {
+    "id": "admin-plan-edit",
+    "group": "admin",
+    "title": "Редактор тарифа",
+    "brief": "Название, цена, срок и добавления фото; остальные лимиты раскрываются.",
+    "image": "pages/admin/admin-plan-edit.png",
+    "status": "generated"
+  },
+  {
+    "id": "admin-analytics",
+    "group": "admin",
+    "title": "Аналитика платформы",
+    "brief": "Регистрации, активные аккаунты, работы, фильтр периода; только демонстрационные показатели.",
+    "image": "pages/admin/admin-analytics.png",
+    "status": "generated"
+  },
+  {
+    "id": "admin-activity",
+    "group": "admin",
+    "title": "Входы и активность",
+    "brief": "Кто зарегистрировался, заходил, когда и сколько активно работал; методика измерения времени.",
+    "image": "pages/admin/admin-activity.png",
+    "status": "generated"
+  },
+  {
+    "id": "admin-content",
+    "group": "admin",
+    "title": "Контент платформы",
+    "brief": "Проекты и AR-работы всех аккаунтов, поиск, превью, открытие и управление статусом.",
+    "image": "pages/admin/admin-content.png",
+    "status": "generated"
+  },
+  {
+    "id": "admin-jobs",
+    "group": "admin",
+    "title": "Обработка и ошибки",
+    "brief": "Очередь, этап, ошибка, безопасный повтор обработки.",
+    "image": "pages/admin/admin-jobs.png",
+    "status": "generated"
+  },
+  {
+    "id": "admin-storage",
+    "group": "admin",
+    "title": "Хранилище и ресурсы",
+    "brief": "Ресурсы сервера, объекты S3, распределение по аккаунтам, резервные копии.",
+    "image": "pages/admin/admin-storage.png",
+    "status": "generated"
+  },
+  {
+    "id": "admin-settings",
+    "group": "admin",
+    "title": "Настройки платформы",
+    "brief": "Регистрация, публикация, поддержка, MFA; последствия изменения и подтверждение.",
+    "image": "pages/admin/admin-settings.png",
+    "status": "generated",
+    "sourceFile": "exec-fcef7586-7916-425a-9448-2912051fabe6.png"
+  },
+  {
+    "id": "admin-audit",
+    "group": "admin",
+    "title": "История действий",
+    "brief": "Исполнитель, объект, время, действие и результат, фильтры без формы причины.",
+    "image": "pages/admin/admin-audit.png",
+    "status": "generated"
+  },
+  {
+    "id": "account-dashboard",
+    "group": "account",
+    "title": "Главная кабинета",
+    "brief": "Последние работы, очередь, остаток пакета и создание; только свои данные.",
+    "image": "pages/account/account-dashboard.png",
+    "status": "generated",
+    "sourceFile": "exec-16f1b722-8cf7-4ef5-acf4-1e1eda758889.png"
+  },
+  {
+    "id": "account-projects",
+    "group": "account",
+    "title": "Мои проекты",
+    "brief": "Поиск, компактные карточки, открыть и изменить, архив.",
+    "image": "pages/account/account-projects.png",
+    "status": "generated",
+    "sourceFile": "exec-2acaefc4-bfe7-4a31-8096-d419f6354777.png"
+  },
+  {
+    "id": "account-project-detail",
+    "group": "account",
+    "title": "Проект и группы",
+    "brief": "Группы и работы одного проекта, добавить группу, изменить проект.",
+    "image": "pages/account/account-project-detail.png",
+    "status": "generated",
+    "sourceFile": "exec-b61d70af-fa4c-4f5e-8255-e5aab0a85c2b.png"
+  },
+  {
+    "id": "account-project-edit",
+    "group": "account",
+    "title": "Редактор проекта",
+    "brief": "Название, описание, тип и обложка; сохранить и отмена.",
+    "image": "pages/account/account-project-edit.png",
+    "status": "generated",
+    "sourceFile": "exec-da978686-05b7-48b2-a2fa-1d7839b69c5f.png"
+  },
+  {
+    "id": "account-groups",
+    "group": "account",
+    "title": "Группы проекта",
+    "brief": "Поиск групп, количество работ, создание, изменение, архив.",
+    "image": "pages/account/account-groups.png",
+    "status": "generated",
+    "sourceFile": "exec-0ff0e9c0-ae92-4960-9da3-a0697e4064db.png"
+  },
+  {
+    "id": "account-items",
+    "group": "account",
+    "title": "AR-работы",
+    "brief": "Превью, название, состояние, просмотр и изменение.",
+    "image": "pages/account/account-items.png",
+    "status": "generated",
+    "sourceFile": "exec-b78f5bff-1fab-4ac0-9a95-c8e844363eba.png"
+  },
+  {
+    "id": "account-item-detail",
+    "group": "account",
+    "title": "Карточка AR-работы",
+    "brief": "Большой просмотр фото и видео, изменить, QR, ссылка, публикация и прогресс.",
+    "image": "pages/account/account-item-detail.png",
+    "status": "generated",
+    "sourceFile": "exec-1de78864-7b8a-4ebd-b2fe-2ecbe44765aa.png"
+  },
+  {
+    "id": "account-create",
+    "group": "account",
+    "title": "Создание AR-фото",
+    "brief": "Название, пары фото-видео, загрузка, кадрирование, подготовить и опубликовать.",
+    "image": "pages/account/account-create.png",
+    "status": "generated",
+    "sourceFile": "exec-2559bb6b-10d1-4556-b3f5-8f033f20d340.png"
+  },
+  {
+    "id": "account-edit",
+    "group": "account",
+    "title": "Редактирование AR-фото",
+    "brief": "Заменить фото/видео, настройки воспроизведения, сохранение и версия публикации.",
+    "image": "pages/account/account-edit.png",
+    "status": "generated",
+    "sourceFile": "exec-6d47399c-8736-44d2-99aa-0bc77864da50.png"
+  },
+  {
+    "id": "account-media",
+    "group": "account",
+    "title": "Медиа и загрузки",
+    "brief": "Свои файлы, размер, прогресс, ошибки, просмотр и повтор загрузки.",
+    "image": "pages/account/account-media.png",
+    "status": "generated",
+    "sourceFile": "exec-e03d5e0c-2063-491e-9de8-512f214879cd.png"
+  },
+  {
+    "id": "account-qr-list",
+    "group": "account",
+    "title": "Мои QR-коды",
+    "brief": "Поиск, фильтр проекта, действующие коды, скачать и печатать.",
+    "image": "pages/account/account-qr-list.png",
+    "status": "generated",
+    "sourceFile": "exec-a5eb849e-2678-40e0-b742-b1422b652461.png"
+  },
+  {
+    "id": "account-qr-detail",
+    "group": "account",
+    "title": "QR и публикация",
+    "brief": "Предпросмотр печати, размер, скачать, скопировать ссылку и открыть AR.",
+    "image": "pages/account/account-qr-detail.png",
+    "status": "generated",
+    "sourceFile": "exec-9e7ab9cd-871f-400b-86c1-4dda1d7cce0c.png"
+  },
+  {
+    "id": "account-analytics",
+    "group": "account",
+    "title": "Статистика моих работ",
+    "brief": "Только открытия и просмотры своих AR-работ; никаких общих входов платформы.",
+    "image": "pages/account/account-analytics.png",
+    "status": "generated",
+    "sourceFile": "exec-7cc495bd-a17f-4a24-9e30-1069b962e254.png"
+  },
+  {
+    "id": "account-subscription",
+    "group": "account",
+    "title": "Мой пакет",
+    "brief": "Срок, оставшиеся расходуемые добавления и объём, условия пакета; без управления чужими тарифами.",
+    "image": "pages/account/account-subscription.png",
+    "status": "generated",
+    "sourceFile": "exec-7556c663-12ff-4623-81da-5e24f7722e3e.png"
+  },
+  {
+    "id": "account-team",
+    "group": "account",
+    "title": "Моя команда",
+    "brief": "Участники своего аккаунта, приглашения и внутренние роли.",
+    "image": "pages/account/account-team.png",
+    "status": "generated",
+    "sourceFile": "exec-ea9ff107-9928-497c-b602-fbda32302115.png"
+  },
+  {
+    "id": "account-profile",
+    "group": "account",
+    "title": "Мой профиль",
+    "brief": "Личные данные, контакты, быстрые настройки, безопасность и выход.",
+    "image": "pages/account/account-profile.png",
+    "status": "generated",
+    "sourceFile": "exec-609781d5-f84f-4612-a257-9e0c9f7cedc7.png"
+  },
+  {
+    "id": "account-settings",
+    "group": "account",
+    "title": "Настройки аккаунта",
+    "brief": "Название своего аккаунта, предпочтения, сохранение и отмена.",
+    "image": "pages/account/account-settings.png",
+    "status": "generated",
+    "sourceFile": "exec-cc50d16a-0259-4c5f-aaa0-2511019553ef.png"
+  },
+  {
+    "id": "account-security",
+    "group": "account",
+    "title": "Безопасность аккаунта",
+    "brief": "MFA, подтверждение текущего сеанса и смена пароля.",
+    "image": "pages/account/account-security.png",
+    "status": "generated",
+    "sourceFile": "exec-c16b32c4-f620-4fd4-8176-8fc8b5b2627a.png"
+  },
+  {
+    "id": "account-support",
+    "group": "account",
+    "title": "Поддержка",
+    "brief": "Обращения своего аккаунта, новое обращение и ответы.",
+    "image": "pages/account/account-support.png",
+    "status": "generated",
+    "sourceFile": "exec-2d536d1a-e8b6-4b6e-a5a3-734879fb254f.png"
+  },
+  {
+    "id": "crm-unlimited",
+    "group": "account",
+    "title": "CRM владельца — полный пакет",
+    "brief": "Тот же пользовательский кабинет, свой аккаунт, безлимит и расширенные внутренние права; нет меню админки.",
+    "image": "pages/account/crm-unlimited.png",
+    "status": "generated",
+    "sourceFile": "exec-20b2d6f4-9952-41dc-9c5e-1df40d818666.png"
+  },
+  {
+    "id": "access-login",
+    "group": "access",
+    "title": "Вход",
+    "brief": "Email, пароль, вход, восстановление, ошибки и ссылка регистрации.",
+    "image": "pages/access/access-login.png",
+    "status": "generated",
+    "sourceFile": "exec-1a991b40-e5fe-4544-8d83-cf312719e256.png"
+  },
+  {
+    "id": "access-register",
+    "group": "access",
+    "title": "Регистрация",
+    "brief": "Имя, email, пароль, согласие и создание своего аккаунта.",
+    "image": "pages/access/access-register.png",
+    "status": "generated",
+    "sourceFile": "exec-fae1784f-42ef-4f52-8872-3c47feb80762.png"
+  },
+  {
+    "id": "access-reset",
+    "group": "access",
+    "title": "Восстановление доступа",
+    "brief": "Запрос восстановления и честное состояние доставки, без ложного обещания письма.",
+    "image": "pages/access/access-reset.png",
+    "status": "generated",
+    "sourceFile": "exec-eeab3bf8-c64f-4da1-9bd5-6cf83dfab1c9.png"
+  },
+  {
+    "id": "access-password",
+    "group": "access",
+    "title": "Новый пароль",
+    "brief": "Новый пароль и подтверждение, требования; при MFA понятный следующий шаг.",
+    "image": "pages/access/access-password.png",
+    "status": "generated",
+    "sourceFile": "exec-d324fae4-225f-403e-9813-ade77cbb76e7.png"
+  },
+  {
+    "id": "access-mfa",
+    "group": "access",
+    "title": "Подтверждение MFA",
+    "brief": "Шестизначный код, подтверждение и восстановление доступа без приложения.",
+    "image": "pages/access/access-mfa.png",
+    "status": "generated",
+    "sourceFile": "exec-52244a97-22b5-4845-bbfc-5d352634a2ee.png"
+  },
+  {
+    "id": "viewer-camera",
+    "group": "access",
+    "title": "AR-камера",
+    "brief": "Разрешение камеры, инструкция наведения, распознавание фотографии, воспроизведение.",
+    "image": "pages/access/viewer-camera.png",
+    "status": "generated",
+    "sourceFile": "exec-e3e095cc-3776-4db0-b460-32506037edb6.png"
+  },
+  {
+    "id": "viewer-public",
+    "group": "access",
+    "title": "Открытие AR по QR",
+    "brief": "Название работы, запуск камеры, звук и обычное видео при недоступной AR.",
+    "image": "pages/access/viewer-public.png",
+    "status": "generated",
+    "sourceFile": "exec-32701b5d-0dee-4aa3-a880-80b9b871f89b.png"
+  },
+  {
+    "id": "viewer-privacy",
+    "group": "access",
+    "title": "Конфиденциальность",
+    "brief": "Понятное использование камеры и данных, условия, контакт и возврат.",
+    "image": "pages/access/viewer-privacy.png",
+    "status": "generated",
+    "sourceFile": "exec-c0019f07-3d34-43e3-b8bb-ee32ce38cabd.png"
+  },
+  {
+    "id": "viewer-unsupported",
+    "group": "access",
+    "title": "Неподдерживаемый браузер",
+    "brief": "Причина, совместимый способ открытия и просмотр обычного видео.",
+    "image": "pages/access/viewer-unsupported.png",
+    "status": "generated",
+    "sourceFile": "exec-25c3f96e-f9cd-4bc9-8a65-ec226f6996ca.png"
+  },
+  {
+    "id": "viewer-not-found",
+    "group": "access",
+    "title": "Страница не найдена",
+    "brief": "Короткая ошибка, на главную, назад и поддержка.",
+    "image": "pages/access/viewer-not-found.png",
+    "status": "generated",
+    "sourceFile": "exec-c42cd7a4-52e8-4cc7-868e-99b3f99593a0.png"
+  }
+]

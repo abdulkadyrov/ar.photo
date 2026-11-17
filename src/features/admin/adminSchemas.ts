@@ -199,6 +199,48 @@ export const adminSettingSchema = z
   .strict();
 
 export const adminReasonSchema = z.string().trim().min(10).max(500);
+export const adminAccountUpdateSchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .refine(
+        (value) => [...value].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) !== 127),
+        "Название содержит управляющие символы",
+      ),
+    timezone: z
+      .string()
+      .trim()
+      .min(1)
+      .max(64)
+      .refine((value) => {
+        try {
+          new Intl.DateTimeFormat("ru-RU", { timeZone: value });
+          return true;
+        } catch {
+          return false;
+        }
+      }, "Проверьте часовой пояс"),
+  })
+  .strict();
+export const adminUserUpdateSchema = z
+  .object({
+    fullName: z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .refine(
+        (value) => [...value].every((char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) !== 127),
+        "Имя содержит управляющие символы",
+      ),
+  })
+  .strict();
+export type AdminAccountUpdate = z.infer<typeof adminAccountUpdateSchema>;
+export type AdminUserUpdate = z.infer<typeof adminUserUpdateSchema>;
+
 export const createAdminAccountSchema = z
   .object({
     email: z.string().trim().email(),

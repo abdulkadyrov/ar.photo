@@ -26,6 +26,71 @@ describe("DemoAdminRepository", () => {
     expect(snapshot.audit.items[0]).toMatchObject({ action: "admin.support_access", accountId: alphaId });
   });
 
+  it("edits account and user profiles without changing access or package state", async () => {
+    const repository = createDemoAdminRepository();
+    const before = await repository.getAccountDetail(alphaId, "Проверка исходной карточки аккаунта");
+    await repository.updateAccount(
+      alphaId,
+      { name: "  Обновлённая студия  ", timezone: "Asia/Yekaterinburg" },
+      "Редактирование профиля аккаунта администратором",
+    );
+    await repository.updateUser(
+      alphaId,
+      alphaOwnerId,
+      { fullName: "Новый контакт владельца" },
+      "Редактирование имени владельца администратором",
+    );
+    const after = await repository.getAccountDetail(alphaId, "Проверка сохранённой карточки аккаунта");
+    expect(after.account).toMatchObject({
+      name: "Обновлённая студия",
+      timezone: "Asia/Yekaterinburg",
+      slug: before.account.slug,
+      status: before.account.status,
+    });
+    expect(after.subscription).toEqual(before.subscription);
+    expect(after.users.find((user) => user.id === alphaOwnerId)).toMatchObject({
+      fullName: "Новый контакт владельца",
+      role: "owner",
+      isActive: true,
+    });
+    const snapshot = await repository.getSnapshot();
+    expect(snapshot.accounts.items.find((account) => account.id === alphaId)).toMatchObject({
+      name: "Обновлённая студия",
+      ownerName: "Новый контакт владельца",
+    });
+    expect(
+      snapshot.audit.items.find((log) => log.action === "admin.account.profile.update")?.metadataSafe,
+    ).toMatchObject({ before: { name: before.account.name }, after: { name: "Обновлённая студия" } });
+  });
+
+  it("rejects foreign user edits and invalid profile values before mutation", async () => {
+    const repository = createDemoAdminRepository();
+    await expect(
+      repository.updateUser(
+        betaId,
+        alphaEditorId,
+        { fullName: "Чужой пользователь" },
+        "Попытка изменить чужой профиль",
+      ),
+    ).rejects.toBeInstanceOf(AdminError);
+    await expect(
+      repository.updateAccount(alphaId, { name: " ", timezone: "Europe/Moscow" }, "Некорректное название аккаунта"),
+    ).rejects.toThrow();
+    await expect(
+      repository.updateAccount(
+        alphaId,
+        { name: "Valid", timezone: "Wrong/Zone" },
+        "Некорректный часовой пояс аккаунта",
+      ),
+    ).rejects.toThrow();
+    await expect(
+      repository.updateUser(alphaId, alphaEditorId, { fullName: "\u0001invalid" }, "Некорректное имя пользователя"),
+    ).rejects.toThrow();
+    expect((await repository.getSnapshot()).audit.items.some((log) => log.action.endsWith("profile.update"))).toBe(
+      false,
+    );
+  });
+
   it("suspends and restores an account with audit evidence", async () => {
     const repository = createDemoAdminRepository();
     await repository.setAccountStatus(alphaId, "suspended", "Проверка инцидента RISK-18 клиента");

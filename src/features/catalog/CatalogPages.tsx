@@ -7,12 +7,9 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
-  FolderKanban,
   FolderPlus,
-  GripVertical,
   Image,
   Layers3,
   EllipsisVertical,
@@ -26,9 +23,9 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
   Group,
   GroupInput,
@@ -48,6 +45,7 @@ import { Button, ErrorState, FileButton, Input, Modal, Panel, Select, Skeleton, 
 import { CatalogError, getCatalogRepository } from "./catalogRepository";
 import { CoverFileError, coverFileAccept } from "./coverFile";
 import { getArItemRepository } from "../ar-items/arItemRepository";
+import { captureWorkspaceOrigin, useWorkspaceBack } from "../ar-items/itemNavigation";
 import "./CatalogPages.css";
 
 const catalogRepository = getCatalogRepository();
@@ -76,7 +74,7 @@ export function ProjectsRoute() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [editing, setEditing] = useState<Project | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(searchParams.get("create") === "1");
   const [confirmation, setConfirmation] = useState<ProjectAction | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
 
@@ -138,7 +136,8 @@ export function ProjectsRoute() {
     <AppShell
       eyebrow={workspace.accountName}
       title="Мои проекты"
-      description="Создавайте коллекции, управляйте группами и отслеживайте готовность AR-материалов."
+      titleBadge={projectsQuery.data?.total ?? "…"}
+      description="Проекты AR-фото вашей студии"
       compactMobile
       actions={
         <Button
@@ -231,10 +230,14 @@ export function ProjectsRoute() {
         </div>
       ) : projectsQuery.data.items.length ? (
         <>
-          <section
-            className="projects-grid mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-3"
-            aria-label="Список проектов"
-          >
+          <section className="projects-grid mt-6" aria-label="Список проектов">
+            <div className="project-table-heading" aria-hidden="true">
+              <span>Проект</span>
+              <span>Группы</span>
+              <span>Работы</span>
+              <span>Последнее обновление</span>
+              <span />
+            </div>
             {projectsQuery.data.items.map((project) => (
               <ProjectCard
                 key={project.id}
@@ -291,116 +294,266 @@ export function ProjectsRoute() {
 
 export function GroupsRoute() {
   const auth = useAuth();
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
+  const [editing, setEditing] = useState<{ projectId: string; group: Group | null } | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [renaming, setRenaming] = useState<Group | null>(null);
+  const [groupName, setGroupName] = useState("");
   const workspaceQuery = useWorkspaceQuery(auth.session!.user.id);
   const accountId = workspaceQuery.data?.accountId;
+  const selectedProjectId = searchParams.get("projectId") ?? "";
   const catalogQuery = useQuery({
     queryKey: ["catalog", "group-directory", accountId],
     queryFn: async () => {
-      const projects = await catalogRepository.listProjectOptions(accountId!);
-      return Promise.all(
-        projects.map(async (project) => ({
-          ...project,
-          groups: await catalogRepository.listGroups(accountId!, project.id),
-        })),
-      );
+      const [projects, groups] = await Promise.all([
+        catalogRepository.listProjectOptions(accountId!),
+        catalogRepository.listGroups(accountId!),
+      ]);
+      return projects.map((project) => ({
+        ...project,
+        groups: groups.filter((group) => group.project_id === project.id),
+      }));
     },
     enabled: Boolean(accountId),
   });
-
+  const itemsQuery = useQuery({
+    queryKey: ["ar-items", accountId],
+    queryFn: () => arItemRepository.listItems(accountId!),
+    enabled: Boolean(accountId),
+  });
+  const renameMutation = useMutation({
+    mutationFn: () =>
+      catalogRepository.updateGroup(accountId!, renaming!.id, {
+        name: groupName,
+        description: renaming!.description ?? "",
+      }),
+    onSuccess: async () => {
+      setRenaming(null);
+      setNotice({ title: "Название группы сохранено", tone: "success" });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["catalog", "group-directory"] }),
+        queryClient.invalidateQueries({ queryKey: ["catalog", "groups"] }),
+      ]);
+    },
+  });
   if (workspaceQuery.isPending) return <CatalogLoading title="Группы" />;
   if (workspaceQuery.error) return <WorkspaceError error={workspaceQuery.error} />;
-
-  const normalizedSearch = search.trim().toLocaleLowerCase("ru");
-  const projects = (catalogQuery.data ?? [])
-    .map((project) => ({
-      ...project,
-      groups: project.groups.filter(
-        (group) =>
-          !normalizedSearch ||
-          group.name.toLocaleLowerCase("ru").includes(normalizedSearch) ||
-          project.name.toLocaleLowerCase("ru").includes(normalizedSearch),
-      ),
-    }))
-    .filter((project) => project.groups.length || (!normalizedSearch && project.name));
-
+  const projects = catalogQuery.data ?? [];
+  const selectedProject = projects.find((project) => project.id === selectedProjectId);
+  const groups = projects
+    .filter((project) => !selectedProjectId || project.id === selectedProjectId)
+    .flatMap((project) => project.groups.map((group) => ({ ...group, projectName: project.name })))
+    .filter((group) =>
+      `${group.name} ${group.projectName}`.toLocaleLowerCase("ru").includes(search.trim().toLocaleLowerCase("ru")),
+    );
   return (
     <AppShell
-      eyebrow={workspaceQuery.data.accountName}
-      title="Группы"
-      description="Все активные проекты и группы в одном каталоге. Порядок и перенос управляются внутри проекта."
+      eyebrow={selectedProject?.name ?? workspaceQuery.data.accountName}
+      title={selectedProject ? "Группы проекта" : "Группы"}
+      breadcrumbs={
+        selectedProject ? (
+          <>
+            <Link to="/projects">Проекты</Link>
+            <span>/</span>
+            <Link to={`/projects/${selectedProject.id}`}>{selectedProject.name}</Link>
+            <span>/</span>
+            <span>Группы</span>
+          </>
+        ) : undefined
+      }
+      description={selectedProject ? `Проект «${selectedProject.name}»` : "Группы ваших проектов"}
+      compactMobile
       actions={
-        <Link className="btn btn-primary" to="/projects">
-          <FolderKanban size={17} />
-          Проекты
-        </Link>
+        selectedProject && workspaceQuery.data.canWrite ? (
+          <Button icon={<Plus size={17} />} onClick={() => setEditing({ projectId: selectedProject.id, group: null })}>
+            Создать группу
+          </Button>
+        ) : (
+          <Link className="btn btn-ghost" to="/projects">
+            Проекты <ArrowRight size={17} />
+          </Link>
+        )
       }
     >
-      <Panel className="mt-6">
-        <div className="relative max-w-xl">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" size={17} />
-          <Input
-            aria-label="Поиск групп"
-            className="pl-10"
-            placeholder="Поиск по группе или проекту"
-            value={search}
-            onValueChange={setSearch}
-          />
-        </div>
-      </Panel>
-
+      {selectedProject ? (
+        <nav className="group-project-tabs" aria-label="Разделы выбранного проекта">
+          {[
+            { label: "Обзор проекта", to: `/projects/${selectedProject.id}` },
+            { label: "Группы", to: `/groups?projectId=${encodeURIComponent(selectedProject.id)}`, active: true },
+            { label: "AR-фото", to: `/items?projectId=${encodeURIComponent(selectedProject.id)}` },
+            { label: "QR-коды", to: `/qr-codes?projectId=${encodeURIComponent(selectedProject.id)}` },
+            { label: "Настройки", to: `/projects/${selectedProject.id}/edit` },
+          ].map((tab) => (
+            <Link
+              key={tab.label}
+              className={tab.active ? "is-active" : undefined}
+              aria-current={tab.active ? "page" : undefined}
+              state={captureWorkspaceOrigin(location, accountId)}
+              to={tab.to}
+            >
+              {tab.label}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
+      <div className="groups-toolbar mt-5">
+        <Input aria-label="Поиск групп" placeholder="Поиск по группам…" value={search} onValueChange={setSearch} />
+        <Select
+          label=""
+          aria-label="Проект групп"
+          value={selectedProjectId}
+          options={[
+            { value: "", label: "Все проекты" },
+            ...projects.map((project) => ({ value: project.id, label: project.name })),
+          ]}
+          onChange={(event) => {
+            const next = new URLSearchParams(searchParams);
+            if (event.target.value) next.set("projectId", event.target.value);
+            else next.delete("projectId");
+            setSearchParams(next);
+          }}
+        />
+      </div>
       {catalogQuery.isPending ? (
         <ProjectGridSkeleton />
       ) : catalogQuery.error ? (
-        <div className="mt-6">
-          <ErrorState
-            text={readableCatalogError(catalogQuery.error)}
-            action={<Button onClick={() => void catalogQuery.refetch()}>Повторить</Button>}
-          />
-        </div>
-      ) : projects.length ? (
-        <div className="mt-6 grid gap-4 xl:grid-cols-2">
-          {projects.map((project) => (
-            <Panel key={project.id}>
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary">Проект</p>
-                  <h2 className="mt-1 text-xl font-semibold">{project.name}</h2>
-                </div>
-                <Link className="font-semibold text-primary hover:text-violet-300" to={`/projects/${project.id}`}>
-                  Открыть
-                </Link>
-              </div>
-              <div className="mt-4 grid gap-2">
-                {project.groups.length ? (
-                  project.groups.map((group) => (
-                    <div
-                      key={group.id}
-                      className="flex items-center gap-3 rounded-2xl border border-line bg-white px-3 py-3"
-                    >
-                      <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary/10 text-primary">
-                        <Layers3 size={17} />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold">{group.name}</p>
-                        <p className="text-xs text-muted">Позиция {group.sort_order + 1}</p>
-                      </div>
-                      {group.archived_at ? <StatusPill tone="muted">Архив</StatusPill> : null}
-                    </div>
-                  ))
+        <ErrorState
+          text={readableCatalogError(catalogQuery.error)}
+          action={<Button onClick={() => void catalogQuery.refetch()}>Повторить</Button>}
+        />
+      ) : groups.length ? (
+        <section className="group-directory-list mt-5" aria-label="Группы">
+          <div className="group-directory-heading" aria-hidden="true">
+            <span>Группа</span>
+            <span>AR-работ</span>
+            <span>Обновлено</span>
+            <span />
+          </div>
+          {groups.map((group) => (
+            <article className="project-group-row" key={group.id}>
+              <span className="project-group-cover">
+                {group.cover_path ? (
+                  <CoverImage className="h-full w-full object-cover" path={group.cover_path} alt="" />
                 ) : (
-                  <p className="rounded-2xl border border-dashed border-line p-4 text-sm text-muted">Групп пока нет</p>
+                  <Layers3 size={24} />
                 )}
+              </span>
+              <div className="project-group-copy">
+                {renaming?.id === group.id ? (
+                  <div className="group-inline-rename">
+                    <Input
+                      aria-label="Новое название группы"
+                      autoFocus
+                      disabled={renameMutation.isPending}
+                      maxLength={120}
+                      value={groupName}
+                      onValueChange={setGroupName}
+                    />
+                    <div>
+                      <Button
+                        type="button"
+                        disabled={renameMutation.isPending || !groupName.trim()}
+                        onClick={() => renameMutation.mutate()}
+                      >
+                        Сохранить
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={renameMutation.isPending}
+                        onClick={() => {
+                          setRenaming(null);
+                          renameMutation.reset();
+                        }}
+                      >
+                        Отмена
+                      </Button>
+                    </div>
+                    {renameMutation.error ? (
+                      <p className="text-rose-700" role="alert">
+                        {readableCatalogError(renameMutation.error)}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <h2>{group.name}</h2>
+                )}
+                <p>{selectedProject ? group.description : group.projectName}</p>
+                <span>Обновлено {formatShortDate(group.updated_at)}</span>
               </div>
-            </Panel>
+              <span className="project-group-count">
+                {itemsQuery.data ? itemsQuery.data.filter((item) => item.group_id === group.id).length : "—"} AR-фото
+              </span>
+              <Link
+                className="btn btn-ghost"
+                state={captureWorkspaceOrigin(location, accountId)}
+                to={`/items?projectId=${group.project_id}&groupId=${group.id}`}
+              >
+                Открыть <ArrowRight size={16} />
+              </Link>
+              {workspaceQuery.data.canWrite ? (
+                <details className="project-card-menu">
+                  <summary aria-label={`Действия группы «${group.name}»`}>
+                    <EllipsisVertical size={19} />
+                  </summary>
+                  <div className="project-card-menu-popover" role="menu">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={(event) => {
+                        event.currentTarget.closest("details")?.removeAttribute("open");
+                        setRenaming(group);
+                        setGroupName(group.name);
+                        renameMutation.reset();
+                      }}
+                    >
+                      <Pencil size={16} />
+                      Переименовать
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={(event) => {
+                        event.currentTarget.closest("details")?.removeAttribute("open");
+                        setEditing({ projectId: group.project_id, group });
+                      }}
+                    >
+                      Обложка и описание
+                    </button>
+                  </div>
+                </details>
+              ) : null}
+            </article>
           ))}
-        </div>
+        </section>
       ) : (
-        <Panel className="mt-6 py-12 text-center">
-          <h2 className="text-2xl font-semibold">Группы не найдены</h2>
-          <p className="mt-2 text-sm text-muted">Измените поисковый запрос или создайте группу внутри проекта.</p>
+        <Panel className="mt-5">
+          <h2 className="text-lg font-semibold">{search ? "Группы не найдены" : "Пока нет групп"}</h2>
+          <p className="mt-2 text-sm text-muted">
+            {search ? "Измените поисковый запрос." : "Выберите проект и создайте первую группу."}
+          </p>
         </Panel>
       )}
+      <GroupFormModal
+        accountId={accountId!}
+        projectId={editing?.projectId ?? ""}
+        group={editing?.group ?? null}
+        open={Boolean(editing)}
+        onClose={() => setEditing(null)}
+        onSaved={async (title) => {
+          setEditing(null);
+          setNotice({ title, tone: "success" });
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["catalog", "group-directory"] }),
+            queryClient.invalidateQueries({ queryKey: ["catalog", "groups"] }),
+            queryClient.invalidateQueries({ queryKey: ["catalog", "projects"] }),
+          ]);
+        }}
+      />
+      {notice ? <Toast {...notice} onDismiss={() => setNotice(null)} /> : null}
     </AppShell>
   );
 }
@@ -418,7 +571,11 @@ export function ProjectDetailsRoute() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const workspaceQuery = useWorkspaceQuery(auth.session!.user.id);
   const accountId = workspaceQuery.data?.accountId;
-  const tab = searchParams.get("tab") === "settings" ? "settings" : "groups";
+  const goBack = useWorkspaceBack(accountId, "/projects");
+  const location = useLocation();
+  const [editingProject, setEditingProject] = useState(false);
+  const tab =
+    searchParams.get("tab") === "settings" ? "settings" : searchParams.get("tab") === "works" ? "works" : "groups";
 
   const projectQuery = useQuery({
     queryKey: ["catalog", "project", accountId, projectId],
@@ -523,16 +680,40 @@ export function ProjectDetailsRoute() {
     <AppShell
       eyebrow={projectCategoryLabels[project.category]}
       title={project.name}
-      description={project.description ?? "Добавьте описание, чтобы команде было проще ориентироваться в проекте."}
+      breadcrumbs={
+        <>
+          <button type="button" onClick={goBack}>
+            Проекты
+          </button>
+          <span>/</span>
+          <span>{project.name}</span>
+        </>
+      }
+      description={project.description ?? projectCategoryLabels[project.category]}
+      compactMobile
       actions={
         <>
-          <Button variant="quiet" onClick={() => navigate("/projects")} icon={<ArrowLeft size={17} />}>
-            Проекты
-          </Button>
-          <Link className="btn btn-ghost" to={`/items/new?projectId=${project.id}`}>
-            <Sparkles size={17} /> Новая AR-работа
-          </Link>
+          {workspace.canWrite ? (
+            <Link
+              className="btn btn-ghost"
+              state={captureWorkspaceOrigin(location, accountId)}
+              to={`/projects/${project.id}/edit`}
+            >
+              <Pencil size={17} />
+              Изменить
+            </Link>
+          ) : null}
+          {workspace.canWrite && project.status !== "archived" && !project.deleted_at ? (
+            <Link
+              className="btn btn-primary"
+              state={captureWorkspaceOrigin(location, accountId)}
+              to={`/items/new?projectId=${project.id}`}
+            >
+              <Sparkles size={17} /> Создать AR-фото
+            </Link>
+          ) : null}
           <Button
+            variant="ghost"
             disabled={!workspace.canWrite || project.status === "archived" || Boolean(project.deleted_at)}
             onClick={() => setGroupModal({ open: true, group: null })}
             icon={<Plus size={17} />}
@@ -543,18 +724,8 @@ export function ProjectDetailsRoute() {
       }
     >
       {!workspace.canWrite ? <WorkspaceReadOnlyNotice workspace={workspace} /> : null}
-      <section className="mt-6 grid gap-4 sm:grid-cols-3">
-        <ProjectMetric icon={<Layers3 size={19} />} label="Группы" value={groupsQuery.data?.length ?? 0} />
-        <ProjectMetric
-          icon={<Image size={19} />}
-          label="AR-работы"
-          value={arItemsQuery.data?.length ?? 0}
-          to={`/items?projectId=${encodeURIComponent(project.id)}`}
-        />
-        <ProjectMetric icon={<CalendarDays size={19} />} label="Обновлён" value={formatShortDate(project.updated_at)} />
-      </section>
       <div className="mt-6 flex gap-2 border-b border-line" role="tablist" aria-label="Разделы проекта">
-        {(["groups", "settings"] as const).map((item) => (
+        {(["groups", "works", "settings"] as const).map((item) => (
           <button
             key={item}
             aria-selected={tab === item}
@@ -562,7 +733,7 @@ export function ProjectDetailsRoute() {
             onClick={() => setSearchParams(item === "groups" ? {} : { tab: item })}
             role="tab"
           >
-            {item === "groups" ? "Группы" : "Настройки"}
+            {item === "groups" ? "Группы" : item === "works" ? "Работы" : "О проекте"}
           </button>
         ))}
       </div>
@@ -575,7 +746,15 @@ export function ProjectDetailsRoute() {
             <ErrorState text={readableCatalogError(groupsQuery.error)} />
           </div>
         ) : groupsQuery.data.length ? (
-          <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Группы проекта">
+          <section className="project-groups-list mt-6" aria-label="Группы проекта">
+            <div className="project-groups-heading">
+              <h2>Группы проекта</h2>
+              <span>
+                Всего {groupsQuery.data.length} {countLabel(groupsQuery.data.length, "группа", "группы", "групп")} ·{" "}
+                {arItemsQuery.data?.length ?? "—"}{" "}
+                {arItemsQuery.data ? countLabel(arItemsQuery.data.length, "работа", "работы", "работ") : "работ"}
+              </span>
+            </div>
             {groupsQuery.data.map((group, index) => (
               <div
                 key={group.id}
@@ -593,6 +772,11 @@ export function ProjectDetailsRoute() {
               >
                 <GroupCard
                   group={group}
+                  workCount={arItemsQuery.data?.filter((item) => item.group_id === group.id).length}
+                  previewPaths={arItemsQuery.data
+                    ?.filter((item) => item.group_id === group.id)
+                    .flatMap((item) => (item.marker_image_path ? [item.marker_image_path] : []))
+                    .slice(0, 3)}
                   canWrite={workspace.canWrite}
                   first={index === 0}
                   last={index === groupsQuery.data.length - 1}
@@ -608,6 +792,42 @@ export function ProjectDetailsRoute() {
         ) : (
           <EmptyGroups canWrite={workspace.canWrite} onCreate={() => setGroupModal({ open: true, group: null })} />
         )
+      ) : tab === "works" ? (
+        arItemsQuery.isPending ? (
+          <ProjectGridSkeleton />
+        ) : arItemsQuery.error ? (
+          <ErrorState
+            text={readableCatalogError(arItemsQuery.error)}
+            action={<Button onClick={() => void arItemsQuery.refetch()}>Повторить</Button>}
+          />
+        ) : arItemsQuery.data.length ? (
+          <div className="project-work-list mt-6">
+            {arItemsQuery.data.map((item) => (
+              <Link
+                className="project-work-link"
+                key={item.id}
+                state={captureWorkspaceOrigin(location, accountId)}
+                to={`/items/${item.id}`}
+              >
+                <span className="project-work-cover">
+                  <CoverImage
+                    alt=""
+                    className="h-full w-full object-cover"
+                    bucket="markers-private"
+                    path={item.marker_image_path}
+                  />
+                  <Image size={21} />
+                </span>
+                <span>{item.title}</span>
+                <ArrowRight size={17} />
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <Panel className="mt-6">
+            <p className="text-sm text-muted">В проекте пока нет AR-фото.</p>
+          </Panel>
+        )
       ) : (
         <Panel className="mt-6">
           <h2 className="text-xl font-semibold">Состояние проекта</h2>
@@ -620,6 +840,43 @@ export function ProjectDetailsRoute() {
         </Panel>
       )}
 
+      {tab === "groups" && arItemsQuery.data?.length ? (
+        <Panel className="project-latest-work mt-5">
+          <div className="section-heading-row">
+            <h2>Последние работы в проекте</h2>
+            <button type="button" className="text-link" onClick={() => setSearchParams({ tab: "works" })}>
+              Смотреть все работы <ArrowRight size={16} />
+            </button>
+          </div>
+          <div className="project-latest-strip">
+            {arItemsQuery.data.slice(0, 5).map((item) => (
+              <Link key={item.id} state={captureWorkspaceOrigin(location, accountId)} to={`/items/${item.id}`}>
+                <CoverImage
+                  alt={item.title}
+                  className="h-full w-full object-cover"
+                  bucket="markers-private"
+                  path={item.marker_image_path}
+                />
+                <span>{item.title}</span>
+              </Link>
+            ))}
+          </div>
+        </Panel>
+      ) : null}
+      <ProjectFormModal
+        accountId={workspace.accountId}
+        project={project}
+        open={editingProject}
+        onClose={() => setEditingProject(false)}
+        onSaved={async (title) => {
+          setEditingProject(false);
+          setNotice({ tone: "success", title });
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["catalog", "project", accountId, projectId] }),
+            queryClient.invalidateQueries({ queryKey: ["catalog", "projects"] }),
+          ]);
+        }}
+      />
       <GroupFormModal
         accountId={workspace.accountId}
         projectId={project.id}
@@ -658,6 +915,68 @@ export function ProjectDetailsRoute() {
   );
 }
 
+export function ProjectEditRoute() {
+  const { projectId = "" } = useParams<{ projectId: string }>();
+  const auth = useAuth();
+  const queryClient = useQueryClient();
+  const workspaceQuery = useWorkspaceQuery(auth.session!.user.id);
+  const accountId = workspaceQuery.data?.accountId;
+  const goBack = useWorkspaceBack(accountId, `/projects/${projectId}`);
+  const projectQuery = useQuery({
+    queryKey: ["catalog", "project", accountId, projectId],
+    queryFn: () => catalogRepository.getProject(accountId!, projectId),
+    enabled: Boolean(accountId && projectId),
+  });
+  if (workspaceQuery.isPending || projectQuery.isPending) return <CatalogLoading title="Редактор проекта" />;
+  if (workspaceQuery.error) return <WorkspaceError error={workspaceQuery.error} />;
+  if (projectQuery.error || !projectQuery.data)
+    return (
+      <AppShell title="Редактор проекта">
+        <ErrorState
+          text={readableCatalogError(projectQuery.error)}
+          action={
+            <Button type="button" onClick={goBack}>
+              Назад к проекту
+            </Button>
+          }
+        />
+      </AppShell>
+    );
+  const workspace = workspaceQuery.data;
+  return (
+    <AppShell
+      title="Редактор проекта"
+      compactMobile
+      breadcrumbs={
+        <button className="catalog-back-link" type="button" onClick={goBack}>
+          <ArrowLeft size={17} />
+          Назад к проекту
+        </button>
+      }
+    >
+      {workspace.canWrite ? (
+        <ProjectFormModal
+          inline
+          open
+          accountId={workspace.accountId}
+          project={projectQuery.data}
+          onClose={goBack}
+          onSaved={async () => {
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: ["catalog", "project", accountId, projectId] }),
+              queryClient.invalidateQueries({ queryKey: ["catalog", "projects"] }),
+              queryClient.invalidateQueries({ queryKey: ["dashboard", "projects"] }),
+            ]);
+            goBack();
+          }}
+        />
+      ) : (
+        <WorkspaceReadOnlyNotice workspace={workspace} />
+      )}
+    </AppShell>
+  );
+}
+
 function useWorkspaceQuery(userId: string) {
   return useQuery({
     queryKey: ["catalog", "workspace", userId],
@@ -667,12 +986,14 @@ function useWorkspaceQuery(userId: string) {
 }
 
 function ProjectFormModal({
+  inline = false,
   accountId,
   open,
   project,
   onClose,
   onSaved,
 }: {
+  inline?: boolean;
   accountId: string;
   open: boolean;
   project: Project | null;
@@ -733,25 +1054,15 @@ function ProjectFormModal({
     onClose();
   };
 
-  return (
-    <Modal
-      open={open}
-      title={project ? "Редактировать проект" : "Новый проект"}
-      description="Название обязательно. Категория помогает организовать каталог и будущую аналитику."
-      onClose={closeModal}
-      actions={
-        <Button disabled={mutation.isPending} onClick={submit}>
-          {mutation.isPending ? "Сохраняем…" : project ? "Сохранить" : "Создать проект"}
-        </Button>
-      }
+  const fields = (
+    <form
+      className="project-editor-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
     >
-      <form
-        className="space-y-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          submit();
-        }}
-      >
+      <fieldset disabled={mutation.isPending}>
         <FormField label="Название" error={errors.name?.message}>
           <Controller
             control={control}
@@ -766,14 +1077,14 @@ function ProjectFormModal({
             )}
           />
         </FormField>
-        <FormField label="Описание" error={errors.description?.message}>
+        <FormField label="Описание (необязательно)" error={errors.description?.message}>
           <textarea
             className="field-control min-h-28 resize-y"
             placeholder="Краткое описание проекта"
             {...register("description")}
           />
         </FormField>
-        <FormField label="Категория" error={errors.category?.message}>
+        <FormField label="Тип проекта" error={errors.category?.message}>
           <select className="field-control" {...register("category")}>
             {projectCategories.map((category) => (
               <option key={category} value={category}>
@@ -782,12 +1093,44 @@ function ProjectFormModal({
             ))}
           </select>
         </FormField>
-        <CoverFileField file={coverFile} onPick={(file) => setCoverFile(file ?? null)} />
+        <CoverFileField
+          existingPath={project?.cover_path}
+          file={coverFile}
+          onPick={(file) => setCoverFile(file ?? null)}
+        />
         {mutation.error ? <InlineError>{readableCatalogError(mutation.error)}</InlineError> : null}
-        <button className="sr-only" type="submit">
+        <button className="sr-only" type="submit" tabIndex={-1} aria-hidden="true">
           Сохранить
         </button>
-      </form>
+      </fieldset>
+    </form>
+  );
+  const save = (
+    <Button type="button" disabled={mutation.isPending} onClick={submit}>
+      {mutation.isPending ? "Сохраняем…" : project ? "Сохранить" : "Создать проект"}
+    </Button>
+  );
+  if (inline)
+    return (
+      <div className="project-editor">
+        <Panel>{fields}</Panel>
+        <footer>
+          <Button type="button" variant="ghost" disabled={mutation.isPending} onClick={closeModal}>
+            Отмена
+          </Button>
+          {save}
+        </footer>
+      </div>
+    );
+  return (
+    <Modal
+      open={open}
+      title={project ? "Редактировать проект" : "Новый проект"}
+      description="Название и обложка проекта"
+      onClose={closeModal}
+      actions={save}
+    >
+      {fields}
     </Modal>
   );
 }
@@ -891,7 +1234,7 @@ function GroupFormModal({
         </FormField>
         <CoverFileField file={coverFile} onPick={(file) => setCoverFile(file ?? null)} />
         {mutation.error ? <InlineError>{readableCatalogError(mutation.error)}</InlineError> : null}
-        <button className="sr-only" type="submit">
+        <button className="sr-only" type="submit" tabIndex={-1} aria-hidden="true">
           Сохранить
         </button>
       </form>
@@ -910,17 +1253,19 @@ function ProjectCard({
   onEdit: () => void;
   onAction: (type: ProjectAction["type"]) => void;
 }) {
+  const location = useLocation();
   const deleted = Boolean(project.deleted_at);
   return (
-    <article className="project-card surface-card overflow-hidden rounded-card border border-line shadow-soft">
+    <article className="project-card">
       <Link
-        className="project-card-cover group relative block aspect-[16/7] overflow-hidden bg-[radial-gradient(circle_at_25%_20%,rgba(139,92,246,.34),transparent_35%),linear-gradient(145deg,#151e2d,#0b1018)] p-5"
-        to={`/items?projectId=${encodeURIComponent(project.id)}`}
+        className="project-card-cover"
+        state={captureWorkspaceOrigin(location, project.account_id)}
+        to={`/projects/${project.id}`}
       >
         <CoverImage
           alt=""
           bucket={project.previewBucket}
-          className="absolute inset-0 h-full w-full object-cover"
+          className="h-full w-full object-cover"
           path={project.previewPath ?? project.cover_path}
         />
       </Link>
@@ -984,31 +1329,49 @@ function ProjectCard({
           </div>
         </details>
       ) : null}
-      <div className="project-card-body p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="project-card-badges flex flex-wrap items-center gap-2">
-              <StatusPill tone={deleted ? "danger" : project.status === "active" ? "success" : "muted"}>
-                {deleted ? "Удалён" : projectStatusLabels[project.status]}
-              </StatusPill>
-              <span className="text-xs text-muted">{projectCategoryLabels[project.category]}</span>
-            </div>
-            <Link
-              className="project-card-title mt-3 block truncate text-xl font-semibold hover:text-primary"
-              to={`/items?projectId=${encodeURIComponent(project.id)}`}
-            >
-              {project.name}
-            </Link>
-            <p className="project-card-description mt-2 line-clamp-2 min-h-10 text-sm leading-5 text-muted">
-              {project.description || "Описание пока не добавлено"}
-            </p>
-          </div>
+      <div className="project-card-body">
+        <Link
+          className="project-card-title"
+          state={captureWorkspaceOrigin(location, project.account_id)}
+          to={`/projects/${project.id}`}
+        >
+          {project.name}
+        </Link>
+        <div className="project-card-meta">
+          <span>
+            {project.groupCount} {countLabel(project.groupCount, "группа", "группы", "групп")} · {project.arItemCount}{" "}
+            AR-фото
+          </span>
+          <span>Обновлён {formatShortDate(project.updated_at)}</span>
         </div>
-        <div className="project-card-meta mt-4 flex items-center gap-4 border-t border-line pt-4 text-xs text-muted">
-          <span>{project.groupCount} групп</span>
-          <span>{project.arItemCount} AR-работ</span>
-          <span className="ml-auto">{formatShortDate(project.updated_at)}</span>
-        </div>
+        <span className="project-card-state">{deleted ? "Удалён" : projectStatusLabels[project.status]}</span>
+      </div>
+      <span className="project-table-groups">
+        {project.groupCount} {countLabel(project.groupCount, "группа", "группы", "групп")}
+      </span>
+      <span className="project-table-works">
+        {project.arItemCount} {countLabel(project.arItemCount, "работа", "работы", "работ")}
+      </span>
+      <time className="project-table-updated" dateTime={project.updated_at}>
+        {formatShortDate(project.updated_at)}
+      </time>
+      <div className="project-card-actions">
+        <Link
+          className="btn btn-primary"
+          state={captureWorkspaceOrigin(location, project.account_id)}
+          to={`/projects/${project.id}`}
+        >
+          Открыть
+        </Link>
+        {canWrite && !deleted ? (
+          <Link
+            className="btn btn-ghost"
+            state={captureWorkspaceOrigin(location, project.account_id)}
+            to={`/projects/${project.id}/edit`}
+          >
+            Изменить
+          </Link>
+        ) : null}
       </div>
     </article>
   );
@@ -1016,6 +1379,8 @@ function ProjectCard({
 
 function GroupCard({
   group,
+  workCount,
+  previewPaths = [],
   canWrite,
   first,
   last,
@@ -1026,6 +1391,8 @@ function GroupCard({
   onNudge,
 }: {
   group: Group;
+  workCount?: number;
+  previewPaths?: string[];
   canWrite: boolean;
   first: boolean;
   last: boolean;
@@ -1035,65 +1402,83 @@ function GroupCard({
   onMove: () => void;
   onNudge: (direction: -1 | 1) => void;
 }) {
+  const location = useLocation();
   return (
-    <Panel className="h-full">
-      {group.cover_path ? (
-        <div className="-mx-4 -mt-4 mb-4 aspect-[16/6] overflow-hidden rounded-t-card bg-white/[0.03]">
+    <article className="project-group-row">
+      <span className="project-group-cover">
+        {group.cover_path ? (
           <CoverImage className="h-full w-full object-cover" path={group.cover_path} alt="" />
-        </div>
-      ) : null}
-      <div className="flex items-start gap-3">
-        <span className="grid h-11 w-11 flex-none place-items-center rounded-2xl bg-primary/10 text-primary">
-          {canWrite ? <GripVertical aria-label="Перетащите для сортировки" size={20} /> : <Layers3 size={20} />}
+        ) : (
+          <Layers3 size={24} />
+        )}
+      </span>
+      <div className="project-group-copy">
+        <h3>{group.name}</h3>
+        <p>{workCount ?? "—"} AR-фото</p>
+        <span>
+          {group.archived_at ? "В архиве · " : ""}Обновлено {formatShortDate(group.updated_at)}
         </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-lg font-semibold">{group.name}</h3>
-            {group.archived_at ? <StatusPill tone="muted">В архиве</StatusPill> : null}
-          </div>
-          <p className="mt-2 line-clamp-2 min-h-10 text-sm leading-5 text-muted">
-            {group.description || "Описание пока не добавлено"}
-          </p>
-        </div>
       </div>
-      <div className="mt-4 border-t border-line pt-4 text-xs text-muted">Позиция {group.sort_order + 1}</div>
-      {canWrite ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button
-            aria-label={`Поднять группу «${group.name}»`}
-            disabled={first || orderPending}
-            variant="quiet"
-            onClick={() => onNudge(-1)}
-          >
-            <ArrowUp size={15} />
-          </Button>
-          <Button
-            aria-label={`Опустить группу «${group.name}»`}
-            disabled={last || orderPending}
-            variant="quiet"
-            onClick={() => onNudge(1)}
-          >
-            <ArrowDown size={15} />
-          </Button>
-          <Button variant="quiet" onClick={onEdit} icon={<Pencil size={15} />}>
-            Изменить
-          </Button>
-          <Button variant="quiet" onClick={onMove} icon={<MoveRight size={15} />}>
-            Перенести
-          </Button>
-          <Button
-            variant="quiet"
-            onClick={() => onAction(group.archived_at ? "restore" : "archive")}
-            icon={group.archived_at ? <ArchiveRestore size={15} /> : <Archive size={15} />}
-          >
-            {group.archived_at ? "Вернуть" : "В архив"}
-          </Button>
-          <Button variant="danger" onClick={() => onAction("delete")} icon={<Trash2 size={15} />}>
-            Удалить
-          </Button>
+      {previewPaths.length ? (
+        <div className="group-work-previews" aria-label="Последние фотографии группы">
+          {previewPaths.map((path, index) => (
+            <CoverImage
+              key={`${path}-${index}`}
+              className="group-work-preview"
+              alt=""
+              bucket="markers-private"
+              path={path}
+            />
+          ))}
+          {workCount !== undefined && workCount > 3 ? <span>+{workCount - 3}</span> : null}
         </div>
       ) : null}
-    </Panel>
+      <Link
+        className="btn btn-ghost"
+        state={captureWorkspaceOrigin(location, group.account_id)}
+        to={`/items?projectId=${group.project_id}&groupId=${group.id}`}
+      >
+        Открыть <ArrowRight size={16} />
+      </Link>
+      {canWrite ? (
+        <details className="project-card-menu">
+          <summary aria-label={`Действия группы «${group.name}»`}>
+            <EllipsisVertical size={20} />
+          </summary>
+          <div className="project-card-menu-popover" role="menu">
+            <button role="menuitem" type="button" onClick={onEdit}>
+              <Pencil size={16} />
+              Изменить
+            </button>
+            <button role="menuitem" type="button" onClick={onMove}>
+              <MoveRight size={16} />
+              Перенести
+            </button>
+            <button role="menuitem" type="button" disabled={first || orderPending} onClick={() => onNudge(-1)}>
+              <ArrowUp size={16} />
+              Выше
+            </button>
+            <button role="menuitem" type="button" disabled={last || orderPending} onClick={() => onNudge(1)}>
+              <ArrowDown size={16} />
+              Ниже
+            </button>
+            <button role="menuitem" type="button" onClick={() => onAction(group.archived_at ? "restore" : "archive")}>
+              <Archive size={16} />
+              {group.archived_at ? "Вернуть" : "В архив"}
+            </button>
+            <button
+              className="project-card-menu-danger"
+              role="menuitem"
+              type="button"
+              onClick={() => onAction("delete")}
+            >
+              <Trash2 size={16} />
+              Удалить
+            </button>
+          </div>
+        </details>
+      ) : null}
+    </article>
   );
 }
 
@@ -1166,7 +1551,7 @@ function GroupActionModal({
       title={groupActionTitles[action.type]}
       description={
         destructive
-          ? `Группа «${action.group.name}» будет скрыта вместе с её AR-работами. Это soft delete, восстановление останется доступно.`
+          ? `Группа «${action.group.name}» будет скрыта вместе с её AR-работами. Её можно будет восстановить. Потраченные добавления не возвращаются.`
           : `Подтвердите действие для группы «${action.group.name}».`
       }
       onClose={onClose}
@@ -1237,16 +1622,40 @@ function GroupMoveModal({
   );
 }
 
-function CoverFileField({ file, onPick }: { file: File | null; onPick: (file?: File) => void }) {
+function CoverFileField({
+  file,
+  existingPath,
+  onPick,
+}: {
+  file: File | null;
+  existingPath?: string | null;
+  onPick: (file?: File) => void;
+}) {
+  const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+  useEffect(
+    () => () => {
+      if (preview) URL.revokeObjectURL(preview);
+    },
+    [preview],
+  );
   return (
-    <div className="rounded-2xl border border-line bg-white/[0.02] p-4">
+    <div className="project-cover-field">
+      {preview || existingPath ? (
+        <div className="project-cover-preview">
+          {preview ? (
+            <img alt="Новая обложка проекта" src={preview} />
+          ) : (
+            <CoverImage alt="Обложка проекта" className="h-full w-full object-cover" path={existingPath ?? null} />
+          )}
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold">Обложка</p>
           <p className="mt-1 text-xs text-muted">JPEG, PNG или WebP, до 10 МБ</p>
         </div>
         <FileButton accept={coverFileAccept} icon={<Upload size={16} />} onPick={onPick}>
-          Выбрать файл
+          {existingPath || file ? "Заменить" : "Выбрать файл"}
         </FileButton>
       </div>
       {file ? (
@@ -1434,49 +1843,6 @@ function Pagination({
   );
 }
 
-function ProjectMetric({
-  icon,
-  label,
-  value,
-  to,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string | number;
-  to?: string;
-}) {
-  const content = (
-    <div className="flex items-center gap-3">
-      <span className="metric-icon">{icon}</span>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs text-muted">{label}</p>
-        <strong className="mt-1 block text-lg">{value}</strong>
-      </div>
-      {to ? (
-        <ArrowRight
-          aria-hidden="true"
-          className="text-muted transition group-hover:translate-x-0.5 group-hover:text-primary"
-          size={19}
-        />
-      ) : null}
-    </div>
-  );
-
-  if (to) {
-    return (
-      <Link
-        aria-label={`Открыть ${label.toLocaleLowerCase("ru-RU")} проекта: ${value}`}
-        className="surface-card group min-w-0 rounded-card border border-line p-4 shadow-soft transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        to={to}
-      >
-        {content}
-      </Link>
-    );
-  }
-
-  return <Panel>{content}</Panel>;
-}
-
 function FormField({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
   return (
     <label className="block text-sm font-semibold">
@@ -1489,19 +1855,10 @@ function FormField({ label, error, children }: { label: string; error?: string; 
 
 function InlineError({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-xl border border-rose-300/20 bg-rose-300/[0.06] p-3 text-sm text-rose-200" role="alert">
+    <p className="rounded-xl border border-rose-300/20 bg-rose-300/[0.06] p-3 text-sm text-rose-700" role="alert">
       {children}
     </p>
   );
-}
-
-function StatusPill({ children, tone }: { children: ReactNode; tone: "success" | "muted" | "danger" }) {
-  const toneClass = {
-    success: "bg-emerald-50 text-emerald-700",
-    muted: "bg-stone-100 text-muted",
-    danger: "bg-rose-50 text-rose-700",
-  }[tone];
-  return <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${toneClass}`}>{children}</span>;
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
@@ -1564,4 +1921,9 @@ function formatDate(value: string) {
 
 function formatShortDate(value: string) {
   return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "short" }).format(new Date(value));
+}
+
+function countLabel(count: number, one: string, few: string, many: string) {
+  const rule = new Intl.PluralRules("ru").select(count);
+  return rule === "one" ? one : rule === "few" ? few : many;
 }

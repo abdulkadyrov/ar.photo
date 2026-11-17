@@ -21,6 +21,7 @@ async function expectNoSeriousAccessibilityViolations(page: Page, label: string)
 }
 
 test("keeps critical public and protected surfaces free of serious WCAG violations", async ({ page }) => {
+  test.setTimeout(90_000);
   await page.goto("./");
   await expectNoSeriousAccessibilityViolations(page, "landing");
 
@@ -28,12 +29,29 @@ test("keeps critical public and protected surfaces free of serious WCAG violatio
   await expectNoSeriousAccessibilityViolations(page, "login");
   await signInToDemo(page);
   await expectNoSeriousAccessibilityViolations(page, "dashboard");
+  for (const route of [
+    "projects",
+    "groups",
+    "media",
+    "qr-codes",
+    "analytics",
+    "profile",
+    "settings",
+    "settings/subscription",
+    "settings/team",
+    "settings/security",
+    "support",
+  ]) {
+    await page.goto(`./${route}`);
+    await expect(page.locator(".account-shell main")).toBeVisible();
+    await expectNoSeriousAccessibilityViolations(page, route);
+  }
 
   await page.goto("./admin");
-  await expect(page.getByRole("heading", { name: "Супер-админ", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Обзор платформы", exact: true })).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page, "admin");
 
   await page.goto("./ar/demo");
-  await expect(page.getByRole("button", { name: "Включить камеру" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Повторить", exact: true })).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page, "public AR intro");
 });

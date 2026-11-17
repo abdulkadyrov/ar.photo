@@ -1,0 +1,117 @@
+{
+  "measurement": "Application-frame bounds checked against raster border columns/rows, excluding explanatory sheet heading; tolerance approximately 2px.",
+  "sheets": [
+    {
+      "id": "access-login",
+      "source": "pages/access/access-login.png",
+      "desktop": {
+        "x": 25,
+        "y": 89,
+        "w": 1060,
+        "h": 896
+      },
+      "mobile": {
+        "x": 1113,
+        "y": 89,
+        "w": 429,
+        "h": 888
+      }
+    },
+    {
+      "id": "access-register",
+      "source": "pages/access/access-register.png",
+      "desktop": {
+        "x": 34,
+        "y": 122,
+        "w": 1049,
+        "h": 888
+      },
+      "mobile": {
+        "x": 1116,
+        "y": 122,
+        "w": 400,
+        "h": 888
+      }
+    },
+    {
+      "id": "access-reset",
+      "source": "pages/access/access-reset.png",
+      "desktop": {
+        "x": 38,
+        "y": 173,
+        "w": 1186,
+        "h": 711
+      },
+      "mobile": {
+        "x": 1281,
+        "y": 173,
+        "w": 435,
+        "h": 711
+      }
+    },
+    {
+      "id": "access-password",
+      "source": "pages/access/access-password.png",
+      "desktop": {
+        "x": 29,
+        "y": 163,
+        "w": 1041,
+        "h": 817
+      },
+      "mobile": {
+        "x": 1114,
+        "y": 163,
+        "w": 424,
+        "h": 817
+      }
+    },
+    {
+      "id": "access-mfa",
+      "source": "pages/access/access-mfa.png",
+      "desktop": {
+        "x": 30,
+        "y": 102,
+        "w": 1204,
+        "h": 760
+      },
+      "mobile": {
+        "x": 1275,
+        "y": 102,
+        "w": 448,
+        "h": 760
+      }
+    },
+    {
+      "id": "viewer-privacy",
+      "source": "pages/access/viewer-privacy.png",
+      "desktop": {
+        "x": 35,
+        "y": 88,
+        "w": 1005,
+        "h": 897
+      },
+      "mobile": {
+        "x": 1096,
+        "y": 88,
+        "w": 440,
+        "h": 897
+      }
+    },
+    {
+      "id": "viewer-not-found",
+      "source": "pages/access/viewer-not-found.png",
+      "desktop": {
+        "x": 45,
+        "y": 114,
+        "w": 1210,
+        "h": 751
+      },
+      "mobile": {
+        "x": 1281,
+        "y": 114,
+        "w": 425,
+        "h": 751
+      }
+    }
+  ]
+}

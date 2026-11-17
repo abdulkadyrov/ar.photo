@@ -1,0 +1,10 @@
+# Insert inside the existing khanzama.ru site, before its catch-all handler.
+# Deploy only a generated file with VERIFIED identifiers from Apple Developer.
+# Never replace the existing API, media, authentication or frontend handlers.
+handle /.well-known/apple-app-site-association {
+    root * /srv/ar-photo/app-links
+    rewrite * /apple-app-site-association
+    header Content-Type application/json
+    header Cache-Control "public, max-age=3600"
+    file_server
+}

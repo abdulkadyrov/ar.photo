@@ -1,0 +1,96 @@
+{
+  "measurement": "Manual bounds of the viewport panes inside each generated sheet; outer rounded-frame boundary, approximately +/- 2 px. Sheet heading excluded.",
+  "sheets": [
+    {
+      "id": "account-dashboard",
+      "route": "dashboard",
+      "source": "pages/account/account-dashboard.png",
+      "desktop": { "x": 8, "y": 110, "w": 1131, "h": 879 },
+      "mobile": { "x": 1152, "y": 110, "w": 410, "h": 879 }
+    },
+    {
+      "id": "account-projects",
+      "route": "projects",
+      "source": "pages/account/account-projects.png",
+      "desktop": { "x": 20, "y": 81, "w": 1285, "h": 797 },
+      "mobile": { "x": 1335, "y": 81, "w": 400, "h": 797 }
+    },
+    {
+      "id": "account-project-detail",
+      "route": "project",
+      "source": "pages/account/account-project-detail.png",
+      "desktop": { "x": 10, "y": 74, "w": 1278, "h": 808 },
+      "mobile": { "x": 1325, "y": 74, "w": 418, "h": 808 }
+    },
+    {
+      "id": "account-project-edit",
+      "route": "project-edit",
+      "source": "pages/account/account-project-edit.png",
+      "desktop": { "x": 20, "y": 119, "w": 1057, "h": 869 },
+      "mobile": { "x": 1114, "y": 119, "w": 404, "h": 869 }
+    },
+    {
+      "id": "account-groups",
+      "route": "groups",
+      "source": "pages/account/account-groups.png",
+      "desktop": { "x": 20, "y": 124, "w": 1116, "h": 854 },
+      "mobile": { "x": 1154, "y": 124, "w": 393, "h": 854 }
+    },
+    {
+      "id": "account-analytics",
+      "route": "analytics",
+      "source": "pages/account/account-analytics.png",
+      "desktop": { "x": 11, "y": 110, "w": 1146, "h": 893 },
+      "mobile": { "x": 1175, "y": 105, "w": 351, "h": 893 }
+    },
+    {
+      "id": "account-subscription",
+      "route": "settings/subscription",
+      "source": "pages/account/account-subscription.png",
+      "desktop": { "x": 20, "y": 84, "w": 1105, "h": 890 },
+      "mobile": { "x": 1148, "y": 84, "w": 403, "h": 890 }
+    },
+    {
+      "id": "account-team",
+      "route": "settings/team",
+      "source": "pages/account/account-team.png",
+      "desktop": { "x": 20, "y": 106, "w": 1053, "h": 873 },
+      "mobile": { "x": 1110, "y": 106, "w": 444, "h": 873 }
+    },
+    {
+      "id": "account-profile",
+      "route": "profile",
+      "source": "pages/account/account-profile.png",
+      "desktop": { "x": 20, "y": 111, "w": 1066, "h": 886 },
+      "mobile": { "x": 1115, "y": 111, "w": 406, "h": 886 }
+    },
+    {
+      "id": "account-settings",
+      "route": "settings",
+      "source": "pages/account/account-settings.png",
+      "desktop": { "x": 36, "y": 84, "w": 1040, "h": 921 },
+      "mobile": { "x": 1118, "y": 84, "w": 385, "h": 921 }
+    },
+    {
+      "id": "account-security",
+      "route": "settings/security",
+      "source": "pages/account/account-security.png",
+      "desktop": { "x": 20, "y": 79, "w": 1076, "h": 908 },
+      "mobile": { "x": 1130, "y": 109, "w": 384, "h": 889 }
+    },
+    {
+      "id": "account-support",
+      "route": "support",
+      "source": "pages/account/account-support.png",
+      "desktop": { "x": 8, "y": 111, "w": 1172, "h": 861 },
+      "mobile": { "x": 1187, "y": 111, "w": 365, "h": 861 }
+    },
+    {
+      "id": "crm-unlimited",
+      "route": "crm",
+      "source": "pages/account/crm-unlimited.png",
+      "desktop": { "x": 8, "y": 99, "w": 1153, "h": 902 },
+      "mobile": { "x": 1183, "y": 99, "w": 344, "h": 883 }
+    }
+  ]
+}

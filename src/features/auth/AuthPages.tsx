@@ -1,5 +1,17 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, KeyRound, LoaderCircle, LockKeyhole, Mail, Sparkles, UserRound } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Info,
+  LoaderCircle,
+  LockKeyhole,
+  Mail,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  UserRound,
+  UserRoundPlus,
+} from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useForm, type FieldError, type UseFormRegisterReturn } from "react-hook-form";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
@@ -7,6 +19,8 @@ import { getSupabaseBrowserClient } from "../../shared/api/supabase";
 import { Button, Panel } from "../../shared/ui";
 import { useAuth } from "./authContext";
 import { getSignUpErrorMessage } from "./authErrors";
+import "./AuthPages.css";
+import { MfaVerificationCard } from "./MfaVerificationPage";
 import {
   loginSchema,
   registerSchema,
@@ -22,6 +36,7 @@ export function LoginRoute() {
   const auth = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const returnTo = (location.state as { from?: string } | null)?.from ?? "/dashboard";
   const [formError, setFormError] = useState("");
   const {
     register,
@@ -43,26 +58,20 @@ export function LoginRoute() {
     );
   }
 
-  if (auth.status === "authenticated") return <Navigate replace to="/dashboard" />;
+  if (auth.status === "authenticated") return <Navigate replace to={returnTo} />;
 
   const submit = handleSubmit(async (values) => {
     setFormError("");
     try {
       await auth.signIn(values.email, values.password);
-      const state = location.state as { from?: string } | null;
-      navigate(state?.from ?? "/dashboard", { replace: true });
+      navigate(returnTo, { replace: true });
     } catch {
       setFormError("Не удалось войти. Проверьте email и пароль и повторите попытку.");
     }
   });
 
   return (
-    <AuthLayout title="Добро пожаловать" description="Войдите в защищённое пространство AR Photo.">
-      {auth.mode === "demo" ? (
-        <div className="mb-5 rounded-2xl border border-primary/20 bg-primary/10 p-3 text-sm leading-5 text-[#5140b8]">
-          Локальный demo-режим: используйте предзаполненный email и любой пароль от 8 символов.
-        </div>
-      ) : null}
+    <AuthLayout title="Вход в кабинет" description="Войдите, чтобы создавать и управлять AR-работами.">
       <form className="space-y-4" onSubmit={submit} noValidate>
         <AuthField
           label="Email"
@@ -82,24 +91,21 @@ export function LoginRoute() {
           autoComplete="current-password"
           placeholder="Не менее 8 символов"
         />
+        <Link className="auth-recovery-link" to="/reset-password">
+          Забыли пароль?
+        </Link>
         {formError ? <FormNotice tone="error">{formError}</FormNotice> : null}
         <Button
           full
           disabled={isSubmitting}
-          icon={isSubmitting ? <LoaderCircle className="animate-spin" size={18} /> : <KeyRound size={18} />}
+          icon={isSubmitting ? <LoaderCircle className="animate-spin" size={18} /> : undefined}
         >
           {isSubmitting ? "Входим…" : "Войти"}
         </Button>
       </form>
-      <Link className="mt-5 inline-flex text-sm font-semibold text-primary" to="/reset-password">
-        Забыли пароль?
+      <Link className="btn btn-ghost auth-register-link" to="/register">
+        Создать аккаунт
       </Link>
-      <p className="mt-4 text-sm text-muted">
-        Нет аккаунта?{" "}
-        <Link className="font-semibold text-primary" to="/register">
-          Зарегистрироваться
-        </Link>
-      </p>
     </AuthLayout>
   );
 }
@@ -116,6 +122,7 @@ export function RegisterRoute() {
   } = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
+      fullName: "",
       email: "",
       password: "",
       confirmPassword: "",
@@ -140,7 +147,12 @@ export function RegisterRoute() {
   });
 
   return (
-    <AuthLayout title="Создать аккаунт" description="Регистрация по email и паролю, без номера телефона.">
+    <AuthLayout
+      variant="register"
+      icon={<UserRoundPlus size={26} />}
+      title="Регистрация кабинета"
+      description="Создайте кабинет, чтобы добавлять фото и видео и публиковать AR-работы."
+    >
       {confirmationEmail ? (
         <div aria-live="polite">
           <FormNotice tone="success">
@@ -153,6 +165,14 @@ export function RegisterRoute() {
         </div>
       ) : (
         <form className="space-y-4" onSubmit={submit} noValidate>
+          <AuthField
+            label="Ваше имя"
+            icon={<UserRound size={17} />}
+            error={errors.fullName}
+            inputProps={register("fullName")}
+            autoComplete="name"
+            placeholder="Имя и фамилия"
+          />
           <AuthField
             label="Email"
             icon={<Mail size={17} />}
@@ -171,9 +191,6 @@ export function RegisterRoute() {
             autoComplete="new-password"
             placeholder="8+ символов, A–Z, a–z и цифра"
           />
-          <p className="-mt-2 text-xs leading-5 text-muted">
-            Минимум 8 символов: строчная и заглавная латинские буквы и хотя бы одна цифра.
-          </p>
           <AuthField
             label="Повторите пароль"
             icon={<LockKeyhole size={17} />}
@@ -183,9 +200,13 @@ export function RegisterRoute() {
             autoComplete="new-password"
             placeholder="Повторите пароль"
           />
+          <PasswordRequirements />
           <label className="flex cursor-pointer items-start gap-3 text-sm leading-5 text-muted">
             <input className="mt-1 h-4 w-4 accent-primary" type="checkbox" {...register("termsAccepted")} />
-            <span>Я подтверждаю право использовать загружаемые фотографии и видео.</span>
+            <span>
+              Я подтверждаю право использовать загружаемые фотографии и видео.{" "}
+              <Link to="/privacy">Конфиденциальность</Link>
+            </span>
           </label>
           {errors.termsAccepted ? (
             <p className="text-xs font-medium text-rose-700">{errors.termsAccepted.message}</p>
@@ -194,13 +215,13 @@ export function RegisterRoute() {
           <Button
             full
             disabled={isSubmitting}
-            icon={isSubmitting ? <LoaderCircle className="animate-spin" size={18} /> : <UserRound size={18} />}
+            icon={isSubmitting ? <LoaderCircle className="animate-spin" size={18} /> : undefined}
           >
-            {isSubmitting ? "Создаём…" : "Зарегистрироваться"}
+            {isSubmitting ? "Создаём…" : "Создать кабинет"}
           </Button>
-          <Link className="inline-flex items-center gap-2 text-sm font-semibold text-muted" to="/login">
-            <ArrowLeft size={16} /> Уже есть аккаунт
-          </Link>
+          <p className="auth-existing">
+            Уже есть кабинет? <Link to="/login">Войти</Link>
+          </p>
         </form>
       )}
     </AuthLayout>
@@ -230,10 +251,11 @@ export function ResetPasswordRoute() {
 
   return (
     <AuthLayout
-      title="Восстановление доступа"
+      variant="reset"
+      title="Восстановление доступа к кабинету"
       description={
         emailEnabled
-          ? "Отправим безопасную ссылку на подтверждённый email."
+          ? "Укажите email своего аккаунта."
           : "Восстановление доступа через персональную ссылку смены пароля."
       }
     >
@@ -271,7 +293,7 @@ export function ResetPasswordRoute() {
           <Button
             full
             disabled={isSubmitting}
-            icon={isSubmitting ? <LoaderCircle className="animate-spin" size={18} /> : <Mail size={18} />}
+            icon={isSubmitting ? <LoaderCircle className="animate-spin" size={18} /> : undefined}
           >
             {isSubmitting ? "Отправляем…" : "Получить ссылку"}
           </Button>
@@ -280,6 +302,10 @@ export function ResetPasswordRoute() {
           </Link>
         </form>
       )}
+      <div className="auth-help">
+        <Info size={19} />
+        <p>Если электронная почта недоступна, обратитесь к администратору для восстановления доступа к кабинету.</p>
+      </div>
     </AuthLayout>
   );
 }
@@ -292,6 +318,8 @@ export function UpdatePasswordRoute({ recovery = false }: { recovery?: boolean }
   const [recoveryVerified, setRecoveryVerified] = useState(false);
   const navigate = useNavigate();
   const [formError, setFormError] = useState("");
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [confirmingMfa, setConfirmingMfa] = useState(false);
   const {
     register,
     handleSubmit,
@@ -316,6 +344,7 @@ export function UpdatePasswordRoute({ recovery = false }: { recovery?: boolean }
       navigate("/dashboard", { replace: true });
     } catch (error) {
       const code = error && typeof error === "object" && "code" in error ? error.code : "";
+      setMfaRequired(code === "insufficient_aal");
       setFormError(
         code === "same_password"
           ? "Новый пароль должен отличаться от текущего."
@@ -327,72 +356,162 @@ export function UpdatePasswordRoute({ recovery = false }: { recovery?: boolean }
   });
 
   return (
-    <AuthLayout title="Новый пароль" description="Придумайте новый пароль для аккаунта AR Photo.">
-      {recovery && !recoveryToken && !recoveryVerified ? (
-        <FormNotice tone="error">
-          Откройте персональную ссылку восстановления. Если вы уже вошли,{" "}
-          <Link to="/update-password">продолжите смену пароля</Link>.
-        </FormNotice>
-      ) : null}
-      <form className="space-y-4" onSubmit={submit} noValidate>
-        <AuthField
-          label="Новый пароль"
-          icon={<LockKeyhole size={17} />}
-          error={errors.password}
-          inputProps={register("password")}
-          type="password"
-          autoComplete="new-password"
-          placeholder="8+ символов, A–Z, a–z и цифра"
+    <AuthLayout
+      variant={confirmingMfa ? "mfa" : "password"}
+      icon={confirmingMfa ? undefined : <LockKeyhole size={26} />}
+      title={confirmingMfa ? "Подтвердите вход" : "Новый пароль"}
+      description={confirmingMfa ? "Второй фактор (MFA)" : "Задайте новый пароль для своего аккаунта KHANZAMA."}
+    >
+      {confirmingMfa ? (
+        <MfaVerificationCard
+          onVerified={() => {
+            setConfirmingMfa(false);
+            setMfaRequired(false);
+            setFormError("");
+          }}
+          onBack={() => setConfirmingMfa(false)}
         />
-        <p className="-mt-2 text-xs leading-5 text-muted">
-          Минимум 8 символов: строчная и заглавная латинские буквы и хотя бы одна цифра.
-        </p>
-        <AuthField
-          label="Повторите пароль"
-          icon={<LockKeyhole size={17} />}
-          error={errors.confirmPassword}
-          inputProps={register("confirmPassword")}
-          type="password"
-          autoComplete="new-password"
-          placeholder="Повторите новый пароль"
-        />
-        {formError ? <FormNotice tone="error">{formError}</FormNotice> : null}
-        <Button
-          full
-          disabled={isSubmitting || (recovery && !recoveryToken && !recoveryVerified)}
-          icon={isSubmitting ? <LoaderCircle className="animate-spin" size={18} /> : <KeyRound size={18} />}
-        >
-          {isSubmitting ? "Сохраняем…" : "Сохранить пароль"}
-        </Button>
-      </form>
+      ) : (
+        <>
+          {recovery && !recoveryToken && !recoveryVerified ? (
+            <FormNotice tone="error">
+              Откройте персональную ссылку восстановления. Если вы уже вошли,{" "}
+              <Link to="/update-password">продолжите смену пароля</Link>.
+            </FormNotice>
+          ) : null}
+          <form className="space-y-4" onSubmit={submit} noValidate>
+            <AuthField
+              label="Новый пароль"
+              icon={<LockKeyhole size={17} />}
+              error={errors.password}
+              inputProps={register("password")}
+              type="password"
+              autoComplete="new-password"
+              placeholder="8+ символов, A–Z, a–z и цифра"
+            />
+            <AuthField
+              label="Повторите пароль"
+              icon={<LockKeyhole size={17} />}
+              error={errors.confirmPassword}
+              inputProps={register("confirmPassword")}
+              type="password"
+              autoComplete="new-password"
+              placeholder="Повторите новый пароль"
+            />
+            <PasswordRequirements detailed />
+            {mfaRequired ? (
+              <div className="auth-mfa-needed" role="alert">
+                <ShieldCheck size={24} />
+                <div>
+                  <strong>Требуется подтверждение MFA</strong>
+                  <p>Подтвердите второй фактор. Введённый пароль сохранится в этой форме.</p>
+                  <Button type="button" onClick={() => setConfirmingMfa(true)}>
+                    Подтвердить MFA
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+            {formError && !mfaRequired ? <FormNotice tone="error">{formError}</FormNotice> : null}
+            <Button
+              full
+              disabled={isSubmitting || mfaRequired || (recovery && !recoveryToken && !recoveryVerified)}
+              icon={isSubmitting ? <LoaderCircle className="animate-spin" size={18} /> : undefined}
+            >
+              {isSubmitting ? "Сохраняем…" : "Сохранить пароль"}
+            </Button>
+          </form>
+        </>
+      )}
     </AuthLayout>
   );
 }
 
-function AuthLayout({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+export function AuthLayout({
+  title,
+  description,
+  children,
+  variant = "login",
+  icon,
+}: {
+  title: string;
+  description: string;
+  children: ReactNode;
+  variant?: "login" | "register" | "reset" | "password" | "mfa";
+  icon?: ReactNode;
+}) {
+  const auth = useAuth();
   return (
-    <main className="relative grid min-h-screen place-items-center overflow-hidden bg-background px-5 py-10 text-ink">
-      <div className="pointer-events-none absolute left-1/2 top-[-20rem] h-[36rem] w-[36rem] -translate-x-1/2 rounded-full bg-primary/15 blur-[110px]" />
-      <div className="relative w-full max-w-md">
-        <Link className="brand-mark mb-7 justify-center" to="/">
-          <span className="brand-symbol">
-            <Sparkles size={20} />
-          </span>
-          <span>
-            <strong>AR</strong> Photo
-          </span>
+    <main className={`auth-page auth-page-${variant}`}>
+      <header className="auth-page-header">
+        <Link className="auth-wordmark" to="/">
+          KHANZAMA
         </Link>
-        <Panel className="p-6 sm:p-7">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Личный кабинет</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight">{title}</h1>
-          <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
-          <div className="mt-6">{children}</div>
+        <span>{variant === "login" ? "Вход в кабинет" : "AR живые фотографии"}</span>
+        {auth.mode === "demo" ? (
+          <details className="auth-demo-help">
+            <summary>Демо-режим</summary>
+            <p>Локальный demo-режим: используйте предзаполненный email и любой пароль от 8 символов.</p>
+          </details>
+        ) : null}
+      </header>
+      <div className="auth-page-content">
+        <Panel className="auth-panel">
+          <div className="auth-intro">
+            {icon ? <span className="auth-intro-icon">{icon}</span> : null}
+            <div>
+              <h1>{title}</h1>
+              <p className="auth-description">{description}</p>
+            </div>
+          </div>
+          <div className="auth-form-content">{children}</div>
         </Panel>
-        <p className="mt-5 text-center text-xs leading-5 text-muted">
-          Продолжая, вы подтверждаете, что имеете право работать с загружаемыми материалами.
-        </p>
       </div>
     </main>
+  );
+}
+
+export function MfaVerificationRoute() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const requested = new URLSearchParams(location.search).get("returnTo");
+  const returnTo =
+    requested &&
+    /^\/(?:settings\/security|update-password|admin)\/?(?:[?#][^\\]*)?$/.test(requested) &&
+    !Array.from(requested).some((character) => character.charCodeAt(0) < 32)
+      ? requested
+      : "/settings/security";
+  return (
+    <AuthLayout variant="mfa" title="Подтвердите вход" description="Второй фактор (MFA)">
+      <MfaVerificationCard onBack={() => navigate(returnTo)} onVerified={() => navigate(returnTo, { replace: true })} />
+    </AuthLayout>
+  );
+}
+
+function PasswordRequirements({ detailed = false }: { detailed?: boolean }) {
+  return (
+    <div className="auth-password-requirements">
+      <strong>Требования к паролю:</strong>
+      <ul>
+        <li>
+          <Check size={14} />
+          Не менее 8 символов
+        </li>
+        <li>
+          <Check size={14} />
+          {detailed ? "Хотя бы одна заглавная латинская буква" : "Заглавная и строчная латинские буквы"}
+        </li>
+        {detailed ? (
+          <li>
+            <Check size={14} />
+            Хотя бы одна строчная латинская буква
+          </li>
+        ) : null}
+        <li>
+          <Check size={14} />
+          Хотя бы одна цифра
+        </li>
+      </ul>
+    </div>
   );
 }
 
@@ -408,12 +527,32 @@ function AuthField({
   error?: FieldError;
   inputProps: UseFormRegisterReturn;
 } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "name">) {
+  const [visible, setVisible] = useState(false);
+  const password = props.type === "password";
   return (
     <label className="block text-sm font-semibold">
       <span>{label}</span>
       <span className="relative mt-2 block">
         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">{icon}</span>
-        <input {...props} {...inputProps} className="field-control auth-field-control" aria-invalid={Boolean(error)} />
+        <input
+          {...props}
+          {...inputProps}
+          type={password && visible ? "text" : props.type}
+          className={`field-control auth-field-control ${password ? "auth-password-field" : ""}`}
+          aria-label={label}
+          aria-invalid={Boolean(error)}
+        />
+        {password ? (
+          <button
+            type="button"
+            className="auth-password-toggle"
+            aria-label={visible ? "Скрыть пароль" : "Показать пароль"}
+            aria-pressed={visible}
+            onClick={() => setVisible(!visible)}
+          >
+            {visible ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+        ) : null}
       </span>
       {error ? <span className="mt-1.5 block text-xs font-medium text-rose-700">{error.message}</span> : null}
     </label>
