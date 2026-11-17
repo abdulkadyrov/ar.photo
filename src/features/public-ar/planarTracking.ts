@@ -172,7 +172,10 @@ export function createCornerFilter() {
           : 0;
         consistentShape = correlation > 0.85 && deformation > 0.0005 ? consistentShape + 1 : 0;
         previousResidual = residual;
-        const motionAlpha = coefficient(motion, 3, 35, 0.002, 0.004);
+        // A few pixels of shared homography noise are not a camera sweep.
+        // Keep the quiet cutoff until motion exceeds 0.6% of the target
+        // diagonal; larger movements still reach the existing fast cutoff.
+        const motionAlpha = coefficient(motion, 3, 35, 0.006, 0.012);
         // A sustained perspective change is motion, not noise. Alternating
         // corner errors do not pass this directional consistency check.
         const shapeAlpha =
