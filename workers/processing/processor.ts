@@ -22,6 +22,7 @@ import {
   type ProcessingInput,
   type ProcessingJob,
 } from "./jobContract.js";
+import { crmFrameFilter } from "./crmFrame.js";
 import { buildEditedVideoArgs } from "./videoEditing.js";
 import { buildVideoFilter, parseVideoColorMetadata } from "./videoTranscode.js";
 
@@ -193,7 +194,7 @@ async function generateThumbnail(sourcePath: string, outputPath: string) {
   }
 }
 
-async function transcodeVideo(sourcePath: string, outputPath: string, edits?: unknown) {
+async function transcodeVideo(sourcePath: string, outputPath: string, edits?: unknown, crmFrame?: unknown) {
   try {
     const colorProbe = await command(
       "ffprobe",
@@ -210,7 +211,8 @@ async function transcodeVideo(sourcePath: string, outputPath: string, edits?: un
       ],
       2 * 60 * 1000,
     );
-    const videoFilter = buildVideoFilter(parseVideoColorMetadata(colorProbe), await supportsZscale());
+    const videoFilter =
+      buildVideoFilter(parseVideoColorMetadata(colorProbe), await supportsZscale()) + crmFrameFilter(crmFrame);
     let mapping = ["-map", "0:v:0", "-map", "0:a:0?", "-vf", videoFilter];
     if (edits !== undefined) {
       const raw = await command(
@@ -334,7 +336,14 @@ async function executeJob(
       metadataValue && typeof metadataValue === "object" && !Array.isArray(metadataValue)
         ? metadataValue.edits
         : undefined;
-    await transcodeVideo(sourcePath, outputPath, edits);
+    await transcodeVideo(
+      sourcePath,
+      outputPath,
+      edits,
+      metadataValue && typeof metadataValue === "object" && !Array.isArray(metadataValue)
+        ? metadataValue.crmFrame
+        : undefined,
+    );
     await reportProgress(client, job, workerId, 75);
     const metadata = await inspectVideo(outputPath);
     const digest = await uploadGeneratedObject(client, storagePath, outputPath, "video/mp4");
