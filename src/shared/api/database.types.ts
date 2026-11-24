@@ -1,8 +1,21 @@
+import type {
+  PostcardShop,
+  PostcardBatch,
+  PostcardCard,
+  PostcardMovement,
+} from "../../features/postcards/postcardModel.js";
+
+type PostcardTable<Row> = { Row: Row; Insert: Partial<Row>; Update: Partial<Row>; Relationships: [] };
+
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   public: {
     Tables: {
+      postcard_shops: PostcardTable<PostcardShop>;
+      postcard_batches: PostcardTable<PostcardBatch>;
+      postcard_cards: PostcardTable<PostcardCard>;
+      postcard_movements: PostcardTable<PostcardMovement>;
       account_members: {
         Row: {
           accepted_at: string | null;
@@ -1047,6 +1060,26 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      postcard_shop_report: { Args: { p_account_id: string }; Returns: Json };
+      postcard_create_shop: {
+        Args: { p_account_id: string; p_name: string; p_address: string; p_request_id: string };
+        Returns: PostcardShop;
+      };
+      postcard_get_shop_code: { Args: { p_account_id: string; p_shop_id: string }; Returns: string };
+      postcard_create_batch: {
+        Args: {
+          p_account_id: string;
+          p_template_code: string;
+          p_name: string;
+          p_quantity: number;
+          p_request_id: string;
+        };
+        Returns: PostcardBatch;
+      };
+      postcard_move_cards: {
+        Args: { p_account_id: string; p_kind: string; p_shop_id: string; p_card_ids: string[]; p_request_id: string };
+        Returns: PostcardMovement;
+      };
       admin_save_plan: { Args: { p_input: Json; p_reason: string }; Returns: undefined };
       admin_apply_package: {
         Args: { p_target_account_id: string; p_plan_id: string; p_request_id: string; p_reason: string };

@@ -15,6 +15,9 @@ const QuickStartRoute = lazy(() =>
 const DashboardRoute = lazy(() =>
   import("../../features/dashboard/DashboardPage").then((module) => ({ default: module.DashboardRoute })),
 );
+const PostcardsRoute = lazy(() =>
+  import("../../features/postcards/PostcardsPage").then((module) => ({ default: module.PostcardsRoute })),
+);
 const PrototypeProjectRoute = lazy(() =>
   import("../../features/prototype/PrototypeApp").then((module) => ({ default: module.PrototypeProjectRoute })),
 );
@@ -134,6 +137,7 @@ function RoutedContent() {
           <Route path="/update-password" element={<Protected element={<UpdatePasswordRoute />} />} />
           <Route path="/mfa" element={<Protected element={<MfaVerificationRoute />} />} />
           <Route path="/dashboard" element={<Protected element={<DashboardRoute />} />} />
+          <Route path="/postcards" element={<Protected element={<PostcardsRoute />} />} />
           <Route path="/create" element={<Protected element={<QuickStartRoute />} />} />
           <Route path="/projects" element={<Protected element={<ProjectsRoute />} />} />
           <Route path="/projects/:projectId" element={<Protected element={<ProjectDetailsRoute />} />} />
