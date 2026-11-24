@@ -65,10 +65,10 @@ create table public.postcard_movements (
 create index postcard_shops_account_idx on public.postcard_shops(account_id);
 create index postcard_batches_account_idx on public.postcard_batches(account_id, created_at desc);
 create index postcard_cards_account_batch_idx on public.postcard_cards(account_id, batch_id, ordinal);
-create index postcard_cards_shop_idx on public.postcard_cards(shop_id) where shop_id is not null;
-create index postcard_cards_ar_item_idx on public.postcard_cards(ar_item_id) where ar_item_id is not null;
+create index postcard_cards_shop_idx on public.postcard_cards(shop_id, account_id) where shop_id is not null;
+create index postcard_cards_ar_item_idx on public.postcard_cards(ar_item_id, account_id) where ar_item_id is not null;
 create index postcard_movements_account_idx on public.postcard_movements(account_id, created_at desc);
-create index postcard_movements_shop_idx on public.postcard_movements(shop_id) where shop_id is not null;
+create index postcard_movements_shop_idx on public.postcard_movements(shop_id, account_id) where shop_id is not null;
 create index postcard_movements_actor_idx on public.postcard_movements(actor_user_id);
 
 alter table public.postcard_shops enable row level security;

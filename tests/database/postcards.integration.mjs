@@ -48,6 +48,13 @@ insert into auth.users values('${owner}'),('${viewer}');
   await db.exec(
     readFileSync(new URL("../../supabase/migrations/20261124211944_postcard_inventory.sql", import.meta.url), "utf8"),
   );
+  await check("every inventory foreign key has a supporting index", async () => {
+    const missing = await query(`select c.conname from pg_catalog.pg_constraint c
+      join pg_catalog.pg_class t on t.oid=c.conrelid
+      where t.relname like 'postcard_%' and c.contype='f'
+      and not exists(select 1 from pg_catalog.pg_index i where i.indrelid=c.conrelid and c.conkey <@ i.indkey::smallint[])`);
+    assert.deepEqual(missing, []);
+  });
   await db.exec(
     `set role authenticated; set "test.user"='${owner}'; set "test.account"='${account}'; set "test.member_role"='owner'; set "test.active"='yes';`,
   );

@@ -1,9 +1,36 @@
-import type {
-  PostcardShop,
-  PostcardBatch,
-  PostcardCard,
-  PostcardMovement,
-} from "../../features/postcards/postcardModel.js";
+// Keep database row types self-contained: the worker image copies this file without UI features.
+type PostcardShop = { id: string; account_id: string; name: string; address: string; created_at: string };
+type PostcardBatch = {
+  id: string;
+  account_id: string;
+  template_code: string;
+  name: string;
+  quantity: number;
+  request_id: string;
+  created_at: string;
+};
+type PostcardCard = {
+  id: string;
+  account_id: string;
+  batch_id: string;
+  ordinal: number;
+  public_token: string;
+  shop_id: string | null;
+  sold_at: string | null;
+  activated_at: string | null;
+  ar_item_id: string | null;
+  created_at: string;
+};
+type PostcardMovement = {
+  id: string;
+  account_id: string;
+  request_id: string;
+  kind: string;
+  shop_id: string | null;
+  card_ids: string[];
+  actor_user_id: string;
+  created_at: string;
+};
 
 type PostcardTable<Row> = { Row: Row; Insert: Partial<Row>; Update: Partial<Row>; Relationships: [] };
 
