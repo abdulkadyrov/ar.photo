@@ -1,8 +1,55 @@
+// Keep database row types self-contained: the worker image copies this file without UI features.
+type PostcardShop = { id: string; account_id: string; name: string; address: string; created_at: string };
+type PostcardBatch = {
+  project_id: string | null;
+  group_id: string | null;
+  issued_by: string | null;
+  id: string;
+  account_id: string;
+  template_code: string;
+  name: string;
+  quantity: number;
+  request_id: string;
+  created_at: string;
+};
+type PostcardCard = {
+  print_marker_asset_id: string | null;
+  printed_at: string | null;
+  display_mode: string;
+  video_viewport: Json | null;
+  id: string;
+  account_id: string;
+  batch_id: string;
+  ordinal: number;
+  public_token: string;
+  shop_id: string | null;
+  sold_at: string | null;
+  activated_at: string | null;
+  ar_item_id: string | null;
+  created_at: string;
+};
+type PostcardMovement = {
+  id: string;
+  account_id: string;
+  request_id: string;
+  kind: string;
+  shop_id: string | null;
+  card_ids: string[];
+  actor_user_id: string;
+  created_at: string;
+};
+
+type PostcardTable<Row> = { Row: Row; Insert: Partial<Row>; Update: Partial<Row>; Relationships: [] };
+
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   public: {
     Tables: {
+      postcard_shops: PostcardTable<PostcardShop>;
+      postcard_batches: PostcardTable<PostcardBatch>;
+      postcard_cards: PostcardTable<PostcardCard>;
+      postcard_movements: PostcardTable<PostcardMovement>;
       account_members: {
         Row: {
           accepted_at: string | null;
@@ -1047,6 +1094,31 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      postcard_prepare_batch: { Args: { p_account_id: string; p_batch_id: string }; Returns: PostcardBatch };
+      postcard_attach_print_marker: {
+        Args: { p_account_id: string; p_card_id: string; p_asset_id: string };
+        Returns: PostcardCard;
+      };
+      postcard_shop_report: { Args: { p_account_id: string }; Returns: Json };
+      postcard_create_shop: {
+        Args: { p_account_id: string; p_name: string; p_address: string; p_request_id: string };
+        Returns: PostcardShop;
+      };
+      postcard_get_shop_code: { Args: { p_account_id: string; p_shop_id: string }; Returns: string };
+      postcard_create_batch: {
+        Args: {
+          p_account_id: string;
+          p_template_code: string;
+          p_name: string;
+          p_quantity: number;
+          p_request_id: string;
+        };
+        Returns: PostcardBatch;
+      };
+      postcard_move_cards: {
+        Args: { p_account_id: string; p_kind: string; p_shop_id: string; p_card_ids: string[]; p_request_id: string };
+        Returns: PostcardMovement;
+      };
       admin_save_plan: { Args: { p_input: Json; p_reason: string }; Returns: undefined };
       admin_apply_package: {
         Args: { p_target_account_id: string; p_plan_id: string; p_request_id: string; p_reason: string };

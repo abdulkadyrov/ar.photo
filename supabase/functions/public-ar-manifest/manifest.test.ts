@@ -4,6 +4,7 @@ import {
   createPublicManifest,
   extractPublicSlug,
   parseAllowedOrigins,
+  parseVideoViewport,
   requestNetworkIdentifier,
   sha256Hex,
   type PublicManifestSource,
@@ -72,6 +73,42 @@ describe("public AR manifest helpers", () => {
     expect(serialized).not.toContain("accounts/internal");
     expect(serialized).not.toContain("generated-private");
     expect(serialized).not.toContain("account_id");
+    expect(manifest).not.toHaveProperty("videoViewport");
+  });
+
+  it("publishes only a validated postcard video window and leaves its tracked marker unchanged", () => {
+    const videoViewport = { x: 0.08, y: 0.22, width: 0.84, height: 0.5 };
+    const manifest = createPublicManifest(
+      [{ ...source, video_viewport: videoViewport }],
+      [
+        {
+          trackingAssetUrl: "https://storage.test/a.mind",
+          videoUrl: "https://storage.test/a.mp4",
+          posterUrl: "https://storage.test/a.webp",
+        },
+      ],
+      "2026-08-03T00:05:00.000Z",
+    );
+    expect(manifest.videoViewport).toEqual(videoViewport);
+    expect(manifest.marker).toEqual({ width: 1600, height: 1200, aspectRatio: 4 / 3 });
+    expect(manifest.assets.trackingAssetUrl).toBe("https://storage.test/a.mind");
+    expect(JSON.stringify(manifest)).not.toContain("video_viewport");
+  });
+
+  it("rejects invalid or augmented rectangles instead of displaying video outside the frame", () => {
+    expect(parseVideoViewport(undefined)).toBeUndefined();
+    expect(parseVideoViewport(null)).toBeUndefined();
+    const rect = { x: 0.1, y: 0.2, width: 0.8, height: 0.5 };
+    for (const value of [
+      [],
+      "frame",
+      { ...rect, width: 0 },
+      { ...rect, x: 0.5 },
+      { ...rect, y: Number.NaN },
+      { ...rect, code: "secret" },
+    ]) {
+      expect(() => parseVideoViewport(value)).toThrow("Invalid video viewport");
+    }
   });
 
   it("returns an ordered multi-target manifest for one shared QR", () => {

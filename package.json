@@ -33,7 +33,8 @@
     "build:unconfigured": "tsc -b && vite build --mode unconfigured",
     "build:worker": "tsc -p tsconfig.worker.json --pretty false",
     "generate:test-mind": "node scripts/generate-test-mind.mjs",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "test:e2e:postcards": "playwright test --config playwright.postcards.config.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "5.7.1",

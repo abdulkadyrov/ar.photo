@@ -12,6 +12,7 @@ import {
   Headphones,
   House,
   Images,
+  Mail,
   Layers3,
   LogOut,
   Menu,
@@ -38,6 +39,7 @@ const navigation = [
   { to: "/projects", label: "Проекты", icon: FolderKanban },
   { to: "/items", label: "AR-фото", icon: Layers3 },
   { to: "/qr-codes", label: "QR-коды", icon: QrCode },
+  { to: "/postcards", label: "AR-открытки", icon: Mail },
   { to: "/analytics", label: "Статистика", icon: BarChart3 },
 ] as const;
 const accountNavigation = [

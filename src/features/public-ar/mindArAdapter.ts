@@ -1,5 +1,11 @@
 import type * as ThreeModule from "three";
-import { publicArTargets, type PublicArManifest, type PublicArTarget } from "./publicManifest";
+import {
+  publicArTargets,
+  videoViewportSchema,
+  type PublicArManifest,
+  type PublicArTarget,
+  type VideoViewport,
+} from "./publicManifest";
 import { videoMilestones, type PublicArAnalyticsEvent } from "./telemetry";
 import { createArRecordingEngine, type ArRecording, type ArRecordingEngine } from "./arRecording";
 import { createPlanarAnchor, installPlanarObservations } from "./planarTrackingBridge";
@@ -94,6 +100,21 @@ export function markerPlaneGeometry(marker: MarkerDimensions) {
     height: marker.height / marker.width,
     z: 0,
   } as const;
+}
+
+// This affects only the rendered child plane, not the tracked full-image anchor.
+// A top-left normalized print window maps into the anchor's centered, Y-up units.
+export function videoPlaneGeometry(marker: MarkerDimensions, viewport?: VideoViewport) {
+  const markerGeometry = markerPlaneGeometry(marker);
+  const rect = videoViewportSchema.parse(viewport ?? { x: 0, y: 0, width: 1, height: 1 });
+  return {
+    width: rect.width,
+    height: markerGeometry.height * rect.height,
+    x: rect.x + rect.width / 2 - 0.5,
+    y: markerGeometry.height * (0.5 - rect.y - rect.height / 2),
+    z: markerGeometry.z,
+    aspectRatio: (marker.width * rect.width) / (marker.height * rect.height),
+  };
 }
 
 export function coverTextureTransform(videoAspectRatio: number, markerAspectRatio: number) {
@@ -233,8 +254,8 @@ export async function startPublicMindAr(options: {
     const texture = new Three.VideoTexture(video);
     configureSrgbVideoOutput(renderer, texture, Three.SRGBColorSpace);
     let activeMarker: MarkerDimensions = target.marker;
-    const markerGeometry = markerPlaneGeometry(activeMarker);
-    const geometry = new Three.PlaneGeometry(markerGeometry.width, markerGeometry.width);
+    const videoGeometry = videoPlaneGeometry(activeMarker, target.videoViewport);
+    const geometry = new Three.PlaneGeometry(1, 1);
     const material = new Three.MeshBasicMaterial({
       map: texture,
       transparent: false,
@@ -243,8 +264,8 @@ export async function startPublicMindAr(options: {
       toneMapped: false,
     });
     const plane = new Three.Mesh(geometry, material);
-    plane.position.set(0, 0, markerGeometry.z);
-    plane.scale.set(1, markerGeometry.height, 1);
+    plane.position.set(videoGeometry.x, videoGeometry.y, videoGeometry.z);
+    plane.scale.set(videoGeometry.width, videoGeometry.height, 1);
     plane.frustumCulled = false;
     plane.renderOrder = 1;
     const anchor = mindar.addAnchor(index);
@@ -252,7 +273,7 @@ export async function startPublicMindAr(options: {
       if (!video.videoWidth || !video.videoHeight) return;
       const transform = coverTextureTransform(
         video.videoWidth / video.videoHeight,
-        activeMarker.width / activeMarker.height,
+        videoPlaneGeometry(activeMarker, target.videoViewport).aspectRatio,
       );
       texture.repeat.set(transform.repeatX, transform.repeatY);
       texture.offset.set(transform.offsetX, transform.offsetY);
@@ -351,9 +372,10 @@ export async function startPublicMindAr(options: {
         runtime.target.marker,
         mindar.controller?.markerDimensions?.slice(index, index + 1),
       );
-      const markerGeometry = markerPlaneGeometry(marker);
+      const videoGeometry = videoPlaneGeometry(marker, runtime.target.videoViewport);
       runtime.setMarker(marker);
-      runtime.plane.scale.set(1, markerGeometry.height, 1);
+      runtime.plane.position.set(videoGeometry.x, videoGeometry.y, videoGeometry.z);
+      runtime.plane.scale.set(videoGeometry.width, videoGeometry.height, 1);
       runtime.fitVideoToMarker();
     });
     keepCameraVisible(mindar);

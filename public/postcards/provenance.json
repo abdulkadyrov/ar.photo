@@ -1,0 +1,55 @@
+{
+  "generator": "built-in image_gen",
+  "edit": "Remove only demonstration QR, its nearby instruction, divider/arrow; reconstruct matching background. Preserve title, quotation, central illustration and border. Reserve lower-right region (77–98% width,81–96% height) for real dynamic QR and serial. No fake code or white placeholder. Flat full-bleed2:3 artwork.",
+  "assets": [
+    {
+      "code": "new-year",
+      "source": "exec-6a23125e-2cac-43af-b888-78a4b5dfa548.png",
+      "file": "new-year-v1.webp",
+      "sha256": "af5a57079186365bc75c389ee480cfeeef521b62717b5a11b3d6ec58ef0f96bd",
+      "bytes": 666942,
+      "reference": "exec-4ce409a6-aaaf-4e81-beb2-8dad8670c2ad.png"
+    },
+    {
+      "code": "eid",
+      "source": "exec-7d012b50-cdce-4f53-8827-00de821c2027.png",
+      "file": "eid-v1.webp",
+      "sha256": "942c85d31232852b1f64c1376fb80c44bf91bdf47e461c9f556effbe1f4cdfd9",
+      "bytes": 599830,
+      "reference": "exec-8a786971-6b7c-474b-bfde-b069bc1899c1.png"
+    },
+    {
+      "code": "march-8",
+      "source": "exec-e6705632-d795-4415-b94b-9959deac95e6.png",
+      "file": "march-8-v1.webp",
+      "sha256": "71ebaf24e191e7f8bff886280e15b205ec8afbfd927bc9aa2b3dea47204758bb",
+      "bytes": 439686,
+      "reference": "exec-46b60c19-96c4-4b6f-b61f-26f64d2d5c80.png"
+    },
+    {
+      "code": "autumn-ball",
+      "source": "exec-9062948f-5e45-4d4f-82d1-a8d9332e8dff.png",
+      "file": "autumn-ball-v1.webp",
+      "sha256": "15b576b66b6e969022dc7fb59ce6e99d90f216fbb1a930b73b8bd4710491fcca",
+      "bytes": 667028,
+      "reference": "exec-38653ab9-f560-4f55-8a53-f3b1e37ba671.png"
+    },
+    {
+      "code": "best-friend",
+      "source": "exec-66a3d3aa-ba8f-4fc3-9ff2-b6aa647419a7.png",
+      "file": "best-friend-v1.webp",
+      "sha256": "da44423a0680c91009617226d3e2879f5d40f00733c9b0856785790f971d2a0d",
+      "bytes": 503990,
+      "reference": "exec-f7075ff3-6a19-431d-9a58-9b53dc19e062.png"
+    },
+    {
+      "code": "brother-vip",
+      "source": "exec-5751845d-715c-4c85-93e7-6a2d6cbcf25a.png",
+      "file": "brother-vip-v1.webp",
+      "sha256": "437f36e8e44a82b1090450a436b895cce72645318a651ce15f49c47b76e24ba0",
+      "bytes": 582942,
+      "reference": "exec-df1fc879-59af-487b-85db-18d937d20429.png"
+    }
+  ],
+  "prompt": "Use case: precise-object-edit. This is an existing approved flat portrait 2:3 postcard print artwork, edit target attached. Make a surgical edit ONLY to remove the small demonstration black-and-white QR code in the lower right, its white square, the adjacent small words 'Добавь своё видео', its small divider/arrow if present. Reconstruct the same plain paper-colored or burgundy background there naturally. Keep the entire lower-right rectangle from 77% to 98% of width, 81% to 96% of height free of all text and ornaments to reserve for a real dynamically printed QR and serial number later. Do not add any QR, code, empty white box, placeholder, label, symbol or text. Preserve EXACTLY the large title, quotation, publisher imprint 'Хан Зама', central illustration, central picture window bounds, border, colors, artwork crop, paper texture and 2:3 aspect ratio from the source. No new art direction, no mockup, no hands, no desk. Main illustration and quote must remain identical in composition. Deliver one flat full-bleed edited card."
+}

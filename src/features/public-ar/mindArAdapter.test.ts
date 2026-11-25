@@ -10,6 +10,7 @@ import {
   isIosWebKit,
   keepCameraVisible,
   markerPlaneGeometry,
+  videoPlaneGeometry,
   mergeTrackingAssets,
   publicArTrackingConfig,
   resolveMarkerDimensions,
@@ -84,6 +85,46 @@ describe("public AR alignment contract", () => {
   it("rejects invalid marker geometry", () => {
     expect(() => markerPlaneGeometry({ width: 0, height: 1200 })).toThrow("Invalid marker geometry");
     expect(() => markerPlaneGeometry({ width: Number.NaN, height: 1200 })).toThrow("Invalid marker geometry");
+  });
+
+  it("keeps legacy and explicit full-card video planes on the complete marker", () => {
+    const marker = { width: 1000, height: 1500 };
+    const expected = { width: 1, height: 1.5, x: 0, y: 0, z: 0, aspectRatio: 2 / 3 };
+    expect(videoPlaneGeometry(marker)).toEqual(expected);
+    expect(videoPlaneGeometry(marker, { x: 0, y: 0, width: 1, height: 1 })).toEqual(expected);
+  });
+
+  it("positions a postcard window in marker coordinates without changing its anchor", () => {
+    const geometry = videoPlaneGeometry({ width: 1000, height: 1500 }, { x: 0.1, y: 0.2, width: 0.8, height: 0.5 });
+    expect(geometry.width).toBe(0.8);
+    expect(geometry.height).toBe(0.75);
+    expect(geometry.x).toBe(0);
+    expect(geometry.y).toBeCloseTo(0.075);
+    // The child plane's four bounds line up with the chosen top-left print window.
+    expect(geometry.x - geometry.width / 2).toBeCloseTo(-0.4);
+    expect(geometry.x + geometry.width / 2).toBeCloseTo(0.4);
+    expect(geometry.y + geometry.height / 2).toBeCloseTo(0.45);
+    expect(geometry.y - geometry.height / 2).toBeCloseTo(-0.3);
+    expect(geometry.aspectRatio).toBeCloseTo(800 / 750);
+    expect(geometry.z).toBe(0);
+    expect(markerPlaneGeometry({ width: 1000, height: 1500 })).toEqual({ width: 1, height: 1.5, z: 0 });
+  });
+
+  it("crops video against the window aspect rather than the surrounding postcard", () => {
+    const geometry = videoPlaneGeometry({ width: 1000, height: 1500 }, { x: 0.1, y: 0.2, width: 0.8, height: 0.5 });
+    const wide = coverTextureTransform(16 / 9, geometry.aspectRatio);
+    const tall = coverTextureTransform(9 / 16, geometry.aspectRatio);
+    expect(wide.repeatX).toBeCloseTo(0.6);
+    expect(wide.repeatY).toBe(1);
+    expect(tall.repeatX).toBe(1);
+    expect(tall.repeatY).toBeCloseTo(0.52734375);
+  });
+
+  it("rejects a video window outside the marker or with non-finite dimensions", () => {
+    const marker = { width: 1000, height: 1500 };
+    expect(() => videoPlaneGeometry(marker, { x: 0.7, y: 0, width: 0.5, height: 1 })).toThrow();
+    expect(() => videoPlaneGeometry(marker, { x: 0, y: 0, width: 0, height: 1 })).toThrow();
+    expect(() => videoPlaneGeometry(marker, { x: 0, y: Number.NaN, width: 1, height: 1 })).toThrow();
   });
 
   it("uses the compiled tracking target as the authoritative marker format", () => {

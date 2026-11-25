@@ -77,6 +77,8 @@ jobs:
         run: npx playwright test --config playwright.recovery.config.ts
       - name: Explicit demo browser smoke test
         run: npm run test:e2e
+      - name: Public postcard buyer journey
+        run: npm run test:e2e:postcards
       - name: Cross-browser and mobile emulation matrix
         run: npx playwright test --config playwright.cross-browser.config.ts
 

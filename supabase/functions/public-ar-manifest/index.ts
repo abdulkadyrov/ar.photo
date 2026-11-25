@@ -6,6 +6,7 @@ import {
   createPublicManifest,
   extractPublicSlug,
   parseAllowedOrigins,
+  parseVideoViewport,
   requestNetworkIdentifier,
   sha256Hex,
   type PublicManifestSource,
@@ -65,6 +66,33 @@ Deno.serve(async (request) => {
     return json({ code: "manifest_unavailable" }, 503, cors);
   }
   if (!sources.length) return json({ code: "not_found" }, 404, cors);
+
+  // The signed manifest source already enforced publication/subscription rules.
+  // A postcard changes only its video's printed window; no shop or purchaser
+  // information is exposed and legacy works keep their full-marker geometry.
+  const item = await client.from("ar_items").select("id").eq("public_slug", publicSlug).maybeSingle();
+  if (item.error) return json({ code: "manifest_unavailable" }, 503, cors);
+  if (item.data) {
+    const card = await client
+      .from("postcard_cards")
+      .select("video_viewport")
+      .eq("ar_item_id", item.data.id)
+      .maybeSingle();
+    if (card.error) {
+      // During a rolling deployment, old schemas can serve existing printed QR
+      // links before the postcard migration is installed. Other errors fail closed.
+      if (!["42P01", "42703", "PGRST204", "PGRST205"].includes(card.error.code))
+        return json({ code: "manifest_unavailable" }, 503, cors);
+    } else if (card.data) {
+      try {
+        const viewport = parseVideoViewport(card.data.video_viewport);
+        if (viewport && sources.length !== 1) return json({ code: "manifest_unavailable" }, 503, cors);
+        if (viewport) sources[0] = { ...sources[0], video_viewport: viewport };
+      } catch {
+        return json({ code: "manifest_unavailable" }, 503, cors);
+      }
+    }
+  }
 
   const signedTargets = await Promise.all(
     sources.map(async (source) => {

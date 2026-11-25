@@ -17,7 +17,33 @@ export type PublicManifestSource = {
   video_path: string;
   poster_bucket: string;
   poster_path: string;
+  video_viewport?: unknown;
 };
+
+export type VideoViewport = { x: number; y: number; width: number; height: number };
+
+export function parseVideoViewport(value: unknown): VideoViewport | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid video viewport");
+  const rect = value as Record<string, unknown>;
+  if (Object.keys(rect).sort().join(",") !== "height,width,x,y") throw new Error("Invalid video viewport");
+  const { x, y, width, height } = rect;
+  if (
+    typeof x !== "number" ||
+    typeof y !== "number" ||
+    typeof width !== "number" ||
+    typeof height !== "number" ||
+    ![x, y, width, height].every(Number.isFinite) ||
+    x < 0 ||
+    y < 0 ||
+    width <= 0 ||
+    height <= 0 ||
+    x + width > 1 ||
+    y + height > 1
+  )
+    throw new Error("Invalid video viewport");
+  return { x, y, width, height };
+}
 
 export type SignedManifestAssets = {
   trackingAssetUrl: string;
@@ -79,12 +105,14 @@ export function createPublicManifest(
     behavior: primary.behavior,
     fallbackEnabled: primary.fallbackEnabled,
     assets: primary.assets,
+    ...(primary.videoViewport ? { videoViewport: primary.videoViewport } : {}),
     ...(targets.length > 1 ? { targets } : {}),
     signedUrlsExpireAt,
   };
 }
 
 function createTarget(source: PublicManifestSource, assets: SignedManifestAssets) {
+  const videoViewport = parseVideoViewport(source.video_viewport);
   return {
     targetId: `target-${source.target_index}`,
     title: source.title,
@@ -101,6 +129,7 @@ function createTarget(source: PublicManifestSource, assets: SignedManifestAssets
     },
     fallbackEnabled: source.fallback_enabled,
     assets,
+    ...(videoViewport ? { videoViewport } : {}),
   };
 }
 

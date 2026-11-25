@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { initialArMuted, loadPublicManifest, manifestRefreshDelay, PublicManifestError } from "./publicManifest";
+import {
+  initialArMuted,
+  loadPublicManifest,
+  manifestRefreshDelay,
+  parsePublicArManifest,
+  publicArTargets,
+  PublicManifestError,
+} from "./publicManifest";
 
 describe("public AR manifest client", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -38,9 +45,36 @@ describe("public AR manifest client", () => {
   });
 
   it("refreshes signed URLs 45 seconds before expiry", () => {
-    expect(manifestRefreshDelay("2026-08-03T00:05:00.000Z", Date.parse("2026-08-03T00:00:00.000Z"))).toBe(
-      255_000,
-    );
+    expect(manifestRefreshDelay("2026-08-03T00:05:00.000Z", Date.parse("2026-08-03T00:00:00.000Z"))).toBe(255_000);
     expect(manifestRefreshDelay("2026-08-03T00:00:30.000Z", Date.parse("2026-08-03T00:00:00.000Z"))).toBe(0);
+  });
+
+  it("preserves the optional postcard window through the single-target contract", async () => {
+    const legacy = await loadPublicManifest("demo");
+    expect(publicArTargets(legacy)[0]).not.toHaveProperty("videoViewport");
+    const videoViewport = { x: 0.08, y: 0.22, width: 0.84, height: 0.5 };
+    const manifest = parsePublicArManifest({ ...legacy, videoViewport });
+    expect(publicArTargets(manifest)[0].videoViewport).toEqual(videoViewport);
+    expect(publicArTargets(manifest)[0].marker).toEqual(legacy.marker);
+  });
+
+  it("accepts bounded windows per target and rejects unsafe window metadata", async () => {
+    const legacy = await loadPublicManifest("demo");
+    const first = publicArTargets(legacy)[0];
+    const frame = { x: 0.1, y: 0.2, width: 0.8, height: 0.5 };
+    const bundle = parsePublicArManifest({
+      ...legacy,
+      version: 2,
+      targets: [first, { ...first, targetId: "target-1", videoViewport: frame }],
+    });
+    expect(publicArTargets(bundle)[1].videoViewport).toEqual(frame);
+    for (const videoViewport of [
+      { ...frame, x: -0.1 },
+      { ...frame, y: 0.8 },
+      { ...frame, width: 0 },
+      { ...frame, height: Number.POSITIVE_INFINITY },
+      { ...frame, shopCode: "never-public" },
+    ])
+      expect(() => parsePublicArManifest({ ...legacy, videoViewport })).toThrow(PublicManifestError);
   });
 });
