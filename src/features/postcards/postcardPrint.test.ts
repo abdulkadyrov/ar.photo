@@ -57,11 +57,11 @@ function pngChunks(bytes: Uint8Array) {
 }
 
 describe("postcard printing", () => {
-  it("ships eight versioned approved artworks and bounded frame rectangles", () => {
+  it("ships nine versioned approved artworks and bounded frame rectangles", () => {
     const provenance = JSON.parse(readFileSync("public/postcards/provenance.json", "utf8")) as {
       assets: { code: string; file: string; sha256: string }[];
     };
-    expect(postcardTemplateCatalog).toHaveLength(8);
+    expect(postcardTemplateCatalog).toHaveLength(9);
     for (const template of postcardTemplateCatalog) {
       expect(template.frame.x).toBeGreaterThan(0);
       expect(template.frame.y).toBeGreaterThan(0);

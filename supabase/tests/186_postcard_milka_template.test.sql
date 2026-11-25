@@ -1,0 +1,18 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path=public,extensions;
+select no_plan();
+select set_config('test.milka_credits',(select spent::text from private.photo_credit_wallets where account_id='20000000-0000-4000-8000-000000000001'),true);
+select is((select frame from private.postcard_template_layouts where template_code='milka-gift'),'{"x":0.085,"y":0.255,"width":0.83,"height":0.4}'::jsonb,'gift video stays inside the Alpine picture');
+select is((select frame from private.postcard_template_layouts where template_code='love-moon'),'{"x":0.08,"y":0.156,"width":0.84,"height":0.608}'::jsonb,'existing Moon cards retain their printed frame');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000010',true);
+select set_config('request.jwt.claim.role','authenticated',true);
+select set_config('request.jwt.claims','{"sub":"10000000-0000-4000-8000-000000000010","role":"authenticated","aal":"aal1"}',true);
+select lives_ok($$select public.postcard_create_batch('20000000-0000-4000-8000-000000000001','milka-gift','Synthetic gift basket',2,'a8600000-0000-4000-8000-000000000001')$$,'owner creates a Milka-inspired two-card batch');
+select is((select count(distinct c.public_token)::int from public.postcard_cards c join public.postcard_batches b on b.id=c.batch_id where b.request_id='a8600000-0000-4000-8000-000000000001'),2,'physical cards receive different QR capabilities');
+select lives_ok($$select public.postcard_prepare_batch('20000000-0000-4000-8000-000000000001',(select id from public.postcard_batches where request_id='a8600000-0000-4000-8000-000000000001'))$$,'gift batch supports canonical print preparation');
+reset role;
+select is((select spent::text from private.photo_credit_wallets where account_id='20000000-0000-4000-8000-000000000001'),current_setting('test.milka_credits'),'reserving and preparing gifts spend no creation credits');
+select * from finish();
+rollback;

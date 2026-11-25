@@ -24,7 +24,7 @@ const snapshot: BuyerSnapshot = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("postcard buyer API boundary", () => {
-  it.each(["love-meadow", "love-moon"])(
+  it.each(["love-meadow", "love-moon", "milka-gift"])(
     "accepts the new %s artwork without weakening the public boundary",
     (templateCode) => {
       expect(

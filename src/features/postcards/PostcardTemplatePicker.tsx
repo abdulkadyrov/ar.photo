@@ -115,7 +115,7 @@ export function PostcardTemplatePicker({
         <Input type="search" value={search} onValueChange={setSearch} placeholder="Название или праздник" />
       </label>
       <div className="postcard-template-filters" aria-label="Категории открыток">
-        {["Все", "Любовь", "Праздники", "День рождения"].map((name) => (
+        {["Все", "Любовь", "Подарки", "Праздники", "День рождения"].map((name) => (
           <button key={name} type="button" aria-pressed={category === name} onClick={() => setCategory(name)}>
             {name}
           </button>

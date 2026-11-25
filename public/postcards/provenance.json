@@ -67,6 +67,15 @@
       "bytes": 123554,
       "reference": "love-moon-v1 concept approved by user",
       "edit": "Remove only the blank QR placeholder and continue the matching paper background; all text, imagery and frame remain fixed."
+    },
+    {
+      "code": "milka-gift",
+      "source": "exec-0ed92b8f-8085-4fbc-b0f6-85a16ce604ed.png",
+      "file": "milka-gift-v1.webp",
+      "sha256": "5b9a36a394a19a3f54745c7d593293dc9f928d60c088e51ee164c8e1d1b8d993",
+      "bytes": 508452,
+      "reference": "User-requested Milka-inspired gift basket design",
+      "promptFile": "milka-production-prompt.json"
     }
   ],
   "prompt": "Use case: precise-object-edit. This is an existing approved flat portrait 2:3 postcard print artwork, edit target attached. Make a surgical edit ONLY to remove the small demonstration black-and-white QR code in the lower right, its white square, the adjacent small words 'Добавь своё видео', its small divider/arrow if present. Reconstruct the same plain paper-colored or burgundy background there naturally. Keep the entire lower-right rectangle from 77% to 98% of width, 81% to 96% of height free of all text and ornaments to reserve for a real dynamically printed QR and serial number later. Do not add any QR, code, empty white box, placeholder, label, symbol or text. Preserve EXACTLY the large title, quotation, publisher imprint 'Хан Зама', central illustration, central picture window bounds, border, colors, artwork crop, paper texture and 2:3 aspect ratio from the source. No new art direction, no mockup, no hands, no desk. Main illustration and quote must remain identical in composition. Deliver one flat full-bleed edited card.",
@@ -131,6 +140,14 @@
       "file": "previews/new-year-v1.webp",
       "sha256": "201277610ac6d5c6304317d54bba14524a98b25577dedc33b171d58e00ad271d",
       "derivedFrom": "new-year-v1.webp",
+      "width": 480,
+      "height": 720,
+      "quality": 82
+    },
+    {
+      "file": "previews/milka-gift-v1.webp",
+      "sha256": "22f0314571d60e5e98634d0f3db44ef1e4d6bf30746a3268841104c964816612",
+      "derivedFrom": "milka-gift-v1.webp",
       "width": 480,
       "height": 720,
       "quality": 82

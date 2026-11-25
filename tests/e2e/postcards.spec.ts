@@ -96,7 +96,7 @@ for (const width of [319, 390, 1440]) {
     await page.getByLabel("Название тиража *", { exact: true }).fill("Любовь — тест галереи");
     await page.getByLabel("Количество *", { exact: true }).fill("1");
     await expect(page.getByRole("button", { name: "Создать экземпляры" })).toBeDisabled();
-    await expect(page.getByRole("radio")).toHaveCount(8);
+    await expect(page.getByRole("radio")).toHaveCount(9);
     await expect
       .poll(() =>
         page
@@ -154,12 +154,61 @@ for (const width of [319, 390, 1440]) {
     await expect(page.getByText("По вашему запросу открыток нет.")).toBeVisible();
     await expect(page.getByText("Выбрано: Любовь — под луной", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Сбросить фильтры" }).click();
-    await expect(page.getByRole("radio")).toHaveCount(8);
+    await expect(page.getByRole("radio")).toHaveCount(9);
     await page.getByLabel("Найти открытку", { exact: true }).fill("ёлка");
     await expect(page.getByRole("radio", { name: "Новый год", exact: true })).toHaveCount(1);
     await expect(page.getByLabel("Название тиража *", { exact: true })).toHaveValue("Любовь — тест галереи");
     await page.getByRole("button", { name: "Создать экземпляры" }).click();
     await expect(page.locator(".postcard-batch-template")).toContainText("Любовь — под луной");
+    await expect(page.getByRole("list", { name: "Экземпляры тиража" }).getByRole("listitem")).toHaveCount(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
+
+for (const width of [319, 390, 1440]) {
+  test(`adds a Milka-style card to a gift-basket batch at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: width === 319 ? 619 : 1000 });
+    await page.goto("./login");
+    await page.getByPlaceholder("Не менее 8 символов").fill("demo-password");
+    await page.getByRole("button", { name: "Войти", exact: true }).click();
+    await page.goto("./postcards");
+    await page.getByRole("button", { name: "Создать тираж", exact: true }).click();
+    await page.getByLabel("Название тиража *", { exact: true }).fill("Подарочные корзинки — тест");
+    await page.getByLabel("Количество *", { exact: true }).fill("1");
+    await page.getByLabel("Найти открытку", { exact: true }).fill("милка");
+    await expect(page.getByRole("radio")).toHaveCount(1);
+    await page.getByLabel("Найти открытку", { exact: true }).fill("");
+    await page.getByRole("button", { name: "Подарки", exact: true }).click();
+    await expect(page.getByRole("radio")).toHaveCount(1);
+    const name = "Подарочная корзинка · Milka";
+    await expect
+      .poll(() =>
+        page
+          .getByRole("img", { name, exact: true })
+          .evaluate((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0),
+      )
+      .toBe(true);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({
+      path: `artifacts/postcard-milka-20261126/gallery-${width}.png`,
+      fullPage: true,
+      animations: "disabled",
+    });
+    await page.getByRole("button", { name: `Рассмотреть: ${name}`, exact: true }).click();
+    const dialog = page.getByRole("dialog", { name, exact: true });
+    await expect
+      .poll(() =>
+        dialog
+          .getByRole("img", { name, exact: true })
+          .evaluate((image) => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0),
+      )
+      .toBe(true);
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: `artifacts/postcard-milka-20261126/preview-${width}.png`, animations: "disabled" });
+    await dialog.getByRole("button", { name: "Выбрать эту открытку", exact: true }).click();
+    await expect(page.getByRole("radio", { name, exact: true })).toBeChecked();
+    await page.getByRole("button", { name: "Создать экземпляры", exact: true }).click();
+    await expect(page.locator(".postcard-batch-template")).toContainText(name);
     await expect(page.getByRole("list", { name: "Экземпляры тиража" }).getByRole("listitem")).toHaveCount(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
