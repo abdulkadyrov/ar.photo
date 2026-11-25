@@ -24,6 +24,12 @@ const snapshot: BuyerSnapshot = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("postcard buyer API boundary", () => {
+  it("keeps all four numeric activation digits including leading zeros", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(snapshot)));
+    vi.stubGlobal("fetch", fetchMock);
+    await new PostcardBuyerApi(config).claim(publicToken, "0042", editToken);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).shopCode).toBe("0042");
+  });
   it("keeps signed preview URLs stable while polling, but refreshes changed assets and explicit retries", async () => {
     const media = "https://khanzama.ru/storage/v1/object/sign/markers-private/card.png";
     const fetchMock = vi

@@ -112,7 +112,7 @@ export class SupabasePostcardRepository implements PostcardRepository {
     if (error) fail(error);
     return z
       .string()
-      .regex(/^[A-F0-9]{12}$/)
+      .regex(/^(?:[0-9]{4}|[A-F0-9]{12})$/)
       .parse(data);
   }
   async createBatch(accountId: string, raw: BatchInput, requestId: string) {

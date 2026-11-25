@@ -58,7 +58,7 @@ async function mockBuyer(page: Page, initiallyPublished = false) {
     const body = route.request().postDataJSON();
     expect(body.publicToken).toBe(publicToken);
     if (body.action === "claim") {
-      expect(body.shopCode).toBe("ABCDEF123456");
+      expect(body.shopCode).toBe("0042");
       expect(body.editToken).toMatch(/^[a-f0-9]{64}$/);
       ownerToken = body.editToken;
       state = "claimed";
@@ -100,7 +100,7 @@ for (const width of [319, 390, 1440]) {
     await page.goto(`./card/${publicToken}`);
     await expect(page.getByRole("heading", { name: "Активируйте открытку" })).toBeVisible();
     await page.screenshot({ path: `artifacts/postcards-full-20261125/buyer-${width}-activation.png`, fullPage: true });
-    await page.getByLabel("Код с вкладыша").fill("ABCD · EF12 · 3456");
+    await page.getByLabel("Код с вкладыша").fill("0042");
     await page.getByRole("button", { name: "Активировать открытку", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Добавьте своё видео" })).toBeVisible();
     await page.getByRole("radio", { name: /На всю открытку/ }).check();
@@ -164,7 +164,7 @@ test("cancelled browser Back preserves the exact buyer entry, File and placement
     { token: publicToken },
   );
   await page.goto(`./card/${publicToken}`);
-  await page.getByLabel("Код с вкладыша").fill("ABCDEF123456");
+  await page.getByLabel("Код с вкладыша").fill("0042");
   await page.getByRole("button", { name: "Активировать открытку", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Добавьте своё видео" })).toBeVisible();
   const picker = page.getByLabel("Выбрать видео для открытки");

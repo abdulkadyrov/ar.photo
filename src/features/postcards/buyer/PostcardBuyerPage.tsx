@@ -408,12 +408,12 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
                           value={shopCode}
                           onChange={(event) => setShopCode(event.target.value)}
                           autoComplete="off"
-                          autoCapitalize="characters"
+                          inputMode="numeric"
                           spellCheck={false}
                           maxLength={64}
                           required
                           disabled={Boolean(busy)}
-                          placeholder="Введите код магазина"
+                          placeholder="4 цифры с вкладыша"
                         />
                         <Button
                           type="submit"

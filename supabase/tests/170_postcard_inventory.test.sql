@@ -8,7 +8,7 @@ select set_config('request.jwt.claim.role', 'authenticated', true);
 select lives_ok($$select public.postcard_create_shop('20000000-0000-4000-8000-000000000001','Postcard test shop','Test address','a7000000-0000-4000-8000-000000000001')$$, 'owner creates shop');
 select lives_ok($$select public.postcard_create_shop('20000000-0000-4000-8000-000000000001','Postcard test shop','Test address','a7000000-0000-4000-8000-000000000001')$$, 'shop request retries safely');
 select is((select count(*)::int from public.postcard_shops where id='a7000000-0000-4000-8000-000000000001'),1,'one shop after retry');
-select matches(public.postcard_get_shop_code('20000000-0000-4000-8000-000000000001','a7000000-0000-4000-8000-000000000001'),'^[A-F0-9]{12}$','shop has shared activation code');
+select matches(public.postcard_get_shop_code('20000000-0000-4000-8000-000000000001','a7000000-0000-4000-8000-000000000001'),'^[0-9]{4}$','shop has shared four-digit numeric activation code');
 select throws_ok($$select * from private.postcard_shop_secrets$$,'42501',null,'secret table cannot be selected');
 select lives_ok($$select public.postcard_create_batch('20000000-0000-4000-8000-000000000001','eid','Postcard test batch',3,'a7000000-0000-4000-8000-000000000002')$$,'owner reserves batch');
 select lives_ok($$select public.postcard_create_batch('20000000-0000-4000-8000-000000000001','eid','Postcard test batch',3,'a7000000-0000-4000-8000-000000000002')$$,'batch request retries safely');

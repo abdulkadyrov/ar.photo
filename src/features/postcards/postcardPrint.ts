@@ -219,7 +219,12 @@ export async function createPostcardPrintHtml(
 
 /** Separate shop insert. No code is baked into the public postcard or its QR. */
 export function createShopActivationInsertHtml(shopName: string, activationCode: string, quantity = 10) {
-  if (!/^[A-F0-9]{12}$/.test(activationCode) || !Number.isInteger(quantity) || quantity < 1 || quantity > 100)
+  if (
+    !/^(?:[0-9]{4}|[A-F0-9]{12})$/.test(activationCode) ||
+    !Number.isInteger(quantity) ||
+    quantity < 1 ||
+    quantity > 100
+  )
     throw new Error("Проверьте код магазина и количество вкладышей (1–100).");
   const insert = `<article><strong>Ваше видео — внутри открытки</strong><p>Отсканируйте QR на открытке, введите код и добавьте своё видео.</p><div class="code">${activationCode.match(/.{4}/g)!.join(" · ")}</div><small>${escapeHtml(shopName)} · Хан Зама</small><p class="hint">Передайте этот вкладыш вместе с открыткой её покупателю.</p></article>`;
   const html = `<!doctype html><html lang="ru"><meta charset="utf-8"><title>Коды активации — ${escapeHtml(shopName)}</title><style>body{font-family:Arial,sans-serif;margin:0;color:#222}.controls{padding:16px}button{padding:12px;font:inherit}.inserts{display:flex;flex-wrap:wrap;gap:4mm}article{box-sizing:border-box;width:62mm;min-height:68mm;border:1px dashed #aaa;padding:5mm;break-inside:avoid}strong{font-size:13pt}p{font-size:10pt;line-height:1.5}.code{font-size:15pt;font-weight:bold;margin:5mm 0;white-space:nowrap}small,.hint{font-size:8pt}@page{size:A4;margin:8mm}@media print{.controls{display:none}}</style><div class="controls"><p>Вкладыши для магазина «${escapeHtml(shopName)}». Код одинаковый на всех вкладышах этого магазина.</p><button type="button" onclick="window.print()">Печатать вкладыши</button></div><main class="inserts">${insert.repeat(quantity)}</main></html>`;
