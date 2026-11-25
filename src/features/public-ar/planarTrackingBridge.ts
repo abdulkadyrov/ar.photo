@@ -22,7 +22,10 @@ type Controller = {
 };
 export type PlanarObservation = {
   corners: Quad;
+  // Availability controls the existing loss grace period; capture controls
+  // filter cadence and duplicate detection. They are different clocks.
   time: number;
+  frameTime?: number;
   input: { width: number; height: number };
   aspect: number;
 };
@@ -89,7 +92,8 @@ export function installPlanarObservations(
                   corners: isRotatedInput(runtime.video, inputSize)
                     ? (corners.map((p) => ({ x: p.y, y: 1 - p.x })) as Quad)
                     : corners,
-                  time:
+                  time: performance.now(),
+                  frameTime:
                     input !== null && typeof input === "object"
                       ? (capturedAt.get(input) ?? performance.now())
                       : performance.now(),
@@ -133,6 +137,7 @@ export function createPlanarAnchor(options: {
   group.visible = false;
   options.scene.add(group);
   let lastSample = -Infinity;
+  let acceptedAt = -Infinity;
   let current: PlanarObservation | null = null;
   const setVisible = (visible: boolean) => {
     if (group.visible === visible) return;
@@ -155,15 +160,19 @@ export function createPlanarAnchor(options: {
   const consumeObservation = () => {
     if (!options.anchor.visible) {
       cornerFilter.reset();
+      acceptedAt = -Infinity;
       current = null;
       setVisible(false);
       return;
     }
     const sample = options.readObservation();
-    if (!options.isTracking() || !sample || sample.time <= lastSample || now() - sample.time > PLANAR_HOLD_MS) return;
-    lastSample = sample.time;
-    const corners = cornerFilter.sample(sample.corners, sample.time);
+    if (!options.isTracking() || !sample || now() - sample.time > PLANAR_HOLD_MS) return;
+    const frameTime = sample.frameTime ?? sample.time;
+    if (frameTime <= lastSample) return;
+    lastSample = frameTime;
+    const corners = cornerFilter.sample(sample.corners, frameTime);
     if (!corners) return;
+    acceptedAt = sample.time;
     current = { ...sample, corners };
     updateMatrix();
     setVisible(true);
@@ -176,7 +185,7 @@ export function createPlanarAnchor(options: {
       // 3D pose solve. Render them immediately for an acquired target, without
       // bypassing acquisition hysteresis or processing a sample twice.
       consumeObservation();
-      if (!cornerFilter.fresh(now())) {
+      if (now() - acceptedAt > PLANAR_HOLD_MS) {
         setVisible(false);
         current = null;
       } else updateMatrix(); // viewport changes do not require a new recognition

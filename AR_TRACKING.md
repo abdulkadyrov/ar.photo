@@ -133,12 +133,16 @@ sustained pan without using accumulated filter lag to open the motion gate.
 Rejected samples, expired geometry and explicit resets clear velocity history.
 Perspective deformation retains its separate consistency filter.
 
-The pinned adapter timestamps each input tensor when the camera image is read.
-Repeated `video.currentTime` values keep the same timestamp; processing one
-camera frame twice no longer counts as two new observations. Once acquisition
+The pinned adapter timestamps each input tensor when the camera image is read,
+separately from when its planar coordinates become available. Repeated
+`video.currentTime` values keep the same capture timestamp; processing one
+camera frame twice no longer counts as two new observations. The existing
+120 ms loss grace starts at availability, so GPU processing time does not
+shorten it and cause intermittent hiding. Duplicate frames never refresh it.
+Once acquisition
 warmup has completed, the render loop consumes fresh planar coordinates before
-the vendor's asynchronous 3D worker callback. A delayed result older than the
-120 ms hold is rejected even if it was not seen before. No prediction extends
+the vendor's asynchronous 3D worker callback. An unconsumed result available
+more than 120 ms ago is rejected even if it was not seen before. No prediction extends
 tracking after the photograph is lost.
 
 On the existing deterministic 720×1280 stationary-noise and slow-pan fixtures:
