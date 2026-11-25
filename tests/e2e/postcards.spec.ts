@@ -39,7 +39,7 @@ for (const width of [319, 390, 1440]) {
     await page.getByRole("button", { name: "Сохранить магазин" }).click();
     await page.getByRole("button", { name: "Показать код магазина" }).click();
     const code = page.getByLabel("Код активации магазина");
-    await expect(code).toHaveText(/^[A-F0-9]{12}$/);
+    await expect(code).toHaveText(/^[0-9]{4}$/);
     const originalCode = await code.textContent();
     await page.getByRole("button", { name: "Скрыть код магазина" }).click();
     await expect(code).toHaveCount(0);

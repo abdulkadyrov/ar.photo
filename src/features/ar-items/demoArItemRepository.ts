@@ -280,8 +280,8 @@ export class DemoArItemRepository implements ArItemRepository {
   async publishBundle(accountId: string, rootItemId: string, publicBaseUrl: string, expiresAt?: string) {
     const root = await this.getItem(accountId, rootItemId);
     const bundleItems = (await this.listItems(accountId)).filter((item) => item.qr_bundle_id === root.qr_bundle_id);
-    if (!bundleItems.length || bundleItems.length > 20) {
-      throw new ArItemRepositoryError("limit_reached", "В одном QR-коде может быть до 20 AR-фото");
+    if (!bundleItems.length || bundleItems.length > 50) {
+      throw new ArItemRepositoryError("limit_reached", "В одном QR-коде может быть до 50 AR-фото");
     }
     await this.publish(accountId, root.id, publicBaseUrl, expiresAt);
     for (const item of bundleItems) {

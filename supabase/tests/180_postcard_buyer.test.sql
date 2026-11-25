@@ -20,6 +20,8 @@ select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claims','{"sub":"10000000-0000-4000-8000-000000000010","role":"authenticated","aal":"aal1"}',true);
 select lives_ok($$select public.postcard_create_shop('20000000-0000-4000-8000-000000000001','Buyer integration shop','Synthetic only','a8000000-0000-4000-8000-000000000001')$$,'owner creates the issuing shop');
 select set_config('test.pc_shop_code',public.postcard_get_shop_code('20000000-0000-4000-8000-000000000001','a8000000-0000-4000-8000-000000000001'),true);
+select matches(current_setting('test.pc_shop_code'),'^[0-9]{4}$','manager receives exactly four numeric digits');
+select is(public.postcard_get_shop_code('20000000-0000-4000-8000-000000000001','a8000000-0000-4000-8000-000000000001'),current_setting('test.pc_shop_code'),'shop PIN remains stable on repeated read');
 select lives_ok($$select public.postcard_create_batch('20000000-0000-4000-8000-000000000001','eid','Buyer integration batch',4,'a8000000-0000-4000-8000-000000000002')$$,'owner reserves a four-card batch');
 select set_config('test.pc_batch',(select id::text from public.postcard_batches where request_id='a8000000-0000-4000-8000-000000000002'),true);
 select lives_ok($$select public.postcard_prepare_batch('20000000-0000-4000-8000-000000000001',current_setting('test.pc_batch')::uuid)$$,'owner prepares the account-scoped printing project and group');
@@ -37,6 +39,15 @@ select lives_ok($$select public.postcard_move_cards('20000000-0000-4000-8000-000
 select lives_ok($$select public.create_group('20000000-0000-4000-8000-000000000001',current_setting('test.pc_project')::uuid,'Unrelated group','Synthetic mismatch fixture','a8000000-0000-4000-8000-000000000004')$$,'owner creates a different group for cross-group upload rejection');
 select set_config('test.pc_other_group',(select id::text from public.groups where account_id='20000000-0000-4000-8000-000000000001' and idempotency_key='a8000000-0000-4000-8000-000000000004'),true);
 reset role;
+
+select set_config('test.pc_legacy_code',(select activation_code from private.postcard_shop_secrets where shop_id='a8000000-0000-4000-8000-000000000001'),true);
+select ok((select bool_and(pin ~ '^[0-9]{4}$') from (select private.generate_postcard_shop_pin() pin from generate_series(1,1000)) samples),'all generated PINs contain four digits');
+select throws_ok($$update private.postcard_shop_secrets set activation_pin='42' where shop_id='a8000000-0000-4000-8000-000000000001'$$,'23514',null,'PIN constraint prevents losing leading zeros');
+update private.postcard_shop_secrets set activation_pin='0042' where shop_id='a8000000-0000-4000-8000-000000000001';
+set local role authenticated;
+select is(public.postcard_get_shop_code('20000000-0000-4000-8000-000000000001','a8000000-0000-4000-8000-000000000001'),'0042','manager receives leading-zero PIN verbatim');
+reset role;
+select set_config('test.pc_shop_code','0042',true);
 
 -- The PNG metadata mirrors the canonical server-uploaded 1200x1800 artwork.
 -- Card four intentionally has no registered print marker and cannot activate.
@@ -70,6 +81,7 @@ select throws_ok($$select * from private.postcard_claims$$,'42501',null,'even th
 select is(public.postcard_buyer_claim(current_setting('test.pc_token_1'),'WRONG',repeat('1',64))::text,
  public.postcard_buyer_claim(repeat('f',32),'WRONG',repeat('1',64))::text,'wrong code and unknown card produce the same generic response');
 select is(public.postcard_buyer_claim(current_setting('test.pc_token_4'),current_setting('test.pc_shop_code'),repeat('4',64))->>'error','invalid_card','unprinted stock cannot be activated');
+select is(public.postcard_buyer_claim(current_setting('test.pc_token_1'),'42',repeat('1',64))->>'error','invalid_card','claim requires all four digits including leading zeros');
 select set_config('test.pc_claim_1',public.postcard_buyer_claim(current_setting('test.pc_token_1'),current_setting('test.pc_shop_code'),repeat('1',64))::text,true);
 select ok((current_setting('test.pc_claim_1')::jsonb->>'owned')::boolean,'correct shop code atomically claims the specific card');
 select is(current_setting('test.pc_claim_1')::jsonb#>>'{card,state}','claimed','claim creates a draft, not an invented ready video');
@@ -86,8 +98,8 @@ select ok((select sold_at is null from public.postcard_cards where id=current_se
 select set_config('test.pc_item',(select ar_item_id::text from public.postcard_cards where id=current_setting('test.pc_card_1')::uuid),true);
 set local role service_role;
 select ok((public.postcard_buyer_claim(current_setting('test.pc_token_2'),
- lower(substr(current_setting('test.pc_shop_code'),1,4)||' · '||substr(current_setting('test.pc_shop_code'),5,4)||'-'||substr(current_setting('test.pc_shop_code'),9,4)),repeat('2',64))->>'owned')::boolean,
- 'printed grouped shop codes normalize spaces, middle dots, hyphens and case');
+ lower(substr(current_setting('test.pc_legacy_code'),1,4)||' · '||substr(current_setting('test.pc_legacy_code'),5,4)||'-'||substr(current_setting('test.pc_legacy_code'),9,4)),repeat('2',64))->>'owned')::boolean,
+ 'previously printed legacy codes still activate cards after the PIN migration');
 -- Safe fallback also makes a normalization regression fail only its own check.
 select public.postcard_buyer_claim(current_setting('test.pc_token_2'),current_setting('test.pc_shop_code'),repeat('2',64));
 reset role;

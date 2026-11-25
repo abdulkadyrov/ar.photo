@@ -58,7 +58,7 @@ const commonManifestShape = {
 };
 const publicManifestSchema = z.union([
   z.object({ version: z.literal(1), ...commonManifestShape }).strict(),
-  z.object({ version: z.literal(2), ...commonManifestShape, targets: z.array(targetSchema).min(2).max(20) }).strict(),
+  z.object({ version: z.literal(2), ...commonManifestShape, targets: z.array(targetSchema).min(2).max(50) }).strict(),
 ]);
 
 export type PublicArManifest = z.infer<typeof publicManifestSchema>;

@@ -47,7 +47,7 @@ import { cropImageFile } from "../media/cropImage";
 
 const mediaRepository = getMediaRepository();
 const arItemRepository = getArItemRepository();
-const MAX_QUICK_AR_PHOTOS = 10;
+const MAX_QUICK_AR_PHOTOS = 50;
 
 type QuickMediaPair = {
   edits?: PairEdits;
