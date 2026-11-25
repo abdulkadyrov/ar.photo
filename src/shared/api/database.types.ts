@@ -1,6 +1,9 @@
 // Keep database row types self-contained: the worker image copies this file without UI features.
 type PostcardShop = { id: string; account_id: string; name: string; address: string; created_at: string };
 type PostcardBatch = {
+  project_id: string | null;
+  group_id: string | null;
+  issued_by: string | null;
   id: string;
   account_id: string;
   template_code: string;
@@ -10,6 +13,10 @@ type PostcardBatch = {
   created_at: string;
 };
 type PostcardCard = {
+  print_marker_asset_id: string | null;
+  printed_at: string | null;
+  display_mode: string;
+  video_viewport: Json | null;
   id: string;
   account_id: string;
   batch_id: string;
@@ -1087,6 +1094,11 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      postcard_prepare_batch: { Args: { p_account_id: string; p_batch_id: string }; Returns: PostcardBatch };
+      postcard_attach_print_marker: {
+        Args: { p_account_id: string; p_card_id: string; p_asset_id: string };
+        Returns: PostcardCard;
+      };
       postcard_shop_report: { Args: { p_account_id: string }; Returns: Json };
       postcard_create_shop: {
         Args: { p_account_id: string; p_name: string; p_address: string; p_request_id: string };

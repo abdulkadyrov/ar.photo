@@ -214,3 +214,17 @@
     align-items: flex-start;
   }
 }
+
+.postcards-print-options {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  min-width: 0;
+}
+.postcards-print-options > label {
+  display: grid;
+  gap: 7px;
+  max-width: 300px;
+  font-size: 14px;
+  font-weight: 600;
+}

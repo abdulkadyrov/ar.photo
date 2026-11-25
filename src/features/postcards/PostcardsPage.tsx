@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useLocation } from "react-router-dom";
-import { Check, Download, Eye, EyeOff, PackagePlus, Plus, Store } from "lucide-react";
+import { Check, Download, Eye, EyeOff, PackagePlus, Plus, Store, ScanLine } from "lucide-react";
 import { AppShell } from "../../app/layout/AppShell";
 import { Button, ErrorState, Input, Panel, Select } from "../../shared/ui";
 import { useAuth } from "../auth/authContext";
 import { getCatalogRepository } from "../catalog/catalogRepository";
+import { getSettingsRepository } from "../settings/settingsRepository";
 import { getPostcardRepository } from "./postcardRepository";
 import {
   cardInventoryCode,
@@ -18,6 +19,9 @@ import {
   type PostcardShop,
 } from "./postcardModel";
 import "./PostcardsPage.css";
+
+const PostcardScanner = lazy(() => import("./PostcardScanner").then((module) => ({ default: module.PostcardScanner })));
+const PostcardPrintPanel = lazy(() => import("./PostcardPrintPanel"));
 
 const kinds = { assign: "Передать магазину", sell: "Отметить продажу", return: "Вернуть на склад" };
 type CreationKind = "shop" | "batch";
@@ -60,6 +64,12 @@ export function PostcardsRoute() {
 
 function PostcardsWorkspace({ accountId, canManage, demo }: { accountId: string; canManage: boolean; demo: boolean }) {
   const cache = useQueryClient();
+  const entitlements = useQuery({
+    queryKey: ["settings", "entitlements", accountId],
+    queryFn: () => getSettingsRepository().getEntitlements(accountId),
+    enabled: !demo,
+    refetchInterval: 30_000,
+  });
   const location = useLocation();
   const draftScope = `${accountId}:${location.key}`;
   const [batchId, setBatchId] = useState("");
@@ -116,6 +126,7 @@ function PostcardsWorkspace({ accountId, canManage, demo }: { accountId: string;
   }, [formBusy]);
   const [selected, setSelected] = useState<string[]>([]);
   const [scan, setScan] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [kind, setKind] = useState<MovementInput["kind"]>("assign");
   const [message, setMessage] = useState("");
   const [scanError, setScanError] = useState("");
@@ -192,32 +203,44 @@ function PostcardsWorkspace({ accountId, canManage, demo }: { accountId: string;
     setScanError("");
     move.reset();
   };
-  const submitScan = (event: FormEvent) => {
-    event.preventDefault();
-    const card = findScannedCard(scan, cards.data ?? []);
+  const addScannedCode = (value: string) => {
+    const card = findScannedCard(value, cards.data ?? []);
     if (!card) {
-      setScanError("Открытка не найдена в выбранном тираже. Проверьте номер и тираж.");
-      return;
+      const message = "Открытка не найдена в выбранном тираже. Проверьте номер и тираж.";
+      setScanError(message);
+      return { accepted: false, message };
     }
     if (!canMoveCard(card, { kind, shopId: currentShopId })) {
-      setScanError("Открытка недоступна для выбранного действия.");
-      return;
+      const message = "Открытка недоступна для выбранного действия.";
+      setScanError(message);
+      return { accepted: false, message };
     }
     if (selected.includes(card.id)) {
-      setScanError("Эта открытка уже выбрана.");
-      return;
+      const message = "Эта открытка уже выбрана.";
+      setScanError(message);
+      return { accepted: false, message };
     }
     setSelected((old) => [...old, card.id]);
     setScan("");
     setScanError("");
     setConfirm(false);
     scanRef.current?.focus();
+    return { accepted: true, message: `Открытка ${card.ordinal} добавлена.` };
+  };
+  const submitScan = (event: FormEvent) => {
+    event.preventDefault();
+    addScannedCode(scan);
   };
   return (
     <div className="postcards-workspace">
+      {scannerOpen && (
+        <Suspense fallback={<p role="status">Открываем сканер…</p>}>
+          <PostcardScanner onDetected={addScannedCode} onClose={() => setScannerOpen(false)} />
+        </Suspense>
+      )}
       <p className="postcards-stage">
-        {demo ? "Демо: данные хранятся только в этом браузере. " : ""}Учёт тиражей. Печать рабочих QR и активация видео
-        покупателем ещё не подключены.
+        {demo ? "Демо: данные хранятся только в этом браузере. " : ""}Создайте тираж, подготовьте печать и передайте
+        открытки магазину. Покупатель добавит своё видео по QR и коду на вкладыше.
       </p>
       {!canManage && (
         <p className="postcards-stage">
@@ -393,7 +416,24 @@ function PostcardsWorkspace({ accountId, canManage, demo }: { accountId: string;
                 />
                 <p className="postcards-muted">
                   {postcardTemplates.find((t) => t.code === currentBatch?.template_code)?.name} · 10 × 15 см. Создание
-                  тиража резервирует номера; AR-добавления пока не расходуются.
+                  тиража резервирует номера. Каждая новая активация расходует одно AR-добавление.
+                </p>
+                <p className="postcards-muted" role="status">
+                  {cards.data
+                    ? `Для оставшихся активаций этого тиража нужно: ${cards.data.filter((card) => !card.ar_item_id).length} добавлений. `
+                    : "Потребность тиража загружается. "}
+                  {demo || entitlements.error || !entitlements.data
+                    ? "Доступный остаток добавлений: недоступен."
+                    : entitlements.data.limits.arItems === null
+                      ? "Пакет: безлимитные добавления."
+                      : `Доступный остаток добавлений: ${Math.max(0, entitlements.data.limits.arItems - entitlements.data.usage.arItems)}.`}
+                  {entitlements.data &&
+                  cards.data &&
+                  entitlements.data.limits.arItems !== null &&
+                  cards.data.filter((card) => !card.ar_item_id).length >
+                    Math.max(0, entitlements.data.limits.arItems - entitlements.data.usage.arItems)
+                    ? " Пополните пакет перед передачей тиража: текущего остатка не хватит на все активации."
+                    : " Остаток общий для всех тиражей и других новых работ."}
                 </p>
                 {cards.isPending ? (
                   <p role="status">Загружаем экземпляры…</p>
@@ -446,6 +486,14 @@ function PostcardsWorkspace({ accountId, canManage, demo }: { accountId: string;
                             </Button>
                           </div>
                         </form>
+                        <Button
+                          variant="ghost"
+                          icon={<ScanLine size={18} />}
+                          disabled={!currentShopId}
+                          onClick={() => setScannerOpen(true)}
+                        >
+                          Сканировать камерой
+                        </Button>
                         {scanError && <p role="alert">{scanError}</p>}
                         <div className="postcards-selection">
                           <span>Выбрано: {selected.length}</span>
@@ -535,6 +583,20 @@ function PostcardsWorkspace({ accountId, canManage, demo }: { accountId: string;
               </div>
             )}
           </Panel>
+          {currentBatch && cards.data?.length ? (
+            <Suspense fallback={<p role="status">Открываем печать…</p>}>
+              <PostcardPrintPanel
+                key={currentBatch.id}
+                accountId={accountId}
+                batch={currentBatch}
+                cards={cards.data}
+                shop={currentShop}
+                canManage={canManage}
+                demo={demo}
+                onUpdated={invalidate}
+              />
+            </Suspense>
+          ) : null}
           <Panel>
             <h2>История движения</h2>
             <p className="postcards-muted">Последние 50 операций. Продажа отмечается отдельно от активации видео.</p>
@@ -641,7 +703,7 @@ function CreateForm({
                 <Input type="number" min={1} max={500} step={1} required value={quantity} onValueChange={setQuantity} />
               </label>
               <p className="postcards-muted">
-                Резервируем экземпляры 10 × 15 см. Печатный файл будет доступен после подключения шаблонов и активации.
+                Резервируем экземпляры 10 × 15 см. После создания подготовьте печать и передайте открытки магазину.
               </p>
             </>
           )}

@@ -2,6 +2,18 @@ import { z } from "zod";
 import { getPublicRuntimeConfig } from "../../shared/config/env";
 
 const assetUrl = z.string().url();
+export const videoViewportSchema = z
+  .object({
+    x: z.number().finite().min(0).max(1),
+    y: z.number().finite().min(0).max(1),
+    width: z.number().finite().positive().max(1),
+    height: z.number().finite().positive().max(1),
+  })
+  .strict()
+  .refine((rect) => rect.x + rect.width <= 1 && rect.y + rect.height <= 1, {
+    message: "Video viewport must remain inside the marker",
+  });
+export type VideoViewport = z.infer<typeof videoViewportSchema>;
 const markerSchema = z
   .object({
     width: z.number().int().positive(),
@@ -32,6 +44,7 @@ const targetSchema = z
     behavior: behaviorSchema,
     fallbackEnabled: z.boolean(),
     assets: assetsSchema,
+    videoViewport: videoViewportSchema.optional(),
   })
   .strict();
 const commonManifestShape = {
@@ -40,6 +53,7 @@ const commonManifestShape = {
   behavior: behaviorSchema,
   fallbackEnabled: z.boolean(),
   assets: assetsSchema,
+  videoViewport: videoViewportSchema.optional(),
   signedUrlsExpireAt: z.string().datetime({ offset: true }),
 };
 const publicManifestSchema = z.union([
@@ -75,6 +89,7 @@ export function publicArTargets(manifest: PublicArManifest): PublicArTarget[] {
       behavior: manifest.behavior,
       fallbackEnabled: manifest.fallbackEnabled,
       assets: manifest.assets,
+      ...(manifest.videoViewport ? { videoViewport: manifest.videoViewport } : {}),
     },
   ];
 }
@@ -106,7 +121,11 @@ export async function loadPublicManifest(publicSlug: string, signal?: AbortSigna
     throw new PublicManifestError("rate_limited", "Слишком много запросов. Попробуйте позже");
   if (!response.ok) throw new PublicManifestError("unavailable", "AR-фотография временно недоступна");
 
-  const parsed = publicManifestSchema.safeParse(await response.json().catch(() => null));
+  return parsePublicArManifest(await response.json().catch(() => null));
+}
+
+export function parsePublicArManifest(value: unknown): PublicArManifest {
+  const parsed = publicManifestSchema.safeParse(value);
   if (!parsed.success) throw new PublicManifestError("invalid_response", "Получен некорректный AR manifest");
   return parsed.data;
 }

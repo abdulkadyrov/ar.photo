@@ -1,0 +1,330 @@
+.postcard-buyer-page {
+  min-height: 100dvh;
+  background: #f7f6f3;
+  color: #17191f;
+}
+.postcard-buyer-header {
+  min-height: 72px;
+  padding: 18px max(20px, calc((100vw - 1120px) / 2));
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  border-bottom: 1px solid #e4e0d8;
+  background: white;
+}
+.postcard-buyer-brand {
+  color: #3b189c;
+  font-weight: 800;
+  font-size: 23px;
+  letter-spacing: -0.7px;
+  text-decoration: none;
+}
+.postcard-buyer-header > span {
+  color: #59616c;
+  font-size: 14px;
+}
+.postcard-buyer-main {
+  width: min(1120px, calc(100% - 40px));
+  margin: 40px auto 0;
+  padding-bottom: 28px;
+}
+.postcard-buyer-heading {
+  margin-bottom: 28px;
+}
+.postcard-buyer-heading h1,
+.postcard-buyer-panel > h1 {
+  font-size: clamp(27px, 3vw, 38px);
+  font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.postcard-buyer-heading > p {
+  color: #59616c;
+  margin-top: 12px;
+  font-size: 16px;
+}
+.postcard-buyer-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(320px, 1.1fr);
+  gap: 40px;
+  align-items: start;
+}
+.postcard-buyer-preview-section {
+  min-width: 0;
+  max-width: 440px;
+}
+.postcard-buyer-preview {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  background: #e8e3da;
+  overflow: hidden;
+  border-radius: 3px;
+}
+.postcard-buyer-preview > img {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  display: block;
+}
+.postcard-buyer-preview > video {
+  position: absolute;
+  object-fit: cover;
+  display: block;
+  background: #17191f;
+}
+.postcard-buyer-preview-unavailable {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: #514d45;
+  padding: 28px;
+  text-align: center;
+}
+.postcard-buyer-controls {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.postcard-buyer-panel {
+  background: #fff;
+  border: 1px solid #e4e0d8;
+  border-radius: 14px;
+  padding: 24px;
+  min-width: 0;
+}
+.postcard-buyer-panel h2,
+.postcard-buyer-access h2 {
+  font-size: 20px;
+  line-height: 1.3;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.postcard-buyer-panel > p,
+.postcard-buyer-access > p {
+  color: #464a54;
+  line-height: 1.65;
+  font-size: 15px;
+  max-width: 65ch;
+  margin-bottom: 16px;
+}
+.postcard-buyer-panel .btn,
+.postcard-buyer-access .btn {
+  min-height: 44px;
+}
+.postcard-buyer-form {
+  display: grid;
+  gap: 10px;
+}
+.postcard-buyer-form label {
+  font-weight: 600;
+  font-size: 14px;
+}
+.postcard-buyer-form .field-control {
+  min-width: 0;
+}
+.postcard-buyer-form .btn {
+  justify-self: start;
+  margin-top: 6px;
+}
+.postcard-buyer-hint {
+  color: #59616c !important;
+  font-size: 13px !important;
+  line-height: 1.65;
+  margin-top: 12px;
+  margin-bottom: 0 !important;
+}
+.postcard-buyer-notice {
+  display: flex;
+  gap: 9px;
+  color: #24583a;
+  font-size: 14px;
+  line-height: 1.6;
+  align-items: flex-start;
+}
+.postcard-buyer-notice > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.postcard-buyer-error {
+  padding: 16px;
+  background: #fff0ef;
+  color: #9b2531;
+  font-size: 14px;
+  line-height: 1.6;
+  border-radius: 12px;
+}
+.postcard-buyer-modes {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 20px;
+}
+.postcard-buyer-mode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e4e0d8;
+  border-radius: 10px;
+  min-height: 60px;
+  cursor: pointer;
+}
+.postcard-buyer-mode-selected {
+  background: #f5f2ff;
+  border-color: #8067ef;
+}
+.postcard-buyer-mode input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: #6142f4;
+}
+.postcard-buyer-mode strong {
+  font-size: 14px;
+  display: block;
+}
+.postcard-buyer-mode small {
+  color: #59616c;
+  font-size: 12px;
+  line-height: 1.6;
+  display: block;
+  margin-top: 3px;
+}
+.postcard-buyer-picker {
+  position: relative;
+  width: 100%;
+  cursor: pointer;
+}
+.postcard-buyer-picker:focus-within {
+  outline: 2px solid #7357ff;
+  outline-offset: 3px;
+}
+.postcard-buyer-picker-disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.postcard-buyer-file {
+  overflow-wrap: anywhere;
+  font-weight: 600;
+  font-size: 14px;
+  margin-top: 16px;
+}
+.postcard-buyer-file > small {
+  display: block;
+  font-weight: 400;
+  color: #59616c;
+  margin-top: 5px;
+}
+.postcard-buyer-progress {
+  margin: 18px 0;
+  font-size: 14px;
+}
+.postcard-buyer-progress progress {
+  accent-color: #6142f4;
+  width: 100%;
+  height: 8px;
+  margin-top: 12px;
+}
+.postcard-buyer-jobs {
+  margin: 18px 0;
+  display: grid;
+  gap: 12px;
+}
+.postcard-buyer-jobs li {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 13px;
+}
+.postcard-buyer-jobs li > strong {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.postcard-buyer-access {
+  border-top: 1px solid #e4e0d8;
+  padding-top: 20px;
+}
+.postcard-buyer-access h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 16px;
+}
+.postcard-buyer-access h2 svg {
+  flex-shrink: 0;
+}
+.postcard-buyer-access > div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.postcard-buyer-access > div .btn {
+  font-size: 13px;
+}
+.postcard-buyer-footer {
+  border-top: 1px solid #e4e0d8;
+  margin-top: 40px;
+  padding-top: 20px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+  color: #59616c;
+}
+.postcard-buyer-footer a {
+  color: #5942cf;
+  text-underline-offset: 4px;
+}
+@media (max-width: 720px) {
+  .postcard-buyer-header {
+    padding: 16px 20px;
+    min-height: 64px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .postcard-buyer-header > span {
+    font-size: 12px;
+  }
+  .postcard-buyer-main {
+    width: calc(100% - 28px);
+    margin-top: 28px;
+  }
+  .postcard-buyer-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .postcard-buyer-preview-section {
+    max-width: 320px;
+    width: min(100%, 320px);
+    margin: 0 auto;
+  }
+  .postcard-buyer-layout-activation .postcard-buyer-preview-section {
+    grid-row: 2;
+  }
+  .postcard-buyer-preview {
+    width: min(100%, 37.333dvh);
+    margin: 0 auto;
+  }
+  .postcard-buyer-panel {
+    padding: 20px;
+  }
+  .postcard-buyer-controls {
+    gap: 16px;
+  }
+  .postcard-buyer-access > div {
+    flex-direction: column;
+  }
+  .postcard-buyer-access > div .btn {
+    justify-content: center;
+  }
+  .postcard-buyer-form .btn {
+    justify-self: stretch;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .postcard-buyer-page * {
+    scroll-behavior: auto !important;
+  }
+}

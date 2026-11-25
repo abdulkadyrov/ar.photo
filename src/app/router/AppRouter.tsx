@@ -1,4 +1,6 @@
 import { lazy, Suspense, type ReactNode } from "react";
+// Register the optional buyer POP gate before BrowserRouter installs its history listener.
+import "../../features/postcards/buyer/postcardBuyerHistory";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { File } from "lucide-react";
 import { PublicDocument } from "../../shared/ui/PublicDocument";
@@ -14,6 +16,9 @@ const QuickStartRoute = lazy(() =>
 );
 const DashboardRoute = lazy(() =>
   import("../../features/dashboard/DashboardPage").then((module) => ({ default: module.DashboardRoute })),
+);
+const PostcardBuyerRoute = lazy(() =>
+  import("../../features/postcards/buyer/PostcardBuyerPage").then((module) => ({ default: module.PostcardBuyerRoute })),
 );
 const PostcardsRoute = lazy(() =>
   import("../../features/postcards/PostcardsPage").then((module) => ({ default: module.PostcardsRoute })),
@@ -137,6 +142,7 @@ function RoutedContent() {
           <Route path="/update-password" element={<Protected element={<UpdatePasswordRoute />} />} />
           <Route path="/mfa" element={<Protected element={<MfaVerificationRoute />} />} />
           <Route path="/dashboard" element={<Protected element={<DashboardRoute />} />} />
+          <Route path="/card/:publicToken" element={<PostcardBuyerRoute />} />
           <Route path="/postcards" element={<Protected element={<PostcardsRoute />} />} />
           <Route path="/create" element={<Protected element={<QuickStartRoute />} />} />
           <Route path="/projects" element={<Protected element={<ProjectsRoute />} />} />
