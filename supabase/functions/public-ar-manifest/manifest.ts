@@ -95,7 +95,7 @@ export function createPublicManifest(
   assets: SignedManifestAssets[],
   signedUrlsExpireAt: string,
 ) {
-  if (!sources.length || sources.length !== assets.length) throw new Error("Invalid public AR bundle");
+  if (!sources.length || sources.length > 50 || sources.length !== assets.length) throw new Error("Invalid public AR bundle");
   const targets = sources.map((source, index) => createTarget(source, assets[index]));
   const primary = targets[0];
   return {

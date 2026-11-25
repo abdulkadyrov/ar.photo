@@ -1,4 +1,5 @@
 import type * as Three from "three";
+import { installAlbumCandidateSearch, type FeaturePoint } from "./albumCandidateSearch";
 import {
   createCornerFilter,
   cornerProjectionMatrix,
@@ -17,6 +18,7 @@ type Controller = {
   addImageTargets(url: string): Promise<unknown>;
   addImageTargetsFromBuffer(buffer: ArrayBuffer): unknown;
   dummyRun(input: HTMLVideoElement): unknown;
+  _workerMatch?: (points: FeaturePoint[], indices: number[]) => Promise<unknown>;
   inputLoader?: { loadInput(input: HTMLVideoElement): object };
   tracker?: { track(input: unknown, pose: unknown, index: number): { worldCoords: Point2[]; screenCoords: Point2[] } };
 };
@@ -51,6 +53,7 @@ export function installPlanarObservations(
           const buffer = await response.arrayBuffer();
           signal.throwIfAborted();
           const result = next.addImageTargetsFromBuffer(buffer);
+          installAlbumCandidateSearch(next, result);
           const tracker = next.tracker;
           if (!tracker) throw new Error("MindAR observation contract unavailable");
           const capturedAt = new WeakMap<object, number>();
@@ -105,7 +108,9 @@ export function installPlanarObservations(
             }
             return sample;
           };
-          return result;
+          // Three needs only dimensions. Do not retain a second full matching
+          // dataset in the startup promise after the worker and index own it.
+          return { dimensions: next.markerDimensions };
         } catch (error) {
           // The vendor uses an async Promise executor, which loses rejections.
           // Reject our cancellable startup boundary and leave its executor idle.

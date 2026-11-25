@@ -77,4 +77,13 @@ describe("public AR manifest client", () => {
     ])
       expect(() => parsePublicArManifest({ ...legacy, videoViewport })).toThrow(PublicManifestError);
   });
+  it("accepts 50 photographs on one QR and rejects a 51st target", async () => {
+    const legacy = await loadPublicManifest("demo");
+    const target = publicArTargets(legacy)[0];
+    const targets = Array.from({ length: 50 }, (_, i) => ({ ...target, targetId: `target-${i}` }));
+    expect(publicArTargets(parsePublicArManifest({ ...legacy, version: 2, targets }))).toHaveLength(50);
+    expect(() =>
+      parsePublicArManifest({ ...legacy, version: 2, targets: [...targets, { ...target, targetId: "target-50" }] }),
+    ).toThrow(PublicManifestError);
+  });
 });
