@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { postcardTemplateCodes } from "../postcardTemplates";
 import { getPublicRuntimeConfig, type PublicRuntimeConfig } from "../../../shared/config/env";
 
 export const publicCardTokenPattern = /^[a-f0-9]{32}$/;
@@ -17,7 +18,7 @@ const frameSchema = z
 export const buyerSnapshotSchema = z.object({
   card: z.object({
     publicToken: z.string().regex(publicCardTokenPattern),
-    templateCode: z.enum(["new-year", "eid", "march-8", "autumn-ball", "best-friend", "brother-vip"]),
+    templateCode: z.enum(postcardTemplateCodes),
     title: z.string().max(160),
     state: z.enum(["available", "claimed", "processing", "ready", "published", "unavailable"]),
     mode: buyerModeSchema,

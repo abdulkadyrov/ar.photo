@@ -34,6 +34,7 @@
     "build:worker": "tsc -p tsconfig.worker.json --pretty false",
     "generate:test-mind": "node scripts/generate-test-mind.mjs",
     "preview": "vite preview --host 0.0.0.0",
+    "test:e2e:albums": "playwright test --config playwright.albums.config.ts",
     "test:e2e:postcards": "playwright test --config playwright.postcards.config.ts"
   },
   "dependencies": {

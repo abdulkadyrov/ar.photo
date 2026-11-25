@@ -24,6 +24,17 @@ const snapshot: BuyerSnapshot = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("postcard buyer API boundary", () => {
+  it.each(["love-meadow", "love-moon"])(
+    "accepts the new %s artwork without weakening the public boundary",
+    (templateCode) => {
+      expect(
+        buyerSnapshotSchema.parse({ ...snapshot, card: { ...snapshot.card, templateCode } }).card.templateCode,
+      ).toBe(templateCode);
+      expect(
+        buyerSnapshotSchema.safeParse({ ...snapshot, card: { ...snapshot.card, templateCode: "unknown" } }).success,
+      ).toBe(false);
+    },
+  );
   it("keeps all four numeric activation digits including leading zeros", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(snapshot)));
     vi.stubGlobal("fetch", fetchMock);

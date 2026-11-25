@@ -1,13 +1,7 @@
 import { z } from "zod";
 
-export const postcardTemplates = [
-  { code: "new-year", name: "Новый год" },
-  { code: "eid", name: "Ид аль-Фитр" },
-  { code: "march-8", name: "8 Марта" },
-  { code: "autumn-ball", name: "Осенний бал" },
-  { code: "best-friend", name: "День рождения ЛП" },
-  { code: "brother-vip", name: "День рождения друга / брата · VIP" },
-] as const;
+import { postcardTemplateCatalog, postcardTemplateCodes } from "./postcardTemplates";
+export const postcardTemplates = postcardTemplateCatalog.map(({ code, name }) => ({ code, name }));
 
 export const shopInputSchema = z.object({
   name: z.string().trim().min(1, "Введите название магазина").max(120),
@@ -15,7 +9,7 @@ export const shopInputSchema = z.object({
 });
 export const batchInputSchema = z.object({
   name: z.string().trim().min(1, "Введите название тиража").max(120),
-  templateCode: z.enum(["new-year", "eid", "march-8", "autumn-ball", "best-friend", "brother-vip"]),
+  templateCode: z.enum(postcardTemplateCodes),
   quantity: z.number().int().min(1).max(500),
 });
 export const shopSchema = z.object({

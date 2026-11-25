@@ -1,0 +1,13 @@
+{
+  "tool": "image_gen.imagegen",
+  "assets": [
+    {
+      "code": "love-meadow",
+      "prompt": "Edit this exact postcard asset non-destructively for production printing. Change ONLY the blank pure-white QR placeholder square at the bottom right: remove that white square completely and continue the surrounding warm ivory paper background seamlessly through its former area. The real QR is inserted later in software. Preserve everything else exactly: image dimensions and portrait2:3 ratio, the couple, meadow, moon, all photograph colors and position, rectangular photo frame, all typography, exact Russian and English text, the guillemets around the headline, quote, layout, footer caption. Do not add text, QR modules, icons, gradients, borders or objects. The result must look identical to the input except no white placeholder square remains in the footer."
+    },
+    {
+      "code": "love-moon",
+      "prompt": "Edit this exact navy romantic postcard asset for production printing. Change ONLY the blank white QR placeholder square at the bottom right: remove the entire white square, replacing its exact area with a seamless continuation of the surrounding dark navy paper background. The actual QR is inserted by software later. Preserve absolutely everything else: dimensions, portrait2:3 ratio, all moon and stars details, adult couple silhouettes and hands, palm trees, rectangular photo frame and its position, every Russian and English letter, headline, quote, footer caption, typography and all colors. No QR modules, no new objects, no extra text. Identical image except no white footer placeholder remains."
+    }
+  ]
+}

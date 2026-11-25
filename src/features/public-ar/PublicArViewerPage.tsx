@@ -27,12 +27,19 @@ import { Button } from "../../shared/ui";
 import { saveArRecording, type ArRecording } from "./arRecording";
 import {
   cachePublicArProject,
+  loadPublicArVideo,
+  publicArAssetFingerprint,
+  refreshedPlaybackTarget,
   loadCachedPublicArProject,
-  materializeCachedPublicArProject,
   type CachedPublicArProject,
-  type MaterializedPublicArProject,
 } from "./publicArCache";
-import { loadPublicManifest, manifestRefreshDelay, PublicManifestError, type PublicArManifest } from "./publicManifest";
+import {
+  loadPublicManifest,
+  manifestRefreshDelay,
+  publicArTargets,
+  PublicManifestError,
+  type PublicArManifest,
+} from "./publicManifest";
 import {
   createPublicArPlaybackVideos,
   startPublicMindAr,
@@ -57,6 +64,9 @@ export function PublicArViewerRoute() {
   const [message, setMessage] = useState("");
   const [muted, setMuted] = useState(true);
   const [paused, setPaused] = useState(false);
+  const [cacheUnavailable, setCacheUnavailable] = useState(false);
+  const [videoState, setVideoState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const latestManifestRef = useRef<PublicArManifest | null>(null);
   const [cacheStep, setCacheStep] = useState<1 | 2 | 3 | 4>(1);
   const [recording, setRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -66,7 +76,6 @@ export function PublicArViewerRoute() {
   const scannerVideoRef = useRef<HTMLVideoElement>(null);
   const scannerStreamRef = useRef<MediaStream | null>(null);
   const sessionRef = useRef<PublicArSession | null>(null);
-  const materializedRef = useRef<MaterializedPublicArProject | null>(null);
   const preparedVideosRef = useRef<HTMLVideoElement[]>([]);
   const flowControllerRef = useRef<AbortController | null>(null);
   const telemetry = useMemo(() => createPublicArTelemetry(publicSlug), [publicSlug]);
@@ -74,6 +83,7 @@ export function PublicArViewerRoute() {
   const refreshManifest = useCallback(
     async (signal?: AbortSignal) => {
       const next = await loadPublicManifest(publicSlug, signal);
+      latestManifestRef.current = next;
       setManifest(next);
       return next;
     },
@@ -84,6 +94,14 @@ export function PublicArViewerRoute() {
     const controller = new AbortController();
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
+      flowControllerRef.current?.abort();
+      sessionRef.current?.stop();
+      sessionRef.current = null;
+      stopMediaStream(scannerStreamRef.current);
+      scannerStreamRef.current = null;
+      releasePreparedVideos(preparedVideosRef.current);
+      preparedVideosRef.current = [];
+      latestManifestRef.current = null;
       setManifest(null);
       setNotFound(false);
       setCachedProject(null);
@@ -129,8 +147,6 @@ export function PublicArViewerRoute() {
       scannerStreamRef.current = null;
       sessionRef.current?.stop();
       sessionRef.current = null;
-      materializedRef.current?.dispose();
-      materializedRef.current = null;
       releasePreparedVideos(preparedVideosRef.current);
       preparedVideosRef.current = [];
     },
@@ -151,6 +167,8 @@ export function PublicArViewerRoute() {
     const controller = new AbortController();
     flowControllerRef.current = controller;
     setMessage("");
+    setVideoState("idle");
+    setCacheUnavailable(false);
     setRecordingNotice("");
     telemetry.track("camera_started");
     const playbackVideos = createPublicArPlaybackVideos(manifest, muted);
@@ -187,8 +205,6 @@ export function PublicArViewerRoute() {
       if (preparedVideosRef.current === playbackVideos) preparedVideosRef.current = [];
       sessionRef.current?.stop();
       sessionRef.current = null;
-      materializedRef.current?.dispose();
-      materializedRef.current = null;
       setMode("error");
       setMessage(classifyViewerError(error));
       telemetry.track("error", null, viewerErrorCode(error));
@@ -207,21 +223,47 @@ export function PublicArViewerRoute() {
     signal.throwIfAborted();
     sessionRef.current?.stop();
     sessionRef.current = null;
-    materializedRef.current?.dispose();
-    const materialized = materializeCachedPublicArProject(manifest, project);
-    materializedRef.current = materialized;
     const session = await startPublicMindAr({
       container: containerRef.current,
-      manifest: materialized.manifest,
+      manifest,
       muted,
       playbackVideos,
       cameraStream,
       signal,
+      trackingAssets: project.targets.map((target) => target.trackingAsset),
+      async loadVideo(index, loadSignal) {
+        const original = publicArTargets(manifest)[index];
+        const load = (current: PublicArManifest) => {
+          const target = refreshedPlaybackTarget(current, original);
+          if (!target) {
+            setRecordingNotice("Альбом обновлён. Откройте QR-код заново.");
+            throw new DOMException("Photo is no longer published", "NotFoundError");
+          }
+          const legacy =
+            publicArAssetFingerprint(current) === project.fingerprint ? project.targets[index]?.video : undefined;
+          return loadPublicArVideo(target.assets.videoUrl, loadSignal, legacy, () => setCacheUnavailable(true));
+        };
+        try {
+          return await load(latestManifestRef.current ?? manifest);
+        } catch (error) {
+          loadSignal.throwIfAborted();
+          if (!(error instanceof DOMException) || !("status" in error) || ![401, 403].includes(Number(error.status)))
+            throw error;
+          return load(await refreshManifest(loadSignal));
+        }
+      },
+      onMediaState(state) {
+        setVideoState(state);
+        if (state !== "idle") setPaused(true);
+      },
       onTrackingState: (state: PublicArTrackingState) => {
         setMode(state);
         if (state === "tracking") telemetry.track("marker_detected");
       },
-      onPlaybackEvent: (event, valueSeconds, errorCode) => telemetry.track(event, valueSeconds, errorCode),
+      onPlaybackEvent: (event, valueSeconds, errorCode) => {
+        if (event === "playback_started") setPaused(false);
+        telemetry.track(event, valueSeconds, errorCode);
+      },
     });
     if (signal.aborted) {
       session.stop();
@@ -246,8 +288,6 @@ export function PublicArViewerRoute() {
     flowControllerRef.current?.abort();
     sessionRef.current?.stop();
     sessionRef.current = null;
-    materializedRef.current?.dispose();
-    materializedRef.current = null;
     setRecording(false);
     setMode("fallback");
   };
@@ -350,7 +390,7 @@ export function PublicArViewerRoute() {
               <div className="ar-pairing-card">
                 <ScanLine size={23} />
                 <h1>Наведите камеру на QR-код</h1>
-                <p>Проект сохранится на этом устройстве</p>
+                <p>Просмотренные видео сохранятся на устройстве</p>
                 {message ? <span className="ar-pairing-warning">{message}</span> : null}
               </div>
             </>
@@ -377,7 +417,15 @@ export function PublicArViewerRoute() {
         <>
           <div className="ar-status-pill" role="status">
             <span className={mode === "tracking" ? "ar-status-dot ar-status-dot-live" : "ar-status-dot"} />
-            {mode === "starting" ? "Готовим камеру" : mode === "tracking" ? "Фото найдено" : "Наведите камеру на фото"}
+            {mode === "starting"
+              ? "Готовим камеру"
+              : mode === "tracking"
+                ? videoState === "loading"
+                  ? "Загружаем видео…"
+                  : videoState === "error"
+                    ? "Видео не загрузилось"
+                    : "Фото найдено"
+                : "Наведите камеру на фото"}
           </div>
           {mode !== "tracking" ? <CornerGuide className="ar-photo-guide" testId="marker-scan-guide" /> : null}
           {mode !== "starting" ? (
@@ -388,6 +436,7 @@ export function PublicArViewerRoute() {
                 className={`ar-record-button ${recording ? "ar-record-button-active" : ""}`}
                 aria-label={recording ? "Остановить запись AR" : "Записать AR-видео"}
                 aria-pressed={recording}
+                disabled={!recording && videoState !== "ready"}
                 onClick={() => void toggleRecording()}
               >
                 <span />
@@ -407,7 +456,7 @@ export function PublicArViewerRoute() {
             </button>
             <button
               type="button"
-              disabled={mode !== "tracking"}
+              disabled={mode !== "tracking" || videoState === "loading" || videoState === "idle"}
               onClick={() => {
                 void sessionRef.current
                   ?.togglePlayback()
@@ -415,7 +464,8 @@ export function PublicArViewerRoute() {
                   .catch(() => setRecordingNotice("Не удалось изменить воспроизведение"));
               }}
             >
-              {paused ? <Play size={18} /> : <Pause size={18} />} {paused ? "Продолжить" : "Пауза"}
+              {paused ? <Play size={18} /> : <Pause size={18} />}{" "}
+              {videoState === "error" ? "Повторить загрузку" : paused ? "Продолжить" : "Пауза"}
             </button>
             {typeof document.documentElement.requestFullscreen === "function" ? (
               <button
@@ -433,9 +483,12 @@ export function PublicArViewerRoute() {
               </button>
             ) : null}
           </div>
-          {recordingNotice ? (
+          {recordingNotice || cacheUnavailable ? (
             <div className="ar-record-notice" role="status">
-              <span>{recordingNotice}</span>
+              <span>
+                {recordingNotice ||
+                  "Не удалось сохранить видео на устройстве. Для повторного просмотра может понадобиться интернет."}
+              </span>
               {pendingRecording ? (
                 <button type="button" onClick={() => void savePendingRecording()}>
                   <Download size={16} /> Сохранить
