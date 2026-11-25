@@ -82,7 +82,7 @@ export class DemoPostcardRepository implements PostcardRepository {
     }
     const shop = { id: requestId, account_id: accountId, ...input, created_at: new Date().toISOString() };
     state.shops.unshift(shop);
-    state.codes[shop.id] = crypto.randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase();
+    state.codes[shop.id] = String(crypto.getRandomValues(new Uint16Array(1))[0] % 10000).padStart(4, "0");
     this.save(state);
     return shop;
   }

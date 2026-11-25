@@ -123,6 +123,14 @@ describe("postcard printing", () => {
     expect(() => postcardPublicUrl("../../other")).toThrow("Некорректный номер");
   });
 
+  it("prints four-digit PINs with leading zeros and keeps legacy inserts compatible", async () => {
+    const html = await createShopActivationInsertHtml("Shop", "0042", 2).text();
+    expect(html.match(/class="code">0042</g)).toHaveLength(2);
+    expect(html).not.toContain("/card/");
+    expect(() => createShopActivationInsertHtml("Shop", "42")).toThrow();
+    expect(() => createShopActivationInsertHtml("Shop", "12a4")).toThrow();
+  });
+
   it("keeps shared shop activation codes on separate escaped inserts", async () => {
     const html = await createShopActivationInsertHtml('<script>alert("x")</script>', "ABCDEF123456", 3).text();
     expect(html).toContain("&lt;script&gt;");
