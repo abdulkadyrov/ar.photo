@@ -123,6 +123,8 @@ export function createCornerFilter() {
   let candidate: Quad | null = null;
   let previousResidual: Quad | null = null;
   let consistentShape = 0;
+  let previousInput: Quad | null = null;
+  let velocity: Quad | null = null;
   const distance = (a: Quad, b: Quad) => Math.max(...a.map((p, i) => Math.hypot(p.x - b[i].x, p.y - b[i].y)));
   return {
     reset() {
@@ -130,6 +132,8 @@ export function createCornerFilter() {
       candidate = null;
       previousResidual = null;
       consistentShape = 0;
+      previousInput = null;
+      velocity = null;
       acceptedAt = -Infinity;
     },
     fresh(now: number) {
@@ -141,6 +145,7 @@ export function createCornerFilter() {
         corners = next.map((p) => ({ ...p })) as Quad;
         previousResidual = null;
         consistentShape = 0;
+        velocity = null;
       } else {
         const size = Math.max(0.02, Math.hypot(corners[0].x - corners[2].x, corners[0].y - corners[2].y));
         const delta = distance(corners, next) / size;
@@ -150,15 +155,33 @@ export function createCornerFilter() {
         const oneCornerSlipped = displacements[3] > 0.04 && displacements[3] > 3 * Math.max(displacements[1], 0.005);
         if ((delta > 0.18 || oneCornerSlipped) && (!candidate || distance(candidate, next) / size > 0.03)) {
           candidate = next;
+          // A rejected solve must not become apparent camera velocity.
+          previousInput = null;
+          velocity = null;
           return null;
         }
         // Approach/retreat is mostly one coherent scale + translation. Let
         // that motion follow quickly without also opening the noise gate for
         // independent corner wobble (especially magnified near the photograph).
         const coherent = fitCornerSimilarity(corners, next);
-        const motion = distance(corners, coherent) / size;
         const deformation = distance(coherent, next) / size;
         const dt = (now - acceptedAt) / 1000;
+        // Adapt to sustained velocity rather than distance from the filtered
+        // output. Distance feedback opens/closes the noise gate as lag builds
+        // up, producing stick-slip during a slow pan. Low-pass the signed
+        // similarity velocity so alternating solve noise cancels out.
+        const inputMotion = previousInput ? fitCornerSimilarity(previousInput, next) : next;
+        const velocityAlpha = 1 - Math.exp(-2 * Math.PI * 2.5 * dt);
+        velocity = inputMotion.map((p, i) => {
+          const origin = previousInput?.[i] ?? corners![i];
+          const vx = (p.x - origin.x) / dt;
+          const vy = (p.y - origin.y) / dt;
+          return {
+            x: (velocity?.[i].x ?? 0) + velocityAlpha * (vx - (velocity?.[i].x ?? 0)),
+            y: (velocity?.[i].y ?? 0) + velocityAlpha * (vy - (velocity?.[i].y ?? 0)),
+          };
+        }) as Quad;
+        const speed = Math.max(...velocity.map((p) => Math.hypot(p.x, p.y))) / size;
         const coefficient = (amount: number, quiet: number, moving: number, start: number, end: number) => {
           const t = Math.max(0, Math.min(1, (amount - start) / (end - start)));
           const smooth = t * t * (3 - 2 * t);
@@ -172,10 +195,7 @@ export function createCornerFilter() {
           : 0;
         consistentShape = correlation > 0.85 && deformation > 0.0005 ? consistentShape + 1 : 0;
         previousResidual = residual;
-        // A few pixels of shared homography noise are not a camera sweep.
-        // Keep the quiet cutoff until motion exceeds 0.6% of the target
-        // diagonal; larger movements still reach the existing fast cutoff.
-        const motionAlpha = coefficient(motion, 3, 35, 0.006, 0.012);
+        const motionAlpha = coefficient(speed, 2, 35, 0.05, 0.14);
         // A sustained perspective change is motion, not noise. Alternating
         // corner errors do not pass this directional consistency check.
         const shapeAlpha =
@@ -186,6 +206,7 @@ export function createCornerFilter() {
         })) as Quad;
       }
       candidate = null;
+      previousInput = next.map((p) => ({ ...p })) as Quad;
       acceptedAt = now;
       return corners;
     },
