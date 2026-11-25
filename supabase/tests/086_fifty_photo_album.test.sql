@@ -49,8 +49,9 @@ select lives_ok($test$ select public.publish_ar_bundle('20000000-0000-4000-8000-
  (select id from public.ar_items where idempotency_key='a7000000-0000-4000-8000-000000000001'),'https://example.test/ar.photo',null); $test$,'a fully processed 50-photo album publishes atomically');
 select is((select count(*) from public.qr_codes q join public.ar_items i on i.id=q.ar_item_id where i.idempotency_key::text like 'a7000000-%'),1::bigint,'50 photographs use one durable QR');
 reset role;
+select set_config('test.album_public_slug',(select public_slug from public.ar_items where idempotency_key='a7000000-0000-4000-8000-000000000001'),true);
 set local role service_role;
-select is((select count(*) from public.get_public_ar_manifest_source((select public_slug from public.ar_items where idempotency_key='a7000000-0000-4000-8000-000000000001'))),50::bigint,'the public boundary returns all 50 targets');
+select is((select count(*) from public.get_public_ar_manifest_source(current_setting('test.album_public_slug'))),50::bigint,'the public boundary returns all 50 targets');
 reset role;
 select ok(not pg_catalog.has_function_privilege('authenticated','public.get_public_ar_manifest_source(text)','EXECUTE'),'the publication source stays service-only');
 set local role authenticated;
