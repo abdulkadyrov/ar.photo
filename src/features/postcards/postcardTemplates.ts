@@ -7,9 +7,10 @@ export const postcardTemplateCodes = [
   "brother-vip",
   "love-meadow",
   "love-moon",
+  "milka-gift",
 ] as const;
 export type PostcardTemplateCode = (typeof postcardTemplateCodes)[number];
-export type PostcardTemplateCategory = "Любовь" | "Праздники" | "День рождения";
+export type PostcardTemplateCategory = "Любовь" | "Праздники" | "День рождения" | "Подарки";
 
 export type PostcardFrame = Readonly<{ x: number; y: number; width: number; height: number }>;
 
@@ -28,6 +29,17 @@ export type PostcardPrintTemplate = Readonly<{
 // Normalized inner picture rectangles are inset from decorative borders/corners.
 // These bounds describe artwork v1 only. Printed cards retain their stored marker.
 export const postcardTemplateCatalog: readonly PostcardPrintTemplate[] = [
+  {
+    code: "milka-gift",
+    version: 1,
+    name: "Подарочная корзинка · Milka",
+    imagePath: "postcards/milka-gift-v1.webp",
+    category: "Подарки",
+    caption: "Маленький подарок. Большие чувства.",
+    searchTerms: "milka милка шоколад сладкий корзина корзинка подарок сиреневый нежность",
+    frame: { x: 0.085, y: 0.255, width: 0.83, height: 0.4 },
+    ink: "#fff5e9",
+  },
   {
     code: "love-meadow",
     version: 1,
