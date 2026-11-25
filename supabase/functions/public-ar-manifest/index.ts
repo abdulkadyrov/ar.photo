@@ -12,6 +12,8 @@ import {
   type PublicManifestSource,
 } from "./manifest.ts";
 
+import { signManifestAssets } from "./manifestSigning.ts";
+
 Deno.serve(async (request) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -94,35 +96,16 @@ Deno.serve(async (request) => {
     }
   }
 
-  const signedTargets = await Promise.all(
-    sources.map(async (source) => {
-      const [tracking, video, poster] = await Promise.all([
-        client.storage.from(source.tracking_bucket).createSignedUrl(source.tracking_path, SIGNED_URL_TTL_SECONDS),
-        client.storage.from(source.video_bucket).createSignedUrl(source.video_path, SIGNED_URL_TTL_SECONDS),
-        client.storage.from(source.poster_bucket).createSignedUrl(source.poster_path, SIGNED_URL_TTL_SECONDS),
-      ]);
-      return { tracking, video, poster };
-    }),
-  );
-  if (signedTargets.some(({ tracking, video, poster }) => tracking.error || video.error || poster.error)) {
+  let signedTargets;
+  try {
+    signedTargets = await signManifestAssets(client.storage, sources, SIGNED_URL_TTL_SECONDS);
+  } catch {
     console.error("Public manifest bundle signing failed", { targetCount: sources.length });
     return json({ code: "manifest_unavailable" }, 503, cors);
   }
 
   const expiresAt = new Date(Date.now() + SIGNED_URL_TTL_SECONDS * 1000).toISOString();
-  return json(
-    createPublicManifest(
-      sources,
-      signedTargets.map(({ tracking, video, poster }) => ({
-        trackingAssetUrl: tracking.data!.signedUrl,
-        videoUrl: video.data!.signedUrl,
-        posterUrl: poster.data!.signedUrl,
-      })),
-      expiresAt,
-    ),
-    200,
-    cors,
-  );
+  return json(createPublicManifest(sources, signedTargets, expiresAt), 200, cors);
 });
 
 function json(payload: Record<string, unknown>, status: number, extraHeaders: Record<string, string> = {}) {
