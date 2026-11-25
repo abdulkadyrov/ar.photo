@@ -37,7 +37,7 @@ Worker вычисляет brightness, contrast, sharpness, feature density и en
 | `starting`               | пользователь нажал «Начать AR»                      | Проверяются HTTPS, camera API и WebGL; lazy-load MindAR/Three          |
 | `searching`              | камера запущена, target не найден                   | Показана рамка и инструкция держать фото целиком                       |
 | `tracking`               | первое принятое измерение стабилизатора             | Plane становится видимым; autoplay запускает muted video               |
-| `searching` после потери | потеря anchor или 180 мс без принятой позы          | Применяется выбранное `markerLost` behavior                            |
+| `searching` после потери | потеря anchor или 120 мс без принятой геометрии     | Применяется выбранное `markerLost` behavior                            |
 | `fallback`               | пользователь выбрал обычное видео или AR недоступен | `<video controls playsInline>` работает без камеры/tracking            |
 | `error`                  | permission/device/WebGL/tracking failure            | Безопасное сообщение, retry и fallback                                 |
 
@@ -54,7 +54,7 @@ Worker вычисляет brightness, contrast, sharpness, feature density и en
 - Видео не растягивается: UV координаты выполняют симметричный `cover` crop к пропорциям маркера; при одинаковом aspect UV остаётся 1:1.
 - Public viewer извлекает `worldCoords/screenCoords` непосредственно из `controller.tracker.track` MindAR 1.2.5. RANSAC (до 64 выборок, порог 3 пикселя камеры) оценивает homography между исходной фотографией и кадром. Она определяет четыре угла фотографии; для надёжности нужны минимум 8 inliers, доля 60%, распределение минимум по 45% ширины/высоты и ненулевая площадь опорных точек.
 - `planarTracking.ts` строит projective matrix с однородной координатой W. Поэтому все четыре угла и внутренние UV видео следуют перспективе фотографии; рендер не зависит от неоднозначного 3D-поворота плоского target или предположенного библиотекой угла обзора 45°. Cover-преобразование камеры и viewport учитывается явно.
-- Сглаживаются четыре экранных угла одним коэффициентом: тихий шум — cutoff 3 Hz, движение — 35 Hz. Одиночный скачок одного угла или всей области требует согласованного следующего измерения. Поза старше 120 мс скрывается; повторные матрицы `missTolerance` не продлевают срок. После потери захват начинается с нового измерения.
+- Сглаживание разделяет общее перемещение/масштаб/поворот и изменение перспективы. Для общего движения cutoff меняется от 2 до 35 Hz по сглаженной знаковой скорости (2.5 Hz), а не накопленному отставанию. Одиночный скачок одного угла или всей области требует согласованного следующего измерения. Геометрия старше 120 мс скрывается; повторные кадры камеры и матрицы `missTolerance` не продлевают срок. После потери захват начинается с нового измерения.
 - Поворот InputLoader на 90° компенсируется при переставленных размерах видео, включая квадратный кадр. ResizeObserver, window и visualViewport синхронизируют размер canvas и камеры. При остановке снимаются listeners/observer и завершается worker.
 - MindAR сохраняет `filterMinCF=1`, `filterBeta=0`, warmup=7/miss=10 для распознавания. Его 3D-поза используется внутри feature tracker, но не определяет геометрию публичного видео. Старый `poseStabilizer.ts` остаётся в prototype viewer.
 - Первый запуск передаёт открытый MediaStream QR-сканера в AR без второго getUserMedia. Камера сразу имеет полноэкранный cover-размер; `play()` и проверка готовых пикселей заменяют зависимость от единственного `loadedmetadata`. Отмена и таймаут освобождают даже поздно разрешённый stream. iOS warmup workaround ставится синхронно при создании controller, а не таймером.
@@ -123,3 +123,36 @@ The slow-pan regression stays below 3 camera pixels of lag and settles below
 0.2 pixels within half a second after stopping. These are synthetic filter
 measurements, not measurements of physical iPhone tracking. Existing approach,
 perspective, fast-motion, outlier and reacquisition tests remain required.
+
+### Camera-motion stability (2026-11-25)
+
+Coherent motion now adapts to signed similarity velocity, low-passed at 2.5 Hz.
+The shared-motion cutoff rises smoothly from 2 to 35 Hz between 0.05 and 0.14
+target diagonals per second. This separates alternating solve noise from a
+sustained pan without using accumulated filter lag to open the motion gate.
+Rejected samples, expired geometry and explicit resets clear velocity history.
+Perspective deformation retains its separate consistency filter.
+
+The pinned adapter timestamps each input tensor when the camera image is read.
+Repeated `video.currentTime` values keep the same timestamp; processing one
+camera frame twice no longer counts as two new observations. Once acquisition
+warmup has completed, the render loop consumes fresh planar coordinates before
+the vendor's asynchronous 3D worker callback. A delayed result older than the
+120 ms hold is rejected even if it was not seen before. No prediction extends
+tracking after the photograph is lost.
+
+On the existing deterministic 720×1280 stationary-noise and slow-pan fixtures:
+
+| Observations/s | Jitter RMS / raw, before → after | Steady pan maximum lag, camera pixels, before → after |
+| -------------- | -------------------------------- | ----------------------------------------------------- |
+| 15             | 0.5960 → 0.4313                  | 1.1501 → 0.2439                                       |
+| 30             | 0.3334 → 0.2356                  | 1.9142 → 0.5899                                       |
+| 60             | 0.1721 → 0.1265                  | 2.2674 → 0.8728                                       |
+
+Pan measurements exclude the first second of the three-second run, at normalized
+velocity (0.06, 0.02)/s. Tests also cover irregular observation intervals, stale
+worker results, duplicate inputs, acquisition gating and exactly-once filtering.
+These are synthetic regression measurements, not physical-device or end-to-end
+camera latency measurements. Device acceptance must compare a stationary view,
+slow/fast pan, approach/retreat, strong tilt, stop/reversal and reacquisition on
+the same printed photograph, including glare and partial occlusion.

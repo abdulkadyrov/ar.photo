@@ -3,6 +3,7 @@ import {
   createCornerFilter,
   cornerProjectionMatrix,
   estimatePlanarQuad,
+  PLANAR_HOLD_MS,
   type Point2,
   type Quad,
 } from "./planarTracking";
@@ -16,6 +17,7 @@ type Controller = {
   addImageTargets(url: string): Promise<unknown>;
   addImageTargetsFromBuffer(buffer: ArrayBuffer): unknown;
   dummyRun(input: HTMLVideoElement): unknown;
+  inputLoader?: { loadInput(input: HTMLVideoElement): object };
   tracker?: { track(input: unknown, pose: unknown, index: number): { worldCoords: Point2[]; screenCoords: Point2[] } };
 };
 export type PlanarObservation = {
@@ -48,6 +50,24 @@ export function installPlanarObservations(
           const result = next.addImageTargetsFromBuffer(buffer);
           const tracker = next.tracker;
           if (!tracker) throw new Error("MindAR observation contract unavailable");
+          const capturedAt = new WeakMap<object, number>();
+          if (next.inputLoader) {
+            const load = next.inputLoader.loadInput.bind(next.inputLoader);
+            let mediaTime = -Infinity;
+            let frameTime = -Infinity;
+            next.inputLoader.loadInput = (video) => {
+              // The worker can finish long after this camera frame was read.
+              // Timestamp capture, not completion; repeated camera frames must
+              // neither strengthen smoothing nor extend stale geometry's life.
+              if (video.currentTime !== mediaTime) {
+                mediaTime = video.currentTime;
+                frameTime = performance.now();
+              }
+              const tensor = load(video);
+              capturedAt.set(tensor, frameTime);
+              return tensor;
+            };
+          }
           const track = tracker.track.bind(tracker);
           tracker.track = (input, pose, index) => {
             const sample = track(input, pose, index);
@@ -69,7 +89,10 @@ export function installPlanarObservations(
                   corners: isRotatedInput(runtime.video, inputSize)
                     ? (corners.map((p) => ({ x: p.y, y: 1 - p.x })) as Quad)
                     : corners,
-                  time: performance.now(),
+                  time:
+                    input !== null && typeof input === "object"
+                      ? (capturedAt.get(input) ?? performance.now())
+                      : performance.now(),
                   input: isRotatedInput(runtime.video, inputSize)
                     ? { width: inputSize.height, height: inputSize.width }
                     : inputSize,
@@ -129,7 +152,7 @@ export function createPlanarAnchor(options: {
     if (!clip) return;
     group.matrix.multiplyMatrices(options.camera.projectionMatrixInverse, clip);
   };
-  options.anchor.onTargetUpdate = () => {
+  const consumeObservation = () => {
     if (!options.anchor.visible) {
       cornerFilter.reset();
       current = null;
@@ -137,7 +160,7 @@ export function createPlanarAnchor(options: {
       return;
     }
     const sample = options.readObservation();
-    if (!options.isTracking() || !sample || sample.time <= lastSample) return;
+    if (!options.isTracking() || !sample || sample.time <= lastSample || now() - sample.time > PLANAR_HOLD_MS) return;
     lastSample = sample.time;
     const corners = cornerFilter.sample(sample.corners, sample.time);
     if (!corners) return;
@@ -145,9 +168,14 @@ export function createPlanarAnchor(options: {
     updateMatrix();
     setVisible(true);
   };
+  options.anchor.onTargetUpdate = consumeObservation;
   return {
     group,
     update() {
+      // Feature coordinates are ready before the vendor awaits its worker's
+      // 3D pose solve. Render them immediately for an acquired target, without
+      // bypassing acquisition hysteresis or processing a sample twice.
+      consumeObservation();
       if (!cornerFilter.fresh(now())) {
         setVisible(false);
         current = null;

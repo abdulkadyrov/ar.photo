@@ -163,7 +163,7 @@ describe("four-corner planar tracking", () => {
         filteredEnergy += error(actual, tilted) ** 2;
       }
     }
-    expect(Math.sqrt(filteredEnergy / rawEnergy)).toBeLessThan(fps === 15 ? 0.65 : 0.55);
+    expect(Math.sqrt(filteredEnergy / rawEnergy)).toBeLessThan(fps === 15 ? 0.48 : fps === 30 ? 0.28 : 0.15);
   });
 
   it.each([15, 30, 60])("keeps slow camera motion responsive and settles after stopping at %i Hz", (fps) => {
@@ -181,6 +181,66 @@ describe("four-corner planar tracking", () => {
       actual = filter.sample(expected, 2000 + (frame * 1000) / fps)!;
     }
     expect(error(actual, expected)).toBeLessThan(0.2);
+  });
+
+  it.each([15, 30, 60])("limits steady-pan lag to one camera pixel at %i Hz", (fps) => {
+    const filter = createCornerFilter();
+    filter.sample(tilted, 0);
+    for (let frame = 1; frame <= fps * 3; frame++) {
+      const expected = tilted.map((p) => ({
+        x: p.x + (frame / fps) * 0.06,
+        y: p.y + (frame / fps) * 0.02,
+      })) as Quad;
+      const actual = filter.sample(expected, (frame * 1000) / fps)!;
+      if (frame > fps) expect(error(actual, expected)).toBeLessThan(1);
+    }
+  });
+
+  it.each([15, 30, 60])("bounds combined noise and lag while panning at %i Hz", (fps) => {
+    const filter = createCornerFilter();
+    filter.sample(tilted, 0);
+    let energy = 0;
+    for (let frame = 1; frame <= fps * 3; frame++) {
+      const expected = tilted.map((p) => ({
+        x: p.x + (frame / fps) * 0.06,
+        y: p.y + (frame / fps) * 0.02,
+      })) as Quad;
+      const noisy = expected.map((p) => ({
+        x: p.x + Math.sin(frame * 2.1) * 0.0028,
+        y: p.y + Math.cos(frame * 2.4) * 0.0018,
+      })) as Quad;
+      const actual = filter.sample(noisy, (frame * 1000) / fps)!;
+      expect(actual).not.toBeNull();
+      if (frame > fps) energy += error(actual, expected) ** 2;
+    }
+    expect(Math.sqrt(energy / (fps * 2))).toBeLessThan(2.1);
+  });
+
+  it("keeps noisy tracking stable at uneven camera intervals and resets velocity on reacquisition", () => {
+    const filter = createCornerFilter();
+    filter.sample(tilted, 0);
+    let time = 0,
+      rawEnergy = 0,
+      filteredEnergy = 0;
+    for (let frame = 1; frame <= 180; frame++) {
+      time += [16, 33, 50, 24, 42][frame % 5];
+      const noisy = tilted.map((p) => ({
+        x: p.x + Math.sin(frame * 2.1) * 0.0028,
+        y: p.y + Math.cos(frame * 2.4) * 0.0018,
+      })) as Quad;
+      const actual = filter.sample(noisy, time)!;
+      expect(actual).not.toBeNull();
+      if (frame > 15) {
+        rawEnergy += error(noisy, tilted) ** 2;
+        filteredEnergy += error(actual, tilted) ** 2;
+      }
+    }
+    expect(Math.sqrt(filteredEnergy / rawEnergy)).toBeLessThan(0.35);
+    const moved = tilted.map((p) => ({ x: p.x + 0.3, y: p.y })) as Quad;
+    expect(filter.sample(moved, time + PLANAR_HOLD_MS + 1)).toEqual(moved);
+    expect(filter.sample(moved, time + PLANAR_HOLD_MS + 34)).toEqual(moved);
+    filter.reset();
+    expect(filter.sample(tilted, time + PLANAR_HOLD_MS + 67)).toEqual(tilted);
   });
 
   it("rejects a single corner slipping while the other three stay in place", () => {
