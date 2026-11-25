@@ -18,6 +18,7 @@ import {
   type PostcardCard,
   type PostcardShop,
 } from "./postcardModel";
+import { PostcardTemplatePicker, PostcardTemplatePreview } from "./PostcardTemplatePicker";
 import "./PostcardsPage.css";
 
 const PostcardScanner = lazy(() => import("./PostcardScanner").then((module) => ({ default: module.PostcardScanner })));
@@ -28,7 +29,7 @@ type CreationKind = "shop" | "batch";
 type CreationDraft = {
   name: string;
   address: string;
-  template: (typeof postcardTemplates)[number]["code"];
+  template: (typeof postcardTemplates)[number]["code"] | null;
   quantity: string;
 };
 // Scoped to account + browser history entry. No activation codes or media are retained.
@@ -414,6 +415,7 @@ function PostcardsWorkspace({ accountId, canManage, demo }: { accountId: string;
                     resetSelection();
                   }}
                 />
+                {currentBatch && <PostcardTemplatePreview code={currentBatch.template_code} />}
                 <p className="postcards-muted">
                   {postcardTemplates.find((t) => t.code === currentBatch?.template_code)?.name} · 10 × 15 см. Создание
                   тиража резервирует номера. Каждая новая активация расходует одно AR-добавление.
@@ -644,17 +646,20 @@ function CreateForm({
   const [initial] = useState(() => creationDrafts.get(draftKey));
   const [name, setName] = useState(initial?.name ?? "");
   const [address, setAddress] = useState(initial?.address ?? "");
-  const [template, setTemplate] = useState<(typeof postcardTemplates)[number]["code"]>(initial?.template ?? "new-year");
+  const [template, setTemplate] = useState<(typeof postcardTemplates)[number]["code"] | null>(
+    initial?.template ?? null,
+  );
   const [quantity, setQuantity] = useState(initial?.quantity ?? "10");
   useEffect(() => {
     creationDrafts.set(draftKey, { name, address, template, quantity });
-    onDirtyChange(Boolean(name || address || template !== "new-year" || quantity !== "10"));
+    onDirtyChange(Boolean(name || address || template !== null || quantity !== "10"));
   }, [draftKey, name, address, template, quantity, onDirtyChange]);
   const request = useRef({ fingerprint: "", id: "" });
   const save = useMutation({
     onMutate: () => onBusyChange(true),
     onSettled: () => onBusyChange(false),
     mutationFn: async () => {
+      if (kind === "batch" && !template) throw new Error("Выберите открытку для тиража.");
       const fingerprint = JSON.stringify({ name, address, template, quantity });
       if (request.current.fingerprint !== fingerprint) request.current = { fingerprint, id: crypto.randomUUID() };
       const repository = await getPostcardRepository();
@@ -663,7 +668,7 @@ function CreateForm({
           ? await repository.createShop(accountId, { name, address }, request.current.id)
           : await repository.createBatch(
               accountId,
-              { name, templateCode: template, quantity: Number(quantity) },
+              { name, templateCode: template!, quantity: Number(quantity) },
               request.current.id,
             );
       return result.id;
@@ -680,7 +685,7 @@ function CreateForm({
           save.mutate();
         }}
       >
-        <fieldset disabled={save.isPending}>
+        <fieldset className={kind === "batch" ? "postcards-create-form-batch" : undefined} disabled={save.isPending}>
           <label>
             Название {kind === "shop" ? "магазина" : "тиража"} *
             <Input required maxLength={120} value={name} onValueChange={setName} autoFocus />
@@ -692,12 +697,7 @@ function CreateForm({
             </label>
           ) : (
             <>
-              <Select
-                label="Тема открытки"
-                value={template}
-                onChange={(e) => setTemplate(e.target.value as (typeof postcardTemplates)[number]["code"])}
-                options={postcardTemplates.map((t) => ({ value: t.code, label: t.name }))}
-              />
+              <PostcardTemplatePicker value={template} onChange={setTemplate} />
               <label>
                 Количество *
                 <Input type="number" min={1} max={500} step={1} required value={quantity} onValueChange={setQuantity} />
@@ -709,7 +709,7 @@ function CreateForm({
           )}
           {save.error && <p role="alert">{save.error.message}</p>}
           <div className="postcards-actions">
-            <Button type="submit">
+            <Button type="submit" disabled={kind === "batch" && !template}>
               {save.isPending ? "Сохраняем…" : kind === "shop" ? "Сохранить магазин" : "Создать экземпляры"}
             </Button>
             <Button type="button" variant="quiet" onClick={onCancel}>

@@ -49,7 +49,91 @@
       "sha256": "437f36e8e44a82b1090450a436b895cce72645318a651ce15f49c47b76e24ba0",
       "bytes": 582942,
       "reference": "exec-df1fc879-59af-487b-85db-18d937d20429.png"
+    },
+    {
+      "code": "love-meadow",
+      "source": "exec-783ca2b2-2c46-4590-87b6-2e0e1d725278.png",
+      "file": "love-meadow-v1.webp",
+      "sha256": "dacc7fca73be6e224c5975a8439144dc697c98aa3065f0be363734d8dea70c3d",
+      "bytes": 140304,
+      "reference": "love-meadow-v1 concept approved by user",
+      "edit": "Remove only the blank QR placeholder and continue the matching paper background; all text, imagery and frame remain fixed."
+    },
+    {
+      "code": "love-moon",
+      "source": "exec-5a079d3c-a3a0-443f-8d55-1224a95af717.png",
+      "file": "love-moon-v1.webp",
+      "sha256": "73330b3c4d14e3ce3041d6bc492eed1da101a305dc82663144161adbca8b8941",
+      "bytes": 123554,
+      "reference": "love-moon-v1 concept approved by user",
+      "edit": "Remove only the blank QR placeholder and continue the matching paper background; all text, imagery and frame remain fixed."
     }
   ],
-  "prompt": "Use case: precise-object-edit. This is an existing approved flat portrait 2:3 postcard print artwork, edit target attached. Make a surgical edit ONLY to remove the small demonstration black-and-white QR code in the lower right, its white square, the adjacent small words 'Добавь своё видео', its small divider/arrow if present. Reconstruct the same plain paper-colored or burgundy background there naturally. Keep the entire lower-right rectangle from 77% to 98% of width, 81% to 96% of height free of all text and ornaments to reserve for a real dynamically printed QR and serial number later. Do not add any QR, code, empty white box, placeholder, label, symbol or text. Preserve EXACTLY the large title, quotation, publisher imprint 'Хан Зама', central illustration, central picture window bounds, border, colors, artwork crop, paper texture and 2:3 aspect ratio from the source. No new art direction, no mockup, no hands, no desk. Main illustration and quote must remain identical in composition. Deliver one flat full-bleed edited card."
+  "prompt": "Use case: precise-object-edit. This is an existing approved flat portrait 2:3 postcard print artwork, edit target attached. Make a surgical edit ONLY to remove the small demonstration black-and-white QR code in the lower right, its white square, the adjacent small words 'Добавь своё видео', its small divider/arrow if present. Reconstruct the same plain paper-colored or burgundy background there naturally. Keep the entire lower-right rectangle from 77% to 98% of width, 81% to 96% of height free of all text and ornaments to reserve for a real dynamically printed QR and serial number later. Do not add any QR, code, empty white box, placeholder, label, symbol or text. Preserve EXACTLY the large title, quotation, publisher imprint 'Хан Зама', central illustration, central picture window bounds, border, colors, artwork crop, paper texture and 2:3 aspect ratio from the source. No new art direction, no mockup, no hands, no desk. Main illustration and quote must remain identical in composition. Deliver one flat full-bleed edited card.",
+  "previews": [
+    {
+      "file": "previews/autumn-ball-v1.webp",
+      "sha256": "0c081f96df777e3e985e4b8425bad481437eac9692bf8b521e4dac7c0501e6bf",
+      "derivedFrom": "autumn-ball-v1.webp",
+      "width": 480,
+      "height": 720,
+      "quality": 82
+    },
+    {
+      "file": "previews/love-meadow-v1.webp",
+      "sha256": "9d57b8210c3f0897a56e9220225006c2c1fda95efed532b18a3459223b5783ca",
+      "derivedFrom": "love-meadow-v1.webp",
+      "width": 480,
+      "height": 720,
+      "quality": 82
+    },
+    {
+      "file": "previews/love-moon-v1.webp",
+      "sha256": "b9d0b970d8731652e01a1871d897c2af8156262f38722b0fee4da8ca4ec2a4e4",
+      "derivedFrom": "love-moon-v1.webp",
+      "width": 480,
+      "height": 720,
+      "quality": 82
+    },
+    {
+      "file": "previews/eid-v1.webp",
+      "sha256": "5feb9e9a1e9f4727be6a506613642b12514f12d41bc12f1953907d2af94813e0",
+      "derivedFrom": "eid-v1.webp",
+      "width": 480,
+      "height": 720,
+      "quality": 82
+    },
+    {
+      "file": "previews/march-8-v1.webp",
+      "sha256": "2f1410e0da2090b14770c1b98e3bcf75a36024c4a172b16f486eb3f98c906b9e",
+      "derivedFrom": "march-8-v1.webp",
+      "width": 480,
+      "height": 720,
+      "quality": 82
+    },
+    {
+      "file": "previews/best-friend-v1.webp",
+      "sha256": "76f8a94da902177a26094e09f9c37c83d0b0700bf0d7cec4994d8dc6aa549b11",
+      "derivedFrom": "best-friend-v1.webp",
+      "width": 480,
+      "height": 720,
+      "quality": 82
+    },
+    {
+      "file": "previews/brother-vip-v1.webp",
+      "sha256": "e05a4db4355be43fedfcc6522234061553736e5d603d2bc2cb505aa4582812d3",
+      "derivedFrom": "brother-vip-v1.webp",
+      "width": 480,
+      "height": 720,
+      "quality": 82
+    },
+    {
+      "file": "previews/new-year-v1.webp",
+      "sha256": "201277610ac6d5c6304317d54bba14524a98b25577dedc33b171d58e00ad271d",
+      "derivedFrom": "new-year-v1.webp",
+      "width": 480,
+      "height": 720,
+      "quality": 82
+    }
+  ]
 }

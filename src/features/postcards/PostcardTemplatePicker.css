@@ -1,0 +1,222 @@
+.postcard-template-picker {
+  min-width: 0;
+}
+.postcard-template-picker h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+.postcard-template-search {
+  max-width: 480px;
+}
+.postcard-template-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.postcard-template-filters button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--border, #dedbd5);
+  border-radius: 24px;
+  background: var(--surface, #fff);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.postcard-template-filters button[aria-pressed="true"] {
+  background: #eee9ff;
+  border-color: #7454df;
+  color: #4d3398;
+}
+.postcard-template-selection {
+  margin: 12px 0;
+  font-size: 13px;
+  color: var(--text-secondary, #626174);
+}
+.postcard-template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.postcard-template-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border, #dedbd5);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+}
+.postcard-template-card.is-selected {
+  border-color: #7454df;
+  box-shadow: 0 0 0 1px #7454df;
+}
+.postcards-create-form label.postcard-template-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: calc(100% - 44px);
+  cursor: pointer;
+}
+.postcard-template-option input {
+  position: absolute;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  margin: 10px;
+  accent-color: #7454df;
+}
+.postcard-template-card:focus-within {
+  outline: 3px solid #7454df;
+  outline-offset: 3px;
+}
+.postcard-template-art {
+  position: relative;
+  display: block;
+  aspect-ratio: 2 / 3;
+  background: #f2efe8;
+}
+.postcard-template-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.postcard-template-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #7454df;
+  color: white;
+}
+.postcard-template-name {
+  display: block;
+  padding: 10px 10px 4px;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.postcard-template-enlarge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px;
+  border: 0;
+  background: transparent;
+  color: #5c459d;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.postcard-template-enlarge:hover {
+  background: #f1edfb;
+}
+.postcard-template-empty {
+  padding: 20px 0;
+}
+.postcard-preview-dialog {
+  width: min(560px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 16px;
+  border: 1px solid #dedbd5;
+  border-radius: 16px;
+  background: var(--surface, #fff);
+  color: var(--text, #202128);
+  overflow: auto;
+}
+.postcard-preview-dialog::backdrop {
+  background: #17121dcc;
+}
+.postcard-preview-content {
+  display: grid;
+  gap: 12px;
+}
+.postcard-preview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.postcard-preview-heading h3 {
+  margin: 0;
+  font-size: 17px;
+}
+.postcard-preview-close {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #dedbd5;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.postcard-preview-content > img {
+  display: block;
+  width: 100%;
+  height: min(65dvh, 660px);
+  object-fit: contain;
+  background: #f2efe8;
+}
+.postcard-preview-content p {
+  margin: 0;
+  font-size: 14px;
+}
+.postcard-preview-content p span {
+  display: block;
+  margin-top: 4px;
+}
+.postcard-batch-template {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 16px 0;
+}
+.postcard-batch-template > button {
+  flex: 0 0 80px;
+  padding: 0;
+  border: 1px solid #dedbd5;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: zoom-in;
+  background: #f2efe8;
+}
+.postcard-batch-template img {
+  display: block;
+  width: 80px;
+  height: 120px;
+  object-fit: contain;
+}
+.postcard-batch-template p {
+  margin: 6px 0;
+  font-size: 14px;
+}
+.postcard-artwork-error {
+  display: grid;
+  place-content: center;
+  height: 100%;
+  min-height: 120px;
+  padding: 8px;
+  font-size: 12px;
+  text-align: center;
+}
+.postcards-create-form fieldset.postcards-create-form-batch {
+  max-width: none;
+}
+@media (min-width: 768px) {
+  .postcard-template-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
