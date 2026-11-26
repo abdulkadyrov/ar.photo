@@ -586,7 +586,7 @@ function PostcardsWorkspace({ accountId, canManage, demo }: { accountId: string;
                 {movements.data.map((m) => (
                   <li key={m.id}>
                     <strong>
-                      {kinds[m.kind]} · {m.card_ids.length} шт.
+                      {m.origin === "buyer_code" ? "Привязка по коду" : kinds[m.kind]} · {m.card_ids.length} шт.
                     </strong>
                     <span>{shops.data.find((s) => s.id === m.shop_id)?.name ?? "Магазин"}</span>
                     <time dateTime={m.created_at}>{new Date(m.created_at).toLocaleString("ru-RU")}</time>

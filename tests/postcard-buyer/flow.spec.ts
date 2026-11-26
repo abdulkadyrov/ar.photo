@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 const publicToken = "1234567890abcdef1234567890abcdef";
 const slug = "abcdef".repeat(6);
 const uploadId = "70000000-0000-4000-8000-000000000001";
-const origin = "http://127.0.0.1:4182";
+const origin = process.env.POSTCARD_BUYER_TEST_ORIGIN ?? "http://127.0.0.1:4182";
 
 async function mockBuyer(page: Page, initiallyPublished = false) {
   await page.route(`${origin}/processed-postcard.mp4`, (route) =>
@@ -58,6 +58,10 @@ async function mockBuyer(page: Page, initiallyPublished = false) {
     const body = route.request().postDataJSON();
     expect(body.publicToken).toBe(publicToken);
     if (body.action === "claim") {
+      if (body.shopCode !== "0042") {
+        await route.fulfill({ status: 403, headers, json: { code: "activation_failed" } });
+        return;
+      }
       expect(body.shopCode).toBe("0042");
       expect(body.editToken).toMatch(/^[a-f0-9]{64}$/);
       ownerToken = body.editToken;
@@ -93,23 +97,32 @@ async function mockBuyer(page: Page, initiallyPublished = false) {
   });
 }
 
-for (const width of [319, 390, 1440]) {
+for (const width of [319, 390, 430, 1440]) {
   test(`activates, previews, uploads and explicitly publishes at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 1000 });
+    await page.setViewportSize({ width, height: width === 319 ? 619 : width === 430 ? 932 : 1000 });
     await mockBuyer(page);
     await page.goto(`./card/${publicToken}`);
     await expect(page.getByRole("heading", { name: "Активируйте открытку" })).toBeVisible();
-    await page.screenshot({ path: `artifacts/postcards-full-20261125/buyer-${width}-activation.png`, fullPage: true });
+    await page.screenshot({ path: `artifacts/buyer-easy-20261127/buyer-${width}-activation.png`, fullPage: true });
+    await expect(page.getByLabel("Код с вкладыша")).toBeInViewport();
+    await page.getByLabel("Код с вкладыша").fill("123");
+    await expect(page.getByRole("button", { name: "Активировать открытку", exact: true })).toBeDisabled();
+    await page.getByLabel("Код с вкладыша").fill("9999");
+    await page.getByRole("button", { name: "Активировать открытку", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText("Код не подошёл");
+    await expect(page.getByLabel("Код с вкладыша")).toHaveValue("9999");
+    if (width === 319) await page.screenshot({ path: "artifacts/buyer-easy-20261127/error-319.png", fullPage: true });
     await page.getByLabel("Код с вкладыша").fill("0042");
     await page.getByRole("button", { name: "Активировать открытку", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Добавьте своё видео" })).toBeVisible();
+    if (width === 319) await page.screenshot({ path: "artifacts/buyer-easy-20261127/choose-319.png", fullPage: true });
+    await page.getByLabel("Выбрать видео для открытки").setInputFiles("test-assets/fixtures/h264-aac.mp4");
     await page.getByRole("radio", { name: /На всю открытку/ }).check();
     await page.getByRole("radio", { name: /Внутри рамки/ }).check();
-    await page.getByLabel("Выбрать видео для открытки").setInputFiles("test-assets/fixtures/h264-aac.mp4");
     await expect(page.getByRole("button", { name: "Загрузить видео", exact: true })).toBeEnabled();
     await page.getByRole("button", { name: "Загрузить видео", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Проверьте и опубликуйте" })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByRole("button", { name: "Опубликовать подарок" })).toBeEnabled();
+    await expect(page.getByRole("heading", { name: "Готово к сохранению" })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("button", { name: "Сохранить открытку" })).toBeEnabled();
     await expect
       .poll(() =>
         page.locator(".postcard-buyer-preview video").evaluate((node) => {
@@ -128,13 +141,14 @@ for (const width of [319, 390, 1440]) {
     });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.evaluate(() => scrollTo(0, 0));
-    await page.screenshot({ path: `artifacts/postcards-full-20261125/buyer-${width}-ready.png`, fullPage: true });
-    await page.getByRole("button", { name: "Опубликовать подарок" }).click();
+    await page.screenshot({ path: `artifacts/buyer-easy-20261127/buyer-${width}-ready.png`, fullPage: true });
+    await page.getByRole("button", { name: "Сохранить открытку" }).click();
     await expect(page.getByRole("heading", { name: "Ваш подарок готов" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Посмотреть подарок" })).toHaveAttribute(
       "href",
       `/ar.photo/ar/${slug}`,
     );
+    await page.getByText("Сохранить доступ к видео", { exact: true }).click();
     const backup = page.waitForEvent("download");
     await page.getByRole("button", { name: /Скачать.*доступ|Скачать.*ссылк|Скачать файл/ }).click();
     expect((await backup).suggestedFilename()).toContain("доступ");
@@ -189,6 +203,6 @@ test("cancelled browser Back preserves the exact buyer entry, File and placement
   await expect(page.getByRole("radio", { name: /На всю открытку/ })).toBeChecked();
   expect(await page.evaluate(() => history.state)).toEqual({ idx: 1, key: "buyer-draft", usr: { draft: true } });
   await page.getByRole("button", { name: "Загрузить видео", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Проверьте и опубликуйте" })).toBeVisible({ timeout: 15000 });
-  await expect(page.getByRole("button", { name: "Опубликовать подарок" })).toBeEnabled();
+  await expect(page.getByRole("heading", { name: "Готово к сохранению" })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole("button", { name: "Сохранить открытку" })).toBeEnabled();
 });

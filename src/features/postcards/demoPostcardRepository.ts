@@ -157,6 +157,7 @@ export class DemoPostcardRepository implements PostcardRepository {
       shop_id: shop.id,
       card_ids: input.cardIds,
       actor_user_id: "00000000-0000-4000-8000-000000000001",
+      origin: "manager" as const,
       created_at: now,
     };
     state.movements.unshift(movement);

@@ -328,3 +328,88 @@
     scroll-behavior: auto !important;
   }
 }
+
+.postcard-buyer-steps {
+  display: flex;
+  gap: 18px;
+  margin-top: 16px;
+  list-style: none;
+  padding: 0;
+}
+.postcard-buyer-steps li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #59616c;
+}
+.postcard-buyer-steps li > span {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #d6d0e5;
+  border-radius: 50%;
+}
+.postcard-buyer-steps .is-active {
+  color: #5942cf;
+}
+.postcard-buyer-steps .is-active > span {
+  background: #eee9ff;
+  border-color: #8067ef;
+}
+.postcard-buyer-form #postcard-shop-code {
+  font-size: 24px;
+  letter-spacing: 0.16em;
+  font-variant-numeric: tabular-nums;
+}
+.postcard-buyer-editor > summary,
+.postcard-buyer-access > summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 12px 0;
+  font-size: 14px;
+  font-weight: 650;
+  color: #5942cf;
+}
+.postcard-buyer-editor > .postcard-buyer-panel {
+  margin-top: 8px;
+}
+.postcard-buyer-access:not([open]) {
+  padding-top: 0;
+}
+@media (max-width: 720px) {
+  .postcard-buyer-main {
+    margin-top: 20px;
+  }
+  .postcard-buyer-heading {
+    margin-bottom: 20px;
+  }
+  .postcard-buyer-panel {
+    padding: 18px;
+  }
+  .postcard-buyer-layout-owned .postcard-buyer-preview-small {
+    grid-row: 2;
+    max-width: 120px;
+  }
+  .postcard-buyer-layout-owned .postcard-buyer-preview {
+    width: min(100%, 25dvh);
+  }
+  .postcard-buyer-modes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 16px;
+    margin-bottom: 12px;
+    gap: 8px;
+  }
+  .postcard-buyer-mode {
+    padding: 9px;
+    min-height: 52px;
+    gap: 7px;
+  }
+  .postcard-buyer-mode strong {
+    font-size: 12px;
+  }
+  .postcard-buyer-panel > .btn {
+    width: 100%;
+  }
+}

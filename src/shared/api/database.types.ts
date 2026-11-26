@@ -35,7 +35,8 @@ type PostcardMovement = {
   kind: string;
   shop_id: string | null;
   card_ids: string[];
-  actor_user_id: string;
+  actor_user_id: string | null;
+  origin: "manager" | "buyer_code";
   created_at: string;
 };
 
