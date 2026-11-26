@@ -92,6 +92,23 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 describe("public postcard buyer journey", () => {
+  it("requires four numeric digits and keeps leading zeros", async () => {
+    open();
+    const input = await screen.findByLabelText("Код с вкладыша");
+    expect(input).toHaveAttribute("inputmode", "numeric");
+    fireEvent.change(input, { target: { value: "004" } });
+    expect(screen.getByRole("button", { name: "Активировать открытку" })).toBeDisabled();
+    expect(mocks.claim).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: "0042" } });
+    expect(input).toHaveValue("0042");
+    expect(screen.getByRole("button", { name: "Активировать открытку" })).toBeEnabled();
+    expect(screen.queryByText(available.card.title, { exact: true })).not.toBeInTheDocument();
+  });
+  it("still accepts a legacy printed code", async () => {
+    open();
+    fireEvent.change(await screen.findByLabelText("Код с вкладыша"), { target: { value: "ABCDEF123456" } });
+    expect(screen.getByRole("button", { name: "Активировать открытку" })).toBeEnabled();
+  });
   it("shows an activation form without studio sign-in or navigation", async () => {
     open();
     expect(await screen.findByRole("heading", { name: "Активируйте открытку" })).toBeVisible();
@@ -104,16 +121,17 @@ describe("public postcard buyer journey", () => {
       return withState("claimed");
     });
     open();
-    fireEvent.change(await screen.findByLabelText("Код с вкладыша"), { target: { value: "SECRET-SHOP" } });
+    fireEvent.change(await screen.findByLabelText("Код с вкладыша"), { target: { value: "0042" } });
     fireEvent.click(screen.getByRole("button", { name: "Активировать открытку" }));
-    await screen.findByRole("heading", { name: "Как показать видео" });
+    await screen.findByRole("heading", { name: "Выберите видео" });
     expect(mocks.claim).toHaveBeenCalledWith(
       publicToken,
-      "SECRET-SHOP",
+      "0042",
       expect.stringMatching(/^[a-f0-9]{64}$/),
       expect.any(AbortSignal),
     );
-    expect(JSON.stringify(localStorage)).not.toContain("SECRET-SHOP");
+    expect(Object.values(localStorage)).not.toContain("0042");
+    fireEvent.click(screen.getByText("Сохранить доступ к видео", { exact: true }));
     expect(screen.getByRole("button", { name: "Скопировать личную ссылку" })).toBeVisible();
   });
   it("opens the viewer directly for a published gift without editing access", async () => {
@@ -133,9 +151,9 @@ describe("public postcard buyer journey", () => {
     mocks.lookup.mockResolvedValue(withState("ready"));
     mocks.publish.mockResolvedValue(withState("published"));
     open();
-    await screen.findByRole("heading", { name: "Проверьте и опубликуйте" });
+    await screen.findByRole("heading", { name: "Готово к сохранению" });
     expect(mocks.publish).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Опубликовать подарок" }));
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить открытку" }));
     expect(await screen.findByRole("heading", { name: "Ваш подарок готов" })).toBeVisible();
     expect(mocks.publish).toHaveBeenCalledWith(publicToken, editToken, expect.any(AbortSignal));
   });
@@ -143,17 +161,18 @@ describe("public postcard buyer journey", () => {
     localStorage.setItem(`khanzama-postcard-edit-v1:${publicToken}`, editToken);
     mocks.lookup.mockResolvedValue(withState("ready"));
     open();
-    await screen.findByRole("heading", { name: "Проверьте и опубликуйте" });
+    await screen.findByRole("heading", { name: "Готово к сохранению" });
+    fireEvent.click(screen.getByText("Изменить видео", { exact: true }));
     fireEvent.click(screen.getByRole("radio", { name: /На всю открытку/ }));
-    expect(screen.getByRole("button", { name: "Опубликовать подарок" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Сохранить открытку" })).toBeDisabled();
     expect(mocks.publish).not.toHaveBeenCalled();
   });
   it("requires an available video preview before publishing a ready gift", async () => {
     localStorage.setItem(`khanzama-postcard-edit-v1:${publicToken}`, editToken);
     mocks.lookup.mockResolvedValue({ ...withState("ready"), videoPreviewUrl: null });
     open();
-    await screen.findByRole("heading", { name: "Проверьте и опубликуйте" });
-    expect(screen.getByRole("button", { name: "Опубликовать подарок" })).toBeDisabled();
+    await screen.findByRole("heading", { name: "Готово к сохранению" });
+    expect(screen.getByRole("button", { name: "Сохранить открытку" })).toBeDisabled();
     expect(screen.getByRole("alert")).toHaveTextContent("Предпросмотр видео временно недоступен");
     expect(mocks.publish).not.toHaveBeenCalled();
   });
@@ -161,9 +180,9 @@ describe("public postcard buyer journey", () => {
     localStorage.setItem(`khanzama-postcard-edit-v1:${publicToken}`, editToken);
     mocks.lookup.mockResolvedValue(withState("ready"));
     open();
-    await screen.findByRole("heading", { name: "Проверьте и опубликуйте" });
+    await screen.findByRole("heading", { name: "Готово к сохранению" });
     fireEvent.error(screen.getByLabelText("Предпросмотр вашего видео"));
-    expect(screen.getByRole("button", { name: "Опубликовать подарок" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Сохранить открытку" })).toBeDisabled();
     expect(screen.getByRole("alert")).toHaveTextContent("Предпросмотр видео временно недоступен");
     expect(screen.getByRole("button", { name: "Обновить состояние" })).toBeEnabled();
   });
@@ -175,10 +194,10 @@ describe("public postcard buyer journey", () => {
   it("keeps claim input after a network failure for a safe retry", async () => {
     mocks.claim.mockRejectedValue(new Error("Соединение прервано"));
     open();
-    fireEvent.change(await screen.findByLabelText("Код с вкладыша"), { target: { value: "RETRY-CODE" } });
+    fireEvent.change(await screen.findByLabelText("Код с вкладыша"), { target: { value: "0042" } });
     fireEvent.click(screen.getByRole("button", { name: "Активировать открытку" }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Соединение прервано"));
-    expect(screen.getByLabelText("Код с вкладыша")).toHaveValue("RETRY-CODE");
+    expect(screen.getByLabelText("Код с вкладыша")).toHaveValue("0042");
     expect(screen.getByRole("button", { name: "Активировать открытку" })).toBeEnabled();
   });
   it("uploads only video, polls processing and waits for explicit publication", async () => {
@@ -209,8 +228,8 @@ describe("public postcard buyer journey", () => {
     );
     expect(mocks.publish).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Обновить состояние" }));
-    await screen.findByRole("heading", { name: "Проверьте и опубликуйте" });
-    fireEvent.click(screen.getByRole("button", { name: "Опубликовать подарок" }));
+    await screen.findByRole("heading", { name: "Готово к сохранению" });
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить открытку" }));
     await screen.findByRole("heading", { name: "Ваш подарок готов" });
     expect(screen.getByRole("link", { name: "Посмотреть подарок" })).toHaveAttribute("href", `/ar/${"c".repeat(36)}`);
   });

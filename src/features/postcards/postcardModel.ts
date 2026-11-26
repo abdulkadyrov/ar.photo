@@ -51,7 +51,8 @@ export const movementSchema = z.object({
   kind: z.enum(["assign", "sell", "return"]),
   shop_id: z.string().uuid().nullable(),
   card_ids: z.array(z.string().uuid()),
-  actor_user_id: z.string().uuid(),
+  actor_user_id: z.string().uuid().nullable(),
+  origin: z.enum(["manager", "buyer_code"]).default("manager"),
   created_at: z.string(),
 });
 export const movementInputSchema = z.object({

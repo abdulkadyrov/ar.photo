@@ -164,6 +164,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
   };
   const claim = async (event: FormEvent) => {
     event.preventDefault();
+    if (!/^(?:[0-9]{4}|[A-F0-9]{12})$/.test(shopCode.replace(/[\s·-]+/g, "").toUpperCase())) return;
     const controller = begin("claim");
     try {
       const token = editToken ?? createEditToken(publicToken);
@@ -172,7 +173,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
       setSnapshot(data);
       setMode(data.card.mode);
       setShopCode("");
-      setNotice("Открытка закреплена за вами. Теперь добавьте видео и сохраните личную ссылку управления.");
+      setNotice("Код принят. Выберите видео.");
     } catch (problem) {
       if (!controller.signal.aborted) setError(readableError(problem));
     } finally {
@@ -244,7 +245,6 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
       clearPendingUploadId(publicToken);
       pendingUpload.current = null;
       setUploadInterrupted(false);
-      setNotice("Видео загружено. Подготавливаем его для открытки — страницу можно оставить открытой.");
     } catch (problem) {
       if (
         problem instanceof PostcardBuyerError &&
@@ -284,7 +284,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
     try {
       const data = await api.publish(publicToken, editToken, controller.signal);
       setSnapshot(data);
-      setNotice("Подарок готов. Получатель откроет видео по QR на открытке.");
+      setNotice("Открытка сохранена.");
     } catch (problem) {
       if (!controller.signal.aborted) setError(readableError(problem));
     } finally {
@@ -322,6 +322,88 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
   );
 
   const state = snapshot?.card.state;
+  const normalizedShopCode = shopCode.replace(/[\s·-]+/g, "").toUpperCase();
+  const validShopCode = /^(?:[0-9]{4}|[A-F0-9]{12})$/.test(normalizedShopCode);
+  const step = !owned ? 0 : state === "ready" || state === "published" ? 2 : 1;
+  const editing = state === "claimed" || Boolean(picked && completedInput !== inputKey) || processingFailed;
+  const videoEditor = snapshot ? (
+    <section className="postcard-buyer-panel">
+      <h2>Выберите видео</h2>
+      <label
+        className={`btn ${picked ? "btn-ghost" : "btn-primary"} postcard-buyer-picker ${busy || (processing && !processingFailed) ? "postcard-buyer-picker-disabled" : ""}`}
+      >
+        <Film size={18} />
+        <span>{picked ? "Выбрать другое видео" : "Выбрать видео"}</span>
+        <input
+          className="sr-only"
+          type="file"
+          accept="video/mp4,video/quicktime,video/webm,.mp4,.m4v,.mov,.webm"
+          aria-label="Выбрать видео для открытки"
+          disabled={Boolean(busy) || (processing && !processingFailed)}
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0];
+            event.currentTarget.value = "";
+            void pickVideo(file);
+          }}
+        />
+      </label>
+      <p className="postcard-buyer-hint">
+        MP4, MOV или WebM · до {Math.floor(snapshot.limits.maxVideoBytes / 1024 / 1024)} МБ · до{" "}
+        {Math.floor(snapshot.limits.maxVideoSeconds)} секунд.
+      </p>
+      {(picked || videoUrl) && (
+        <>
+          <fieldset className="postcard-buyer-modes" disabled={Boolean(busy) || (processing && !processingFailed)}>
+            <legend className="sr-only">Область видео</legend>
+            {(["frame", "full"] as const).map((value) => (
+              <label
+                className={mode === value ? "postcard-buyer-mode postcard-buyer-mode-selected" : "postcard-buyer-mode"}
+                key={value}
+              >
+                <input
+                  type="radio"
+                  name="postcard-video-mode"
+                  value={value}
+                  checked={mode === value}
+                  onChange={() => setMode(value)}
+                />
+                <span>
+                  <strong>{value === "frame" ? "Внутри рамки" : "На всю открытку"}</strong>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+        </>
+      )}
+      {picked && (
+        <p className="postcard-buyer-file">
+          {picked.file.name}
+          <small>
+            {Math.ceil(picked.file.size / 1024 / 1024)} МБ · {Math.ceil(picked.metadata.durationSeconds)} с
+          </small>
+        </p>
+      )}
+      {busy === "inspect" && <p role="status">Читаем выбранное видео…</p>}
+      {busy === "upload" && (
+        <div className="postcard-buyer-progress" role="status">
+          <p>{uploadProgress === null ? "Подготавливаем загрузку…" : `Загружаем видео: ${uploadProgress}%`}</p>
+          <progress max={100} value={uploadProgress ?? undefined} aria-label="Загрузка видео" />
+        </div>
+      )}
+      {picked && (!processing || processingFailed) && (
+        <Button disabled={Boolean(busy)} icon={<Upload size={18} />} onClick={() => void sendVideo()}>
+          {busy === "upload"
+            ? "Загружаем…"
+            : error && uploadInterrupted
+              ? "Повторить загрузку"
+              : state === "published"
+                ? "Заменить видео"
+                : "Загрузить видео"}
+        </Button>
+      )}
+      {picked && !busy && <p className="postcard-buyer-hint">Видео пока видно только вам.</p>}
+    </section>
+  ) : null;
   return (
     <div className="postcard-buyer-page">
       <header className="postcard-buyer-header">
@@ -355,15 +437,31 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
                 {owned
                   ? state === "published"
                     ? "Ваш подарок готов"
-                    : "Добавьте своё видео"
-                  : "Подарите живое поздравление"}
+                    : state === "ready"
+                      ? "Проверьте открытку"
+                      : "Добавьте своё видео"
+                  : "Открытка с видео"}
               </h1>
-              <p>{snapshot.card.title}</p>
+              <ol className="postcard-buyer-steps" aria-label="Подготовка открытки">
+                {["Код", "Видео", state === "published" ? "Готово" : "Проверка"].map((label, index) => (
+                  <li
+                    key={index}
+                    aria-current={step === index ? "step" : undefined}
+                    className={step >= index ? "is-active" : ""}
+                  >
+                    <span aria-hidden="true">{step > index ? <Check size={14} /> : index + 1}</span>
+                    {label}
+                  </li>
+                ))}
+              </ol>
             </div>
             <div
               className={`postcard-buyer-layout ${owned ? "postcard-buyer-layout-owned" : "postcard-buyer-layout-activation"}`}
             >
-              <section className="postcard-buyer-preview-section" aria-label="Предпросмотр открытки">
+              <section
+                className={`postcard-buyer-preview-section ${owned && !videoUrl ? "postcard-buyer-preview-small" : ""}`}
+                aria-label="Предпросмотр открытки"
+              >
                 <PostcardPreview
                   imageUrl={snapshot.previewImageUrl}
                   videoUrl={owned ? videoUrl : null}
@@ -374,8 +472,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
                 />
                 {owned && videoUrl && (
                   <p className="postcard-buyer-hint">
-                    Видео заполнит {mode === "frame" ? "окно рамки" : "всю открытку"}; края могут обрезаться. Проверьте,
-                    что главное остаётся в кадре.
+                    {mode === "frame" ? "Видео внутри рамки" : "Видео на всю открытку"} · края могут обрезаться.
                   </p>
                 )}
               </section>
@@ -396,10 +493,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
                   state === "available" ? (
                     <section className="postcard-buyer-panel">
                       <h2>Активируйте открытку</h2>
-                      <p>
-                        Введите код на отдельном вкладыше, который вы получили в магазине. Он закрепит именно эту
-                        открытку за вами.
-                      </p>
+
                       <form onSubmit={(event) => void claim(event)} className="postcard-buyer-form">
                         <label htmlFor="postcard-shop-code">Код с вкладыша</label>
                         <input
@@ -413,20 +507,18 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
                           maxLength={64}
                           required
                           disabled={Boolean(busy)}
-                          placeholder="4 цифры с вкладыша"
+                          placeholder="4 цифры"
+                          autoFocus
                         />
                         <Button
                           type="submit"
-                          disabled={Boolean(busy) || !shopCode.trim()}
+                          disabled={Boolean(busy) || !validShopCode}
                           icon={<LockKeyhole size={18} />}
                         >
                           {busy === "claim" ? "Закрепляем открытку…" : "Активировать открытку"}
                         </Button>
                       </form>
-                      <p className="postcard-buyer-hint">
-                        Регистрация не нужна. После активации сохраните личную ссылку управления — общий код магазина не
-                        сможет заменить ваше видео.
-                      </p>
+                      <p className="postcard-buyer-hint">Код — на вкладыше. Регистрация не нужна.</p>
                     </section>
                   ) : (
                     <section className="postcard-buyer-panel">
@@ -440,7 +532,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
                       </h2>
                       <p>
                         {state === "unavailable"
-                          ? "Обратитесь в магазин: открытка должна быть подготовлена и передана на реализацию."
+                          ? "Открытка пока недоступна. Обратитесь в магазин."
                           : "Если это ваша открытка, откройте сохранённую личную ссылку управления. Код магазина не открывает доступ к чужому видео."}
                       </p>
                       {state === "published" && snapshot.card.publicSlug && (
@@ -455,106 +547,21 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
                   )
                 ) : (
                   <>
-                    <section className="postcard-buyer-panel">
-                      <h2>Как показать видео</h2>
-                      <fieldset
-                        className="postcard-buyer-modes"
-                        disabled={Boolean(busy) || (processing && !processingFailed)}
-                      >
-                        <legend className="sr-only">Область видео</legend>
-                        {(["frame", "full"] as const).map((value) => (
-                          <label
-                            className={
-                              mode === value
-                                ? "postcard-buyer-mode postcard-buyer-mode-selected"
-                                : "postcard-buyer-mode"
-                            }
-                            key={value}
-                          >
-                            <input
-                              type="radio"
-                              name="postcard-video-mode"
-                              value={value}
-                              checked={mode === value}
-                              onChange={() => setMode(value)}
-                            />
-                            <span>
-                              <strong>{value === "frame" ? "Внутри рамки" : "На всю открытку"}</strong>
-                              <small>
-                                {value === "frame"
-                                  ? "Поздравление и края остаются видны"
-                                  : "Видео занимает весь формат 10 × 15 см"}
-                              </small>
-                            </span>
-                          </label>
-                        ))}
-                      </fieldset>
-                      <label
-                        className={`btn btn-ghost postcard-buyer-picker ${busy || (processing && !processingFailed) ? "postcard-buyer-picker-disabled" : ""}`}
-                      >
-                        <Film size={18} />
-                        <span>{picked ? "Выбрать другое видео" : "Выбрать видео"}</span>
-                        <input
-                          className="sr-only"
-                          type="file"
-                          accept="video/mp4,video/quicktime,video/webm,.mp4,.m4v,.mov,.webm"
-                          aria-label="Выбрать видео для открытки"
-                          disabled={Boolean(busy) || (processing && !processingFailed)}
-                          onChange={(event) => {
-                            const file = event.currentTarget.files?.[0];
-                            event.currentTarget.value = "";
-                            void pickVideo(file);
-                          }}
-                        />
-                      </label>
-                      <p className="postcard-buyer-hint">
-                        MP4, MOV или WebM · до {Math.floor(snapshot.limits.maxVideoBytes / 1024 / 1024)} МБ · до{" "}
-                        {Math.floor(snapshot.limits.maxVideoSeconds)} секунд.
-                      </p>
-                      {picked && (
-                        <p className="postcard-buyer-file">
-                          {picked.file.name}
-                          <small>
-                            {Math.ceil(picked.file.size / 1024 / 1024)} МБ ·{" "}
-                            {Math.ceil(picked.metadata.durationSeconds)} с
-                          </small>
-                        </p>
-                      )}
-                      {busy === "inspect" && <p role="status">Читаем выбранное видео…</p>}
-                      {busy === "upload" && (
-                        <div className="postcard-buyer-progress" role="status">
-                          <p>
-                            {uploadProgress === null
-                              ? "Подготавливаем загрузку…"
-                              : `Загружаем видео: ${uploadProgress}%`}
-                          </p>
-                          <progress max={100} value={uploadProgress ?? undefined} aria-label="Загрузка видео" />
-                        </div>
-                      )}
-                      {picked && (!processing || processingFailed) && (
-                        <Button disabled={Boolean(busy)} icon={<Upload size={18} />} onClick={() => void sendVideo()}>
-                          {busy === "upload"
-                            ? "Загружаем…"
-                            : error && uploadInterrupted
-                              ? "Повторить загрузку"
-                              : state === "published"
-                                ? "Заменить видео"
-                                : "Загрузить видео"}
-                        </Button>
-                      )}
-                      {picked && !busy && (
-                        <p className="postcard-buyer-hint">
-                          Предпросмотр пока виден только вам. Получатель увидит видео после публикации.
-                        </p>
-                      )}
-                    </section>
+                    {editing ? (
+                      videoEditor
+                    ) : (
+                      <details className="postcard-buyer-editor">
+                        <summary>Изменить видео</summary>
+                        {videoEditor}
+                      </details>
+                    )}
                     {(processing || state === "ready" || state === "published") && (
                       <section className="postcard-buyer-panel" aria-label="Готовность подарка">
                         <h2>
                           {state === "published"
                             ? "Можно дарить"
                             : state === "ready"
-                              ? "Проверьте и опубликуйте"
+                              ? "Готово к сохранению"
                               : processingFailed
                                 ? "Нужно другое видео"
                                 : "Подготавливаем подарок"}
@@ -564,7 +571,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
                             <p>
                               {processingFailed
                                 ? "Обработка не завершилась. Выберите видео заново и повторите загрузку."
-                                : "Сервис подготавливает видео и распознавание открытки. Это может занять несколько минут."}
+                                : "Это займёт несколько минут. Страницу можно оставить открытой."}
                             </p>
                             <ul className="postcard-buyer-jobs">
                               {snapshot.jobs?.map((job, index) => (
@@ -587,9 +594,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
                         {pollingError && <p role="alert">{pollingError}</p>}
                         {state === "ready" && (
                           <>
-                            <p>
-                              Посмотрите видео в выбранной области. После публикации QR на открытке откроет подарок.
-                            </p>
+                            <p>После сохранения видео откроется по QR на открытке.</p>
                             {changed && (
                               <p className="postcard-buyer-hint">
                                 Вы изменили видео или область показа. Сначала загрузите выбранный вариант.
@@ -605,7 +610,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
                               onClick={() => void publish()}
                               disabled={Boolean(busy) || changed || !previewAvailable}
                             >
-                              {busy === "publish" ? "Публикуем…" : "Опубликовать подарок"}
+                              {busy === "publish" ? "Сохраняем…" : "Сохранить открытку"}
                             </Button>
                           </>
                         )}
@@ -629,15 +634,13 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
                         )}
                       </section>
                     )}
-                    <section className="postcard-buyer-access">
+                    <details className="postcard-buyer-access">
+                      <summary>Сохранить доступ к видео</summary>
                       <h2>
                         <LockKeyhole size={18} />
                         Сохраните доступ к своему видео
                       </h2>
-                      <p>
-                        Личная ссылка позволит вернуться и заменить видео на другом устройстве. Получателю достаточно
-                        обычного QR на открытке.
-                      </p>
+                      <p>Личная ссылка нужна для замены видео. Получателю подарите открытку с обычным QR.</p>
                       <div>
                         <Button
                           variant="ghost"
@@ -656,7 +659,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
                           Скачать файл доступа
                         </Button>
                       </div>
-                    </section>
+                    </details>
                   </>
                 )}
               </div>
