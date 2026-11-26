@@ -12,7 +12,9 @@ function saveBlob(blob: Blob, name: string) {
   const a = document.createElement("a");
   a.href = url;
   a.download = name;
+  document.body.append(a);
   a.click();
+  a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 function showPrint(blob: Blob, preview: Window | null, name: string) {
@@ -49,9 +51,25 @@ export default function PostcardPrintPanel({
   const [canCancel, setCanCancel] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
+  const [archive, setArchive] = useState<{ url: string; name: string; selection: string } | null>(null);
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
   const selected = cards.filter((card) => card.ordinal >= Number(start)).slice(0, Number(count));
+  const selection = JSON.stringify([
+    accountId,
+    batch.id,
+    batch.template_code,
+    start,
+    count,
+    selected.map((card) => card.id),
+  ]);
+  const readyArchive = archive?.selection === selection ? archive : null;
+  useEffect(
+    () => () => {
+      if (archive) URL.revokeObjectURL(archive.url);
+    },
+    [archive],
+  );
   const valid =
     Number.isInteger(Number(start)) &&
     Number(start) >= 1 &&
@@ -150,18 +168,31 @@ export default function PostcardPrintPanel({
         canonical.push({ publicToken: card.public_token, blob });
       }
       setProgress("Собираем файл…");
-      if (format === "zip")
-        saveBlob(
-          await printing.createPostcardZip(batch.template_code, canonical),
-          `postcards-${batch.id}-${start}.zip`,
-        );
-      else
+      if (format === "zip") {
+        const blob = await printing.createPostcardZip(batch.template_code, canonical);
+        if (controller.current.signal.aborted) throw new DOMException("Aborted", "AbortError");
+        const url = URL.createObjectURL(blob);
+        const name = `postcards-${batch.id}-${start}.zip`;
+        setArchive({ url, name, selection });
+        // Automatic saving can be blocked after asynchronous preparation. Keep a real
+        // download link alive so a fresh user click can always retry the ready file.
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = name;
+        document.body.append(link);
+        link.click();
+        link.remove();
+      } else
         showPrint(
           await printing.createPostcardPrintHtml(batch.template_code, canonical, format),
           preview,
           `postcards-${batch.id}.html`,
         );
-      setProgress(`Готово: ${canonical.length} открыток с настоящими QR.`);
+      setProgress(
+        format === "zip"
+          ? "Архив готов. Если скачивание не началось, нажмите «Скачать готовый ZIP»."
+          : `Готово: ${canonical.length} открыток с настоящими QR.`,
+      );
       await onUpdated();
     } catch (e) {
       preview?.close();
@@ -203,16 +234,43 @@ export default function PostcardPrintPanel({
       <fieldset disabled={pending || !canManage} className="postcards-print-options">
         <label>
           Начать с номера
-          <Input type="number" min={1} max={cards.length} value={start} onValueChange={setStart} />
+          <Input
+            type="number"
+            min={1}
+            max={cards.length}
+            value={start}
+            onValueChange={(value) => {
+              setStart(value);
+              setArchive(null);
+              setProgress("");
+            }}
+          />
         </label>
         <label>
           Количество для печати (1–20)
-          <Input type="number" min={1} max={20} value={count} onValueChange={setCount} />
+          <Input
+            type="number"
+            min={1}
+            max={20}
+            value={count}
+            onValueChange={(value) => {
+              setCount(value);
+              setArchive(null);
+              setProgress("");
+            }}
+          />
         </label>
         <div className="postcards-actions">
-          <Button icon={<Download size={17} />} disabled={!valid || demo} onClick={() => void exportCards("zip")}>
-            Скачать PNG в ZIP
-          </Button>
+          {readyArchive && !pending && canManage && valid ? (
+            <a className="btn btn-primary" href={readyArchive.url} download={readyArchive.name}>
+              <Download size={17} aria-hidden="true" />
+              Скачать готовый ZIP
+            </a>
+          ) : (
+            <Button icon={<Download size={17} />} disabled={!valid || demo} onClick={() => void exportCards("zip")}>
+              {pending && canCancel ? "Готовим файл…" : "Скачать PNG в ZIP"}
+            </Button>
+          )}
           <Button
             variant="ghost"
             icon={<Printer size={17} />}

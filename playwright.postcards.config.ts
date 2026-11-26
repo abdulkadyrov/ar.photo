@@ -6,6 +6,10 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: { baseURL: "http://127.0.0.1:4182/ar.photo/", browserName: "chromium", trace: "on-first-retry" },
+  projects: [
+    { name: "chromium", use: { browserName: "chromium" } },
+    { name: "webkit-download", testMatch: "print-download.spec.ts", use: { browserName: "webkit" } },
+  ],
   webServer: {
     command: "npm run dev -- --host 127.0.0.1 --port 4182 --strictPort",
     url: "http://127.0.0.1:4182/ar.photo/",
