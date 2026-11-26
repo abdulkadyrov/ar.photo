@@ -200,17 +200,13 @@ export default function PostcardPrintPanel({
   return (
     <Panel className="postcards-print-panel">
       <h2>Печать открыток 10 × 15 см</h2>
-      <p className="postcards-muted">
-        Сначала сохраняем точное печатное изображение для AR, затем выдаём файл. До 20 открыток за одну выгрузку.
-        Повторная печать сохраняет те же QR; для новых экземпляров создайте новый тираж.
-      </p>
       <fieldset disabled={pending || !canManage} className="postcards-print-options">
         <label>
           Начать с номера
           <Input type="number" min={1} max={cards.length} value={start} onValueChange={setStart} />
         </label>
         <label>
-          Количество для печати
+          Количество для печати (1–20)
           <Input type="number" min={1} max={20} value={count} onValueChange={setCount} />
         </label>
         <div className="postcards-actions">
@@ -245,10 +241,6 @@ export default function PostcardPrintPanel({
       )}
       {error && <p role="alert">{error}</p>}
       {demo && <p className="postcards-muted">Выпуск рабочих QR доступен в подключённом кабинете.</p>}
-      <p className="postcards-muted">
-        Код магазина печатается на отдельном вкладыше. После подготовки передайте экземпляры магазину — тогда покупатель
-        сможет активировать их.
-      </p>
     </Panel>
   );
 }
