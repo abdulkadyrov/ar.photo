@@ -32,7 +32,7 @@ for (const width of [319, 390, 1440]) {
     await page.getByRole("button", { name: "Войти", exact: true }).click();
     await page.goto("./postcards");
     await expect(page.getByRole("heading", { name: "AR-открытки", exact: true })).toBeVisible();
-    await expect(page.getByText("Первый тираж начинается здесь")).toBeVisible();
+    await expect(page.getByText("Тиражей пока нет.", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Добавить магазин", exact: true }).click();
     await page.getByLabel("Название магазина *", { exact: true }).fill("Подарки · центр");
     await page.getByLabel("Адрес", { exact: true }).fill("Грозный, центральный магазин");

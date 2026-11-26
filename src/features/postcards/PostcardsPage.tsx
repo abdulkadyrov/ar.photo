@@ -239,15 +239,8 @@ function PostcardsWorkspace({ accountId, canManage, demo }: { accountId: string;
           <PostcardScanner onDetected={addScannedCode} onClose={() => setScannerOpen(false)} />
         </Suspense>
       )}
-      <p className="postcards-stage">
-        {demo ? "Демо: данные хранятся только в этом браузере. " : ""}Создайте тираж, подготовьте печать и передайте
-        открытки магазину. Покупатель добавит своё видео по QR и коду на вкладыше.
-      </p>
-      {!canManage && (
-        <p className="postcards-stage">
-          Просмотр доступен. Изменять учёт могут владелец и управляющий при действующем пакете.
-        </p>
-      )}
+      {demo && <p className="postcards-stage">Демо · данные только в этом браузере.</p>}
+      {!canManage && <p className="postcards-stage">Только просмотр.</p>}
       <div className="postcards-actions">
         <Button
           icon={<PackagePlus size={18} />}
@@ -358,9 +351,6 @@ function PostcardsWorkspace({ accountId, canManage, demo }: { accountId: string;
                     )}
                   </p>
                 )}
-                <p className="postcards-muted">
-                  Итоги по всем тиражам магазина. Повторная передача после возврата учитывается как новая выдача.
-                </p>
                 {canManage && (
                   <div className="postcards-code-row">
                     <Button
@@ -379,15 +369,10 @@ function PostcardsWorkspace({ accountId, canManage, demo }: { accountId: string;
                     )}
                   </div>
                 )}
-                <p className="postcards-muted">
-                  Один код на все открытки этого магазина. Для отдельного вкладыша покупателю; в QR его не добавляем.
-                </p>
                 {reveal.error && <p role="alert">{reveal.error.message}</p>}
               </>
             ) : (
-              <p className="postcards-muted">
-                Магазинов пока нет. Добавьте первую точку реализации — тираж можно подготовить заранее.
-              </p>
+              <p className="postcards-muted">Магазинов пока нет.</p>
             )}
           </Panel>
           <Panel>
@@ -416,26 +401,22 @@ function PostcardsWorkspace({ accountId, canManage, demo }: { accountId: string;
                   }}
                 />
                 {currentBatch && <PostcardTemplatePreview code={currentBatch.template_code} />}
-                <p className="postcards-muted">
-                  {postcardTemplates.find((t) => t.code === currentBatch?.template_code)?.name} · 10 × 15 см. Создание
-                  тиража резервирует номера. Каждая новая активация расходует одно AR-добавление.
-                </p>
                 <p className="postcards-muted" role="status">
                   {cards.data
-                    ? `Для оставшихся активаций этого тиража нужно: ${cards.data.filter((card) => !card.ar_item_id).length} добавлений. `
-                    : "Потребность тиража загружается. "}
+                    ? `Нужно добавлений: ${cards.data.filter((card) => !card.ar_item_id).length}. `
+                    : "Загружаем лимиты… "}
                   {demo || entitlements.error || !entitlements.data
-                    ? "Доступный остаток добавлений: недоступен."
+                    ? "Остаток недоступен."
                     : entitlements.data.limits.arItems === null
-                      ? "Пакет: безлимитные добавления."
-                      : `Доступный остаток добавлений: ${Math.max(0, entitlements.data.limits.arItems - entitlements.data.usage.arItems)}.`}
+                      ? "Безлимит."
+                      : `Общий остаток: ${Math.max(0, entitlements.data.limits.arItems - entitlements.data.usage.arItems)}.`}
                   {entitlements.data &&
                   cards.data &&
                   entitlements.data.limits.arItems !== null &&
                   cards.data.filter((card) => !card.ar_item_id).length >
                     Math.max(0, entitlements.data.limits.arItems - entitlements.data.usage.arItems)
-                    ? " Пополните пакет перед передачей тиража: текущего остатка не хватит на все активации."
-                    : " Остаток общий для всех тиражей и других новых работ."}
+                    ? " Недостаточно добавлений — пополните пакет."
+                    : ""}
                 </p>
                 {cards.isPending ? (
                   <p role="status">Загружаем экземпляры…</p>
@@ -579,10 +560,7 @@ function PostcardsWorkspace({ accountId, canManage, demo }: { accountId: string;
                 )}
               </>
             ) : (
-              <div className="postcards-empty">
-                <h3>Первый тираж начинается здесь</h3>
-                <p>Выберите тему и количество от 1 до 500. Экземпляры можно передать магазину позже.</p>
-              </div>
+              <p className="postcards-muted">Тиражей пока нет.</p>
             )}
           </Panel>
           {currentBatch && cards.data?.length ? (
@@ -601,7 +579,6 @@ function PostcardsWorkspace({ accountId, canManage, demo }: { accountId: string;
           ) : null}
           <Panel>
             <h2>История движения</h2>
-            <p className="postcards-muted">Последние 50 операций. Продажа отмечается отдельно от активации видео.</p>
             {movements.isPending ? (
               <p role="status">Загружаем историю…</p>
             ) : movements.data?.length ? (
@@ -702,9 +679,6 @@ function CreateForm({
                 Количество *
                 <Input type="number" min={1} max={500} step={1} required value={quantity} onValueChange={setQuantity} />
               </label>
-              <p className="postcards-muted">
-                Резервируем экземпляры 10 × 15 см. После создания подготовьте печать и передайте открытки магазину.
-              </p>
             </>
           )}
           {save.error && <p role="alert">{save.error.message}</p>}
