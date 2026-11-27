@@ -176,6 +176,11 @@ export function PublicArViewerRoute() {
 
     try {
       let project = cachedProject;
+      if (!project && manifest.version === 1 && manifest.videoViewport) {
+        setMode("caching");
+        project = await cachePublicArProject(publicSlug, manifest, setCacheStep, controller.signal);
+        setCachedProject(project);
+      }
       if (!project) {
         flushSync(() => setMode("pairing"));
         await nextPaint();

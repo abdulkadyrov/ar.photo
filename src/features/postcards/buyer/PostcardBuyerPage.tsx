@@ -146,11 +146,11 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
   }, [api, publicToken, editToken, processing, owned, processingFailed]);
 
   useEffect(() => {
-    if (snapshot?.card.state === "published" && !snapshot.owned && snapshot.card.publicSlug)
+    if (snapshot?.card.state === "published" && snapshot.card.publicSlug)
       navigate(`/ar/${snapshot.card.publicSlug}`, { replace: true });
   }, [snapshot, navigate]);
 
-  useBuyerDepartureGuard(Boolean(busy || changed), Boolean(busy));
+  useBuyerDepartureGuard(snapshot?.card.state !== "published" && Boolean(busy || changed), Boolean(busy));
 
   const begin = (kind: NonNullable<typeof busy>) => {
     operation.current?.abort();
@@ -183,7 +183,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
     }
   };
   const pickVideo = async (file?: File) => {
-    if (!file || !snapshot) return;
+    if (!file || !snapshot || snapshot.card.state === "published") return;
     const controller = begin("inspect");
     setCompressionProgress(null);
     try {
@@ -210,14 +210,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
     }
   };
   const sendVideo = async () => {
-    if (!picked || !snapshot || !editToken || !inputKey) return;
-    if (
-      snapshot.card.state === "published" &&
-      !window.confirm(
-        "Заменить видео в подарке? Пока новое видео обрабатывается, просмотр открытки будет временно недоступен.",
-      )
-    )
-      return;
+    if (!picked || !snapshot || !editToken || !inputKey || snapshot.card.state === "published") return;
     const controller = begin("upload");
     setUploadProgress(null);
     try {
@@ -312,7 +305,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
         if (download) {
           const file = new Blob(
             [
-              `Хан Зама — личная ссылка управления открыткой\n\n${link}\n\nСохраните этот файл для замены видео. Получателю подарите открытку с обычным QR.\n`,
+              `Хан Зама — личная ссылка настройки открытки\n\n${link}\n\nПо этой ссылке можно продолжить настройку до сохранения открытки.\n`,
             ],
             { type: "text/plain;charset=utf-8" },
           );
@@ -433,7 +426,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
         <span>Открытка с вашим видео</span>
       </header>
       <main className="postcard-buyer-main">
-        {loading ? (
+        {loading || (snapshot?.card.state === "published" && snapshot.card.publicSlug) ? (
           <section className="postcard-buyer-panel" aria-busy="true">
             <h1>Открываем открытку</h1>
             <p role="status">Проверяем QR и доступ…</p>
@@ -614,7 +607,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
                         {pollingError && <p role="alert">{pollingError}</p>}
                         {state === "ready" && (
                           <>
-                            <p>После сохранения видео откроется по QR на открытке.</p>
+                            <p>После сохранения QR откроет просмотр. Видео и область показа изменить уже нельзя.</p>
                             {changed && (
                               <p className="postcard-buyer-hint">
                                 Вы изменили видео или область показа. Сначала загрузите выбранный вариант.
@@ -660,7 +653,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
                         <LockKeyhole size={18} />
                         Сохраните доступ к своему видео
                       </h2>
-                      <p>Личная ссылка нужна для замены видео. Получателю подарите открытку с обычным QR.</p>
+                      <p>Личная ссылка позволяет вернуться к настройке до сохранения открытки.</p>
                       <div>
                         <Button
                           variant="ghost"

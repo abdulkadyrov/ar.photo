@@ -201,23 +201,12 @@ set local role service_role;
 select is(public.postcard_buyer_publish(current_setting('test.pc_token_1'),repeat('9',64))->>'error','invalid_card','only its purchaser can publish a ready gift');
 select is(public.postcard_buyer_publish(current_setting('test.pc_token_1'),repeat('1',64))#>>'{card,state}','published','ready processed gift publishes through the existing publication rules');
 select is(public.postcard_buyer_publish(current_setting('test.pc_token_1'),repeat('1',64))#>>'{card,state}','published','publication retry keeps the same gift and public slug');
-select set_config('test.pc_upload_2',public.postcard_buyer_start_upload(current_setting('test.pc_token_1'),repeat('1',64),'a8200000-0000-4000-8000-000000000002','full',current_setting('test.pc_video')::jsonb)::text,true);
+select is(public.postcard_buyer_start_upload(current_setting('test.pc_token_1'),repeat('1',64),'a8200000-0000-4000-8000-000000000002','full',current_setting('test.pc_video')::jsonb)->>'error','postcard_locked','even the purchaser cannot reserve a replacement after publication');
+select is(public.postcard_buyer_complete_upload(current_setting('test.pc_token_1'),repeat('1',64),'a8200000-0000-4000-8000-000000000001')->>'error','postcard_locked','an earlier upload cannot change a published gift');
+select is(public.postcard_buyer_upload_target(current_setting('test.pc_token_1'),repeat('1',64),'a8200000-0000-4000-8000-000000000001')->>'error','postcard_locked','an earlier upload cannot overwrite stored bytes after publication');
 reset role;
-select is((select status::text from public.ar_items where id=current_setting('test.pc_item')::uuid),'published','beginning an edit leaves the previously published gift visible');
-set local role service_role;
-select set_config('test.pc_upload_3',public.postcard_buyer_start_upload(current_setting('test.pc_token_1'),repeat('1',64),'a8200000-0000-4000-8000-000000000003','full',current_setting('test.pc_video')::jsonb)::text,true);
-select is(public.postcard_buyer_start_upload(current_setting('test.pc_token_1'),repeat('1',64),'a8200000-0000-4000-8000-000000000004','full',current_setting('test.pc_video')::jsonb)->>'error','too_many_uploads','one card cannot reserve unlimited simultaneous uploads');
-select is(public.postcard_buyer_complete_upload(current_setting('test.pc_token_1'),repeat('1',64),'a8200000-0000-4000-8000-000000000002')->>'error','upload_superseded','an older upload cannot replace a newer chosen video');
-select is(public.postcard_buyer_upload_target(current_setting('test.pc_token_1'),repeat('1',64),'a8200000-0000-4000-8000-000000000002')->>'error','invalid_card','streaming cannot write a superseded upload');
-reset role;
-insert into storage.objects(bucket_id,name,metadata)
-select storage_bucket,storage_path,jsonb_build_object('size',size_bytes,'mimetype',mime_type)
-from public.upload_sessions where idempotency_key='a8200000-0000-4000-8000-000000000003';
-set local role service_role;
-select is(public.postcard_buyer_complete_upload(current_setting('test.pc_token_1'),repeat('1',64),'a8200000-0000-4000-8000-000000000003')#>>'{card,state}','processing','the selected replacement processes on the same existing work');
-reset role;
-select is((select video_viewport from public.postcard_cards where id=current_setting('test.pc_card_1')::uuid),'{"x":0,"y":0,"width":1,"height":1}'::jsonb,'full mode covers the whole printed marker');
-select is((select spent from private.photo_credit_wallets where account_id='20000000-0000-4000-8000-000000000001'),current_setting('test.pc_spent')::bigint+2,'editing a published card never spends a second creation');
+select is((select status::text from public.ar_items where id=current_setting('test.pc_item')::uuid),'published','blocked mutations preserve the published gift');
+select is((select spent from private.photo_credit_wallets where account_id='20000000-0000-4000-8000-000000000001'),current_setting('test.pc_spent')::bigint+2,'blocked edits do not spend a creation');
 select is((select count(*) from public.ar_items where idempotency_key=current_setting('test.pc_card_1')::uuid),1::bigint,'all edits retain one work per physical card');
 select ok(exists(select 1 from public.audit_logs where entity_id=current_setting('test.pc_card_1')::uuid and action='postcard.buyer.claimed' and actor_user_id is null),'purchaser actions are audited without impersonating the issuer');
 
