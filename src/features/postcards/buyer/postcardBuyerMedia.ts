@@ -3,6 +3,42 @@ import type { BuyerVideoMetadata } from "./postcardBuyerApi";
 class NativeMetadataUnavailable extends Error {}
 class BuyerVideoConstraintError extends Error {}
 type VideoDimensions = { width: number; height: number; durationSeconds: number };
+export const postcardVideoMaxBytes = 15 * 1024 * 1024;
+
+export async function compressBuyerVideo(
+  file: File,
+  metadata: BuyerVideoMetadata,
+  maxBytes: number,
+  signal: AbortSignal,
+  onProgress: (progress: number) => void,
+) {
+  const maxDimension = 640;
+  const bitrate = Math.min(650_000, Math.floor((maxBytes * 8 * 0.85) / metadata.durationSeconds) - 160_000);
+  if (
+    file.size <= maxBytes &&
+    metadata.mimeType === "video/mp4" &&
+    Math.max(metadata.width, metadata.height) <= maxDimension &&
+    (file.size * 8) / metadata.durationSeconds <= bitrate + 160_000
+  )
+    return file;
+  onProgress(0);
+  try {
+    const { optimizeVideoFile } = await import("../../media/videoOptimization");
+    signal.throwIfAborted();
+    const compressed = await optimizeVideoFile(file, { ...metadata, audioCodec: "aac" }, onProgress, true, {
+      maxDimension,
+      maxBytes,
+      bitrate: Math.max(80_000, bitrate),
+      signal,
+    });
+    if (file.size <= maxBytes && metadata.mimeType === "video/mp4" && compressed.file.size >= file.size) return file;
+    return compressed.file;
+  } catch {
+    signal.throwIfAborted();
+    if (file.size <= maxBytes) return file;
+    throw new Error("Этот браузер не смог сжать видео до лимита. Выберите более короткое видео или MP4 до 15 МБ.");
+  }
+}
 
 function abortError() {
   return new DOMException("Aborted", "AbortError");

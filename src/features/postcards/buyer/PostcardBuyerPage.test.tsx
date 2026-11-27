@@ -28,7 +28,11 @@ vi.mock("./postcardBuyerApi", async (original) => ({
   },
   uploadSignedBlob: mocks.put,
 }));
-vi.mock("./postcardBuyerMedia", () => ({ inspectBuyerVideo: mocks.inspect }));
+vi.mock("./postcardBuyerMedia", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./postcardBuyerMedia")>()),
+  inspectBuyerVideo: mocks.inspect,
+  compressBuyerVideo: async (file: File) => file,
+}));
 const publicToken = "1234567890abcdef1234567890abcdef";
 const editToken = "a".repeat(64);
 const available: BuyerSnapshot = {

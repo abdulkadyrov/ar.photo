@@ -22,7 +22,7 @@ import {
   clearPendingUploadId,
 } from "./postcardBuyerAccess";
 import { registerBuyerHistoryGuard } from "./postcardBuyerHistory";
-import { inspectBuyerVideo } from "./postcardBuyerMedia";
+import { compressBuyerVideo, inspectBuyerVideo, postcardVideoMaxBytes } from "./postcardBuyerMedia";
 import {
   PostcardBuyerApi,
   PostcardBuyerError,
@@ -71,6 +71,7 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
   const [shopCode, setShopCode] = useState("");
   const [mode, setMode] = useState<BuyerMode>("frame");
   const [picked, setPicked] = useState<PickedVideo | null>(null);
+  const [compressionProgress, setCompressionProgress] = useState<number | null>(null);
   const [busy, setBusy] = useState<"claim" | "inspect" | "upload" | "publish" | "refresh" | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [completedInput, setCompletedInput] = useState<string | null>(null);
@@ -184,10 +185,21 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
   const pickVideo = async (file?: File) => {
     if (!file || !snapshot) return;
     const controller = begin("inspect");
+    setCompressionProgress(null);
     try {
-      const metadata = await inspectBuyerVideo(file, snapshot.limits, controller.signal);
+      const maxBytes = Math.min(snapshot.limits.maxVideoBytes, postcardVideoMaxBytes);
+      const original = await inspectBuyerVideo(
+        file,
+        { ...snapshot.limits, maxVideoBytes: 100 * 1024 * 1024 },
+        controller.signal,
+      );
+      const prepared = await compressBuyerVideo(file, original, maxBytes, controller.signal, setCompressionProgress);
+      const metadata =
+        prepared === file
+          ? original
+          : await inspectBuyerVideo(prepared, { ...snapshot.limits, maxVideoBytes: maxBytes }, controller.signal);
       if (controller.signal.aborted) return;
-      setPicked({ file, metadata, url: URL.createObjectURL(file), key: JSON.stringify(metadata) });
+      setPicked({ file: prepared, metadata, url: URL.createObjectURL(prepared), key: JSON.stringify(metadata) });
       setCompletedInput(null);
       setUploadInterrupted(false);
       pendingUpload.current = null;
@@ -349,7 +361,8 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
         />
       </label>
       <p className="postcard-buyer-hint">
-        MP4, MOV или WebM · до {Math.floor(snapshot.limits.maxVideoBytes / 1024 / 1024)} МБ · до{" "}
+        MP4, MOV или WebM · сжимаем перед отправкой до{" "}
+        {Math.floor(Math.min(snapshot.limits.maxVideoBytes, postcardVideoMaxBytes) / 1024 / 1024)} МБ · до{" "}
         {Math.floor(snapshot.limits.maxVideoSeconds)} секунд.
       </p>
       {(picked || videoUrl) && (
@@ -384,7 +397,13 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
           </small>
         </p>
       )}
-      {busy === "inspect" && <p role="status">Читаем выбранное видео…</p>}
+      {busy === "inspect" && (
+        <p role="status">
+          {compressionProgress === null
+            ? "Читаем выбранное видео…"
+            : `Сжимаем видео: ${Math.round(compressionProgress * 100)}%`}
+        </p>
+      )}
       {busy === "upload" && (
         <div className="postcard-buyer-progress" role="status">
           <p>{uploadProgress === null ? "Подготавливаем загрузку…" : `Загружаем видео: ${uploadProgress}%`}</p>
@@ -714,6 +733,7 @@ function PostcardPreview({
           src={videoUrl}
           style={style}
           controls
+          controlsList="nodownload"
           playsInline
           preload="metadata"
           aria-label="Предпросмотр вашего видео"
