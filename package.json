@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "typecheck": "tsc -b --pretty false && tsc -p tsconfig.worker.json --noEmit --pretty false && tsc -p tools/ar-lab/tsconfig.json",
+    "typecheck": "tsc -b --pretty false && tsc -p tsconfig.worker.json --noEmit --pretty false && tsc -p tools/ar-lab/tsconfig.json && tsc -p tools/ar-replay/tsconfig.json",
     "dev:ar-lab": "vite --host 127.0.0.1 --port 4193 --strictPort --open /ar.photo/tools/ar-lab/",
     "test:ar-lab": "node scripts/ar-lab-benchmark.mjs",
     "lint": "eslint . --max-warnings=0",

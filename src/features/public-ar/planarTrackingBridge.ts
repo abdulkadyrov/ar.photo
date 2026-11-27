@@ -1,3 +1,4 @@
+import { createVideoFrameClock } from "./videoFrameClock";
 import type * as Three from "three";
 import { installAlbumCandidateSearch, type FeaturePoint } from "./albumCandidateSearch";
 import {
@@ -63,16 +64,15 @@ export function installPlanarObservations(
           const capturedAt = new WeakMap<object, number>();
           if (next.inputLoader) {
             const load = next.inputLoader.loadInput.bind(next.inputLoader);
-            let mediaTime = -Infinity;
-            let frameTime = -Infinity;
+            let frameClock: ReturnType<typeof createVideoFrameClock> | undefined;
+            let clockVideo: HTMLVideoElement | undefined;
             next.inputLoader.loadInput = (video) => {
-              // The worker can finish long after this camera frame was read.
-              // Timestamp capture, not completion; repeated camera frames must
-              // neither strengthen smoothing nor extend stale geometry's life.
-              if (video.currentTime !== mediaTime) {
-                mediaTime = video.currentTime;
-                frameTime = performance.now();
+              if (clockVideo !== video) {
+                frameClock?.dispose();
+                clockVideo = video;
+                frameClock = createVideoFrameClock(video, signal);
               }
+              const frameTime = frameClock!.read();
               const tensor = load(video);
               capturedAt.set(tensor, frameTime);
               return tensor;
