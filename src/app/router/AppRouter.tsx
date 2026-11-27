@@ -73,6 +73,11 @@ const PublicArUnsupportedRoute = lazy(() =>
     default: module.PublicArUnsupportedRoute,
   })),
 );
+const ArDiagnosticEntryRoute = lazy(() =>
+  import("../../features/public-ar/ArDiagnosticEntryPage").then((module) => ({
+    default: module.ArDiagnosticEntryRoute,
+  })),
+);
 const ArCameraEntryRoute = lazy(() =>
   import("../../features/public-ar/ArCameraEntryPage").then((module) => ({ default: module.ArCameraEntryRoute })),
 );
@@ -160,6 +165,7 @@ function RoutedContent() {
           <Route path="/admin" element={<Protected element={<AdminRoute />} />} />
           <Route path="/support" element={<Protected element={<SupportRoute />} />} />
           <Route path="/profile" element={<Protected element={<ProfileRoute />} />} />
+          <Route path="/diagnostics" element={<ArDiagnosticEntryRoute />} />
           <Route path="/camera" element={<ArCameraEntryRoute />} />
           <Route path="/settings" element={<Protected element={<SettingsRoute />} />} />
           <Route path="/settings/subscription" element={<Protected element={<SubscriptionRoute />} />} />

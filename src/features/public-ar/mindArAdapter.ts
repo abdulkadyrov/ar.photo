@@ -1,3 +1,4 @@
+import { createArDiagnostics, type ArDiagnosticsEngine, type ArDiagnosticState } from "./arDiagnostics";
 import type * as ThreeModule from "three";
 import {
   publicArTargets,
@@ -163,6 +164,7 @@ export function coverTextureTransform(videoAspectRatio: number, markerAspectRati
 
 export type PublicArSession = {
   readonly recordingSupported: boolean;
+  readonly diagnostics?: ArDiagnosticsEngine | null;
   setMuted(muted: boolean): void;
   togglePlayback(): Promise<boolean>;
   startRecording(): void;
@@ -185,6 +187,8 @@ export function boundedCameraConstraints(constraints: MediaStreamConstraints = {
 
 export async function startPublicMindAr(options: {
   container: HTMLDivElement;
+  diagnostics?: boolean;
+  onDiagnosticState?(state: ArDiagnosticState): void;
   manifest: PublicArManifest;
   muted: boolean;
   playbackVideo?: HTMLVideoElement;
@@ -378,6 +382,7 @@ export async function startPublicMindAr(options: {
       },
       fitVideoToMarker,
       updatePose: stabilizedAnchor.update,
+      diagnosticGroup: stabilizedAnchor.group,
       dispose() {
         stabilizedAnchor.dispose();
       },
@@ -433,6 +438,8 @@ export async function startPublicMindAr(options: {
   document.addEventListener("visibilitychange", visibility);
 
   let recordingEngine: ArRecordingEngine | null = null;
+  let diagnostics: ArDiagnosticsEngine | null = null;
+  let lastDiagnosticFrame = -Infinity;
   try {
     await startMindArWithVisibleCamera(mindar, PUBLIC_AR_START_TIMEOUT_MS, lifetime.signal);
     lifetime.signal.throwIfAborted();
@@ -456,10 +463,44 @@ export async function startPublicMindAr(options: {
         playbackVideo: () => runtimes[activeTargetIndex].video,
       });
     }
+    if (options.diagnostics && mindar.video) {
+      diagnostics = createArDiagnostics({
+        cameraVideo: mindar.video,
+        playbackVideo: video,
+        onState: options.onDiagnosticState,
+        trackingAssets: options.trackingAssets,
+        metadata: {
+          targets: targets.map((t) => ({
+            width: t.marker.width,
+            height: t.marker.height,
+            videoViewport: t.videoViewport,
+          })),
+        },
+      });
+    }
     renderer.setAnimationLoop(() => {
       runtimes.forEach((runtime) => runtime.updatePose());
       renderer.render(scene, camera);
       recordingEngine?.drawFrame();
+      const now = performance.now();
+      if (diagnostics?.active && now - lastDiagnosticFrame >= 70) {
+        lastDiagnosticFrame = now;
+        const observation = readObservation(activeTargetIndex);
+        const group = runtimes[activeTargetIndex].diagnosticGroup;
+        diagnostics.addSample({
+          corners: observation?.corners,
+          frameTime: observation?.frameTime,
+          processingMs: observation ? observation.time - (observation.frameTime ?? observation.time) : undefined,
+          cameraTime: mindar.video?.currentTime,
+          input: observation?.input,
+          partial: observation?.partial,
+          found: group.visible,
+          targetIndex: activeTargetIndex,
+          renderedMatrix: Array.from(group.matrix.elements),
+          projectionMatrix: Array.from((camera as ThreeModule.Camera).projectionMatrix.elements),
+          viewport: { width: container.clientWidth, height: container.clientHeight },
+        });
+      }
     });
     onTrackingState("searching");
   } catch (error) {
@@ -479,6 +520,9 @@ export async function startPublicMindAr(options: {
   }
 
   return {
+    get diagnostics() {
+      return diagnostics;
+    },
     get recordingSupported() {
       return recordingEngine?.supported ?? false;
     },
@@ -523,6 +567,7 @@ export async function startPublicMindAr(options: {
       window.visualViewport?.removeEventListener("resize", resize);
       document.removeEventListener("visibilitychange", visibility);
       renderer.setAnimationLoop(null);
+      diagnostics?.dispose();
       recordingEngine?.dispose();
       stopMindAr(mindar);
       runtimes.forEach((runtime) => runtime.dispose());

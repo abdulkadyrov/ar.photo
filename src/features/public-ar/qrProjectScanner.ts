@@ -78,7 +78,7 @@ export function waitForPublicProjectQr(
   });
 }
 
-function waitForQr<T>(
+export function waitForQr<T>(
   video: HTMLVideoElement,
   options: { signal?: AbortSignal; accept(value: string): T | null; onRejected?(value: string): void },
 ) {

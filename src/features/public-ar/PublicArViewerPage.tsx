@@ -1,3 +1,5 @@
+import { ArDiagnosticPanel } from "./ArDiagnosticPanel";
+import type { ArDiagnosticsEngine, ArDiagnosticState } from "./arDiagnostics";
 import { flushSync } from "react-dom";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import "./PublicArViewerPage.css";
@@ -56,6 +58,9 @@ type ViewerMode =
 export function PublicArViewerRoute() {
   const { publicSlug = "" } = useParams<{ publicSlug: string }>();
   const [publicParams] = useSearchParams();
+  const diagnosticMode = publicParams.get("diagnostics") === "1";
+  const [diagnosticEngine, setDiagnosticEngine] = useState<ArDiagnosticsEngine | null>(null);
+  const [diagnosticState, setDiagnosticState] = useState<ArDiagnosticState | null>(null);
   const ordinaryVideo = publicParams.get("view") === "video";
   const [manifest, setManifest] = useState<PublicArManifest | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -237,6 +242,8 @@ export function PublicArViewerRoute() {
     sessionRef.current?.stop();
     sessionRef.current = null;
     const session = await startPublicMindAr({
+      diagnostics: diagnosticMode,
+      onDiagnosticState: setDiagnosticState,
       container: containerRef.current,
       manifest,
       muted,
@@ -286,6 +293,7 @@ export function PublicArViewerRoute() {
       return;
     }
     sessionRef.current = session;
+    setDiagnosticEngine(session.diagnostics ?? null);
   };
 
   const autoStartViewer = useEffectEvent(() => void startViewer());
@@ -455,7 +463,8 @@ export function PublicArViewerRoute() {
                   : "Наведите камеру на фото"}
           </div>
           {mode !== "tracking" ? <CornerGuide className="ar-photo-guide" testId="marker-scan-guide" /> : null}
-          {mode !== "starting" ? (
+          {diagnosticMode ? <ArDiagnosticPanel engine={diagnosticEngine} state={diagnosticState} /> : null}
+          {mode !== "starting" && !diagnosticMode ? (
             <div className="ar-record-wrap">
               {recording ? <span className="ar-record-timer">{formatDuration(recordingSeconds)}</span> : null}
               <button
