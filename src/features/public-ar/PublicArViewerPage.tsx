@@ -63,6 +63,8 @@ export function PublicArViewerRoute() {
   const [mode, setMode] = useState<ViewerMode>("loading");
   const [message, setMessage] = useState("");
   const [muted, setMuted] = useState(true);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  const [openAttempt, setOpenAttempt] = useState(0);
   const [paused, setPaused] = useState(false);
   const [cacheUnavailable, setCacheUnavailable] = useState(false);
   const [videoState, setVideoState] = useState<"idle" | "loading" | "ready" | "error">("idle");
@@ -106,12 +108,18 @@ export function PublicArViewerRoute() {
       setNotFound(false);
       setCachedProject(null);
       setMode("loading");
+      setAutoplayBlocked(false);
       refreshManifest(controller.signal)
+        .catch((error: unknown) => {
+          if (!(error instanceof PublicManifestError) || error.code !== "unavailable" || controller.signal.aborted)
+            throw error;
+          return refreshManifest(controller.signal);
+        })
         .then(async (next) => {
           const cached = await loadCachedPublicArProject(publicSlug, next);
           if (controller.signal.aborted) return;
-          // Automatic camera entry has no audio gesture; start muted for Safari autoplay.
-          setMuted(true);
+          // For postcards try the original audio first. Safari can request one gesture.
+          setMuted(!(next.version === 1 && next.videoViewport));
           setCachedProject(cached);
           telemetry.track("page_open");
           setMode(ordinaryVideo && next.fallbackEnabled ? "fallback" : "intro");
@@ -124,7 +132,7 @@ export function PublicArViewerRoute() {
         });
     });
     return () => controller.abort();
-  }, [ordinaryVideo, publicSlug, refreshManifest, telemetry]);
+  }, [ordinaryVideo, publicSlug, refreshManifest, telemetry, openAttempt]);
 
   useEffect(() => {
     if (!manifest) return;
@@ -261,12 +269,16 @@ export function PublicArViewerRoute() {
         setVideoState(state);
         if (state !== "idle") setPaused(true);
       },
+      onAutoplayBlocked: () => setAutoplayBlocked(true),
       onTrackingState: (state: PublicArTrackingState) => {
         setMode(state);
         if (state === "tracking") telemetry.track("marker_detected");
       },
       onPlaybackEvent: (event, valueSeconds, errorCode) => {
-        if (event === "playback_started") setPaused(false);
+        if (event === "playback_started") {
+          setPaused(false);
+          setAutoplayBlocked(false);
+        }
         telemetry.track(event, valueSeconds, errorCode);
       },
     });
@@ -361,16 +373,21 @@ export function PublicArViewerRoute() {
         </div>
       </PublicInfo>
     );
-  if (!manifest) return <ViewerNotice title="AR-фотография недоступна" text={message} error />;
+  if (!manifest)
+    return (
+      <ViewerNotice
+        title="AR-фотография недоступна"
+        text={message}
+        error
+        onRetry={() => setOpenAttempt((attempt) => attempt + 1)}
+      />
+    );
 
   const active = mode === "starting" || mode === "searching" || mode === "tracking";
   const pairing = mode === "pairing" || mode === "caching";
+  const postcard = manifest.version === 1 && Boolean(manifest.videoViewport);
   return (
-    <main
-      className="ar-viewer"
-      data-mode={mode}
-      data-postcard={manifest.version === 1 && Boolean(manifest.videoViewport) ? "true" : undefined}
-    >
+    <main className="ar-viewer" data-mode={mode} data-postcard={postcard ? "true" : undefined}>
       <div ref={containerRef} className={active ? "ar-viewer-stage" : "hidden"} aria-hidden={!active} />
 
       {mode === "intro" ? (
@@ -434,7 +451,9 @@ export function PublicArViewerRoute() {
                   : videoState === "error"
                     ? "Видео не загрузилось"
                     : "Фото найдено"
-                : "Наведите камеру на фото"}
+                : postcard
+                  ? "Поместите открытку целиком в кадр"
+                  : "Наведите камеру на фото"}
           </div>
           {mode !== "tracking" ? <CornerGuide className="ar-photo-guide" testId="marker-scan-guide" /> : null}
           {mode !== "starting" ? (
@@ -453,16 +472,18 @@ export function PublicArViewerRoute() {
             </div>
           ) : null}
           <div className="ar-viewer-controls" aria-label="Управление AR-видео">
-            <button
-              type="button"
-              aria-pressed={!muted}
-              onClick={() => {
-                sessionRef.current?.setMuted(!muted);
-                setMuted(!muted);
-              }}
-            >
-              {muted ? <VolumeX size={18} /> : <Volume2 size={18} />} Звук
-            </button>
+            {!postcard && (
+              <button
+                type="button"
+                aria-pressed={!muted}
+                onClick={() => {
+                  sessionRef.current?.setMuted(!muted);
+                  setMuted(!muted);
+                }}
+              >
+                {muted ? <VolumeX size={18} /> : <Volume2 size={18} />} Звук
+              </button>
+            )}
             <button
               type="button"
               disabled={mode !== "tracking" || videoState === "loading" || videoState === "idle"}
@@ -474,7 +495,13 @@ export function PublicArViewerRoute() {
               }}
             >
               {paused ? <Play size={18} /> : <Pause size={18} />}{" "}
-              {videoState === "error" ? "Повторить загрузку" : paused ? "Продолжить" : "Пауза"}
+              {videoState === "error"
+                ? "Повторить загрузку"
+                : postcard && autoplayBlocked
+                  ? "Воспроизвести со звуком"
+                  : paused
+                    ? "Продолжить"
+                    : "Пауза"}
             </button>
             {typeof document.documentElement.requestFullscreen === "function" ? (
               <button
@@ -799,7 +826,17 @@ function InfoCard({ icon, title, children }: { icon: ReactNode; title: string; c
   );
 }
 
-function ViewerNotice({ title, text, error = false }: { title: string; text: string; error?: boolean }) {
+function ViewerNotice({
+  title,
+  text,
+  error = false,
+  onRetry,
+}: {
+  title: string;
+  text: string;
+  error?: boolean;
+  onRetry?: () => void;
+}) {
   return (
     <main className="grid min-h-[100dvh] place-items-center bg-surface px-5 text-ink">
       <div className="w-full max-w-md rounded-2xl border border-line bg-card p-6 text-center">
@@ -817,6 +854,11 @@ function ViewerNotice({ title, text, error = false }: { title: string; text: str
         </span>
         <h1 className="mt-5 text-2xl font-semibold">{title}</h1>
         <p className="mt-3 text-sm leading-6 text-muted">{text}</p>
+        {onRetry && (
+          <Button className="mt-4" onClick={onRetry}>
+            Повторить открытие
+          </Button>
+        )}
       </div>
     </main>
   );

@@ -14,7 +14,7 @@ const target: PublicArTarget = {
     posterUrl: "https://album.test/poster.webp",
   },
 };
-function fixture(count = 50) {
+function fixture(count = 50, lossPauseDelayMs?: number) {
   const video = document.createElement("video");
   let paused = true,
     ready = 0;
@@ -50,13 +50,24 @@ function fixture(count = 50) {
     onState = vi.fn();
   let visible = true;
   const targets = Array.from({ length: count }, (_, index) => ({ ...target, targetId: `target-${index}` }));
-  const player = createAlbumVideoPlayback({ video, targets, load, visible: () => visible, onReady, onState });
+  const onAutoplayBlocked = vi.fn();
+  const player = createAlbumVideoPlayback({
+    video,
+    targets,
+    load,
+    visible: () => visible,
+    onReady,
+    onState,
+    lossPauseDelayMs,
+    onAutoplayBlocked,
+  });
   return {
     video,
     player,
     load,
     onReady,
     onState,
+    onAutoplayBlocked,
     create,
     revoke,
     play,
@@ -147,6 +158,35 @@ describe("lazy album playback", () => {
     await f.player.retry();
     expect(f.player.state).toBe("ready");
     expect(f.load).toHaveBeenCalledTimes(2);
+    f.player.dispose();
+  });
+  it("keeps audio and video running across brief postcard tracking loss", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const f = fixture(1, 320);
+    try {
+      await f.player.select(0);
+      expect(f.video.preload).toBe("auto");
+      f.hide();
+      f.player.lost(0);
+      await vi.advanceTimersByTimeAsync(150);
+      expect(f.video.paused).toBe(false);
+      f.show();
+      await f.player.select(0);
+      expect(f.play).toHaveBeenCalledOnce();
+      f.hide();
+      f.player.lost(0);
+      await vi.advanceTimersByTimeAsync(320);
+      expect(f.video.paused).toBe(true);
+    } finally {
+      f.player.dispose();
+      vi.useRealTimers();
+    }
+  });
+  it("reports when the browser requires a gesture for audio", async () => {
+    const f = fixture(1);
+    f.play.mockRejectedValueOnce(new DOMException("Autoplay blocked", "NotAllowedError"));
+    await f.player.select(0);
+    expect(f.onAutoplayBlocked).toHaveBeenCalledOnce();
     f.player.dispose();
   });
   it("does not assign the previous video's position to a failed new target", async () => {

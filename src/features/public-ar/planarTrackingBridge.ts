@@ -144,6 +144,9 @@ export function createPlanarAnchor(options: {
   let lastSample = -Infinity;
   let acceptedAt = -Infinity;
   let current: PlanarObservation | null = null;
+  let projected: PlanarObservation | null = null;
+  let projectedWidth = 0;
+  let projectedHeight = 0;
   const setVisible = (visible: boolean) => {
     if (group.visible === visible) return;
     group.visible = visible;
@@ -155,12 +158,16 @@ export function createPlanarAnchor(options: {
     const width = options.container.clientWidth,
       height = options.container.clientHeight;
     if (!width || !height) return;
+    if (current === projected && width === projectedWidth && height === projectedHeight) return;
     const clip = cornerProjectionMatrix(options.three, current.corners, current.aspect, current.input, {
       width,
       height,
     });
     if (!clip) return;
     group.matrix.multiplyMatrices(options.camera.projectionMatrixInverse, clip);
+    projected = current;
+    projectedWidth = width;
+    projectedHeight = height;
   };
   const consumeObservation = () => {
     if (!options.anchor.visible) {

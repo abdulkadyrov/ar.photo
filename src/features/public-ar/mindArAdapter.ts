@@ -194,10 +194,12 @@ export async function startPublicMindAr(options: {
   trackingAssets?: Blob[];
   loadVideo?(index: number, signal: AbortSignal): Promise<Blob>;
   onMediaState?(state: AlbumVideoState): void;
+  onAutoplayBlocked?(): void;
   onTrackingState(state: PublicArTrackingState): void;
   onPlaybackEvent(event: PublicArAnalyticsEvent, valueSeconds?: number | null, errorCode?: string | null): void;
 }): Promise<PublicArSession> {
   const { container, manifest, onTrackingState, onPlaybackEvent } = options;
+  const postcard = manifest.version === 1 && Boolean(manifest.videoViewport);
   options.signal?.throwIfAborted();
   const targets = publicArTargets(manifest);
   const videos =
@@ -253,12 +255,27 @@ export async function startPublicMindAr(options: {
     const video = document.createElement("video");
     mindar.video = video;
     container.appendChild(video);
-    await prepareArCamera({
+    const cameraOptions = {
       video,
       signal: lifetime.signal,
       stream: options.cameraStream,
       constraints: boundedCameraConstraints({ audio: false, video: { facingMode: { ideal: "environment" } } }),
-    });
+    };
+    try {
+      await prepareArCamera(cameraOptions);
+    } catch (error) {
+      if (
+        !postcard ||
+        options.cameraStream ||
+        lifetime.signal.aborted ||
+        !(error instanceof DOMException) ||
+        !["NotReadableError", "TrackStartError"].includes(error.name)
+      )
+        throw error;
+      // The system QR camera can still be releasing the device as Safari opens.
+      await abortable(new Promise<void>((resolve) => setTimeout(resolve, 500)), lifetime.signal);
+      await prepareArCamera(cameraOptions);
+    }
   };
   const { renderer, scene, camera } = mindar;
   // Wait for valid camera dimensions and a committed, visible React container.
@@ -279,7 +296,6 @@ export async function startPublicMindAr(options: {
   observer.observe(container);
   window.addEventListener("resize", resize);
   window.visualViewport?.addEventListener("resize", resize);
-  const postcard = manifest.version === 1 && Boolean(manifest.videoViewport);
   renderer.setPixelRatio?.(Math.min(window.devicePixelRatio || 1, postcard && isIosWebKit() ? 1 : 2));
   renderer.setClearColor(0x000000, 0);
   let stopped = false;
@@ -368,6 +384,8 @@ export async function startPublicMindAr(options: {
     targets,
     load: options.loadVideo ?? ((index, signal) => loadPublicArVideo(targets[index].assets.videoUrl, signal)),
     visible: (index) => targetVisible && activeTargetIndex === index,
+    lossPauseDelayMs: postcard ? 320 : undefined,
+    onAutoplayBlocked: options.onAutoplayBlocked,
     onReady(index) {
       if (index !== activeTargetIndex || !targetVisible) return;
       runtimes[index].fitVideoToMarker();
