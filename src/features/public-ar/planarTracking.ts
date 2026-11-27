@@ -253,8 +253,10 @@ export function createCornerFilter() {
         const motionAlpha = coefficient(speed, 2, 35, 0.05, 0.14);
         // A sustained perspective change is motion, not noise. Alternating
         // corner errors do not pass this directional consistency check.
-        const shapeAlpha =
-          consistentShape >= 2 ? 1 - Math.exp(-2 * Math.PI * 35 * dt) : coefficient(deformation, 1.5, 35, 0.004, 0.025);
+        // Oblique views amplify homography uncertainty. Its amplitude alone
+        // must never open the shape gate: a stationary tilted target can have
+        // larger alternating corner errors than a moving front-facing one.
+        const shapeAlpha = 1 - Math.exp(-2 * Math.PI * (consistentShape >= 2 ? 35 : 1.5) * dt);
         corners = corners.map((p, i) => ({
           x: p.x + motionAlpha * (coherent[i].x - p.x) + shapeAlpha * (next[i].x - coherent[i].x),
           y: p.y + motionAlpha * (coherent[i].y - p.y) + shapeAlpha * (next[i].y - coherent[i].y),

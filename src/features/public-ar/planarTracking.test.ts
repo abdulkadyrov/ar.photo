@@ -47,6 +47,68 @@ function measurements(corners = tilted) {
 }
 
 describe("four-corner planar tracking", () => {
+  it.each([15, 30, 60])("suppresses amplified perspective jitter on a stationary oblique target at %i Hz", (fps) => {
+    const filter = createCornerFilter();
+    filter.sample(tilted, 0);
+    let rawEnergy = 0;
+    let filteredEnergy = 0;
+    for (let frame = 1; frame <= fps * 5; frame++) {
+      // Opposing edge errors are a shape change, not shared camera motion.
+      // Their larger amplitude must not make the filter trust them more.
+      const wobble = (frame % 2 ? 1 : -1) * 0.012;
+      const noisy = tilted.map((p, i) => ({
+        x: p.x + (i < 2 ? wobble : -wobble),
+        y: p.y + (i % 2 ? wobble : -wobble),
+      })) as Quad;
+      const actual = filter.sample(noisy, (frame * 1000) / fps)!;
+      expect(actual).not.toBeNull();
+      if (frame > fps) {
+        rawEnergy += error(noisy, tilted) ** 2;
+        filteredEnergy += error(actual, tilted) ** 2;
+      }
+    }
+    expect(Math.sqrt(filteredEnergy / rawEnergy)).toBeLessThan(0.6);
+  });
+
+  it.each([15, 30, 60])("follows sustained perspective changes after brief confirmation at %i Hz", (fps) => {
+    const filter = createCornerFilter();
+    filter.sample(tilted, 0);
+    for (let frame = 1; frame <= fps; frame++) {
+      const progress = frame / fps;
+      const expected = tilted.map((p, i) => ({
+        x: p.x + (i < 2 ? 0.04 : -0.04) * progress,
+        y: p.y + (i % 2 ? 0.02 : -0.02) * progress,
+      })) as Quad;
+      const actual = filter.sample(expected, (frame * 1000) / fps)!;
+      expect(actual).not.toBeNull();
+      if (frame > 3) expect(error(actual, expected)).toBeLessThan(3);
+    }
+  });
+
+  it("damps irregular oblique-view corner noise at uneven observation intervals", () => {
+    const filter = createCornerFilter();
+    filter.sample(tilted, 0);
+    let seed = 37;
+    const random = () => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 2 ** 32 - 0.5;
+    };
+    let time = 0;
+    let rawEnergy = 0;
+    let filteredEnergy = 0;
+    for (let frame = 1; frame <= 240; frame++) {
+      time += [33, 40, 50, 25][frame % 4];
+      const noisy = tilted.map((p) => ({ x: p.x + random() * 0.024, y: p.y + random() * 0.024 })) as Quad;
+      const actual = filter.sample(noisy, time)!;
+      expect(actual).not.toBeNull();
+      if (frame > 30) {
+        rawEnergy += error(noisy, tilted) ** 2;
+        filteredEnergy += error(actual, tilted) ** 2;
+      }
+    }
+    expect(Math.sqrt(filteredEnergy / rawEnergy)).toBeLessThan(0.85);
+  });
+
   it("accepts partial translation but rejects a flattened window", () => {
     const translated = tilted.map((p) => ({ x: p.x + 0.03, y: p.y - 0.02 })) as Quad;
     const stable = stabilizePartialPose(tilted, translated, input);
