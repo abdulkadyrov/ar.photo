@@ -3,7 +3,8 @@ import { installAlbumCandidateSearch, type FeaturePoint } from "./albumCandidate
 import {
   createCornerFilter,
   cornerProjectionMatrix,
-  estimatePlanarQuad,
+  estimatePlanarObservation,
+  partialPoseFollows,
   PLANAR_HOLD_MS,
   type Point2,
   type Quad,
@@ -24,6 +25,7 @@ type Controller = {
 };
 export type PlanarObservation = {
   corners: Quad;
+  partial?: boolean;
   // Availability controls the existing loss grace period; capture controls
   // filter cadence and duplicate detection. They are different clocks.
   time: number;
@@ -37,6 +39,7 @@ export function installPlanarObservations(
   signal: AbortSignal,
   skipWarmup: boolean,
   onError?: (error: unknown) => void,
+  allowPartial = false,
 ) {
   let controller: Controller | undefined;
   const observations = new Map<number, PlanarObservation>();
@@ -81,20 +84,22 @@ export function installPlanarObservations(
             observations.delete(index);
             if (dimensions && !signal.aborted) {
               const inputSize = { width: next.inputWidth, height: next.inputHeight };
-              const corners = estimatePlanarQuad(
+              const estimate = estimatePlanarObservation(
                 sample.worldCoords,
                 sample.screenCoords,
                 { width: dimensions[0], height: dimensions[1] },
                 inputSize,
+                allowPartial,
               );
-              if (corners)
+              if (estimate)
                 observations.set(index, {
                   // InputLoader rotates +90 degrees when the element dimensions
                   // are swapped (also true for square inputs). Undo that before
                   // mapping observations onto the displayed camera image.
                   corners: isRotatedInput(runtime.video, inputSize)
-                    ? (corners.map((p) => ({ x: p.y, y: 1 - p.x })) as Quad)
-                    : corners,
+                    ? (estimate.corners.map((p) => ({ x: p.y, y: 1 - p.x })) as Quad)
+                    : estimate.corners,
+                  partial: estimate.partial,
                   time: performance.now(),
                   frameTime:
                     input !== null && typeof input === "object"
@@ -144,6 +149,7 @@ export function createPlanarAnchor(options: {
   let lastSample = -Infinity;
   let acceptedAt = -Infinity;
   let current: PlanarObservation | null = null;
+  let lastObserved: Quad | null = null;
   let projected: PlanarObservation | null = null;
   let projectedWidth = 0;
   let projectedHeight = 0;
@@ -174,6 +180,7 @@ export function createPlanarAnchor(options: {
       cornerFilter.reset();
       acceptedAt = -Infinity;
       current = null;
+      lastObserved = null;
       setVisible(false);
       return;
     }
@@ -182,9 +189,19 @@ export function createPlanarAnchor(options: {
     const frameTime = sample.frameTime ?? sample.time;
     if (frameTime <= lastSample) return;
     lastSample = frameTime;
+    if (
+      sample.partial &&
+      (!group.visible ||
+        !lastObserved ||
+        now() - acceptedAt > PLANAR_HOLD_MS ||
+        !cornerFilter.fresh(frameTime) ||
+        !partialPoseFollows(lastObserved, sample.corners))
+    )
+      return;
     const corners = cornerFilter.sample(sample.corners, frameTime);
     if (!corners) return;
     acceptedAt = sample.time;
+    lastObserved = sample.corners;
     current = { ...sample, corners };
     updateMatrix();
     setVisible(true);

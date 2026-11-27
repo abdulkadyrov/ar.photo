@@ -59,6 +59,16 @@ function validQuad(quad: Quad) {
 }
 
 export function estimatePlanarQuad(world: Point2[], screen: Point2[], marker: Size, input: Size): Quad | null {
+  return estimatePlanarObservation(world, screen, marker, input)?.corners ?? null;
+}
+
+export function estimatePlanarObservation(
+  world: Point2[],
+  screen: Point2[],
+  marker: Size,
+  input: Size,
+  allowPartial = false,
+) {
   if (world.length < 8 || world.length !== screen.length) return null;
   const source = world.map((p) => ({ x: p.x / marker.width, y: p.y / marker.height }));
   const destination = screen.map((p) => ({ x: p.x / input.width, y: p.y / input.height }));
@@ -101,7 +111,16 @@ export function estimatePlanarQuad(world: Point2[], screen: Point2[], marker: Si
   // A cluster on a face alone cannot reliably locate all four image corners.
   const spanX = Math.max(...points.map((p) => p.x)) - Math.min(...points.map((p) => p.x));
   const spanY = Math.max(...points.map((p) => p.y)) - Math.min(...points.map((p) => p.y));
-  if (spanX < 0.45 || spanY < 0.45) return null;
+  const partial = spanX < 0.45 || spanY < 0.45;
+  if (
+    partial &&
+    (!allowPartial ||
+      best.length < 10 ||
+      best.length < source.length * 0.75 ||
+      Math.min(spanX, spanY) < 0.28 ||
+      Math.max(spanX, spanY) < 0.5)
+  )
+    return null;
   const meanX = points.reduce((sum, p) => sum + p.x, 0) / points.length;
   const meanY = points.reduce((sum, p) => sum + p.y, 0) / points.length;
   const xx = points.reduce((sum, p) => sum + (p.x - meanX) ** 2, 0) / points.length;
@@ -114,7 +133,31 @@ export function estimatePlanarQuad(world: Point2[], screen: Point2[], marker: Si
   );
   if (!h || UNIT_CORNERS.some((p) => h[6] * p.x + h[7] * p.y + 1 <= 0.05)) return null;
   const quad = UNIT_CORNERS.map((p) => projectPoint(h, p)) as Quad;
-  return validQuad(quad) ? quad : null;
+  if (!validQuad(quad)) return null;
+  if (partial) {
+    if (
+      best.some((index) => {
+        const { x, y } = destination[index];
+        return x < 0 || x > 1 || y < 0 || y > 1;
+      })
+    )
+      return null;
+    const error = best.reduce((sum, index) => {
+      const p = projectPoint(h, source[index]);
+      return (
+        sum + ((p.x - destination[index].x) * input.width) ** 2 + ((p.y - destination[index].y) * input.height) ** 2
+      );
+    }, 0);
+    if (Math.sqrt(error / best.length) > 1.6) return null;
+  }
+  return { corners: quad, partial };
+}
+
+export function partialPoseFollows(previous: Quad, next: Quad) {
+  const size = Math.hypot(previous[0].x - previous[2].x, previous[0].y - previous[2].y);
+  return next.every(
+    (point, index) => Math.hypot(point.x - previous[index].x, point.y - previous[index].y) <= size * 0.16,
+  );
 }
 
 export function createCornerFilter() {

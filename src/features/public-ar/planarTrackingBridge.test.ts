@@ -164,14 +164,28 @@ describe("pinned MindAR planar observation bridge", () => {
       onLost: lost,
       now: () => time,
     });
+    sample = { ...sample!, partial: true };
     anchor.onTargetUpdate?.();
+    expect(runtime.group.visible).toBe(false);
+    sample = { ...sample, time: ++time, partial: false };
+    anchor.onTargetUpdate?.();
+    expect(runtime.group.visible).toBe(true);
+    time += PLANAR_HOLD_MS - 1;
+    sample = { ...sample, time, partial: true };
+    runtime.update();
+    time += 2;
+    runtime.update();
     expect(runtime.group.visible).toBe(true);
     time += PLANAR_HOLD_MS + 1;
     anchor.onTargetUpdate?.();
     runtime.update();
     expect(runtime.group.visible).toBe(false);
     expect(lost).toHaveBeenCalledOnce();
-    sample = { ...sample!, time: time + 1 };
+    sample = { ...sample!, time: time + 1, partial: true };
+    time++;
+    anchor.onTargetUpdate?.();
+    expect(runtime.group.visible).toBe(false);
+    sample = { ...sample, time: time + 1, partial: false };
     time++;
     anchor.onTargetUpdate?.();
     expect(runtime.group.visible).toBe(true);

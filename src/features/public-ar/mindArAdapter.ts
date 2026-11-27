@@ -248,8 +248,12 @@ export async function startPublicMindAr(options: {
   const abort = () => lifetime.abort(options.signal?.reason);
   options.signal?.addEventListener("abort", abort, { once: true });
   if (options.signal?.aborted) abort();
-  const readObservation = installPlanarObservations(mindar, lifetime.signal, isIosWebKit(), (error) =>
-    lifetime.abort(error),
+  const readObservation = installPlanarObservations(
+    mindar,
+    lifetime.signal,
+    isIosWebKit(),
+    (error) => lifetime.abort(error),
+    postcard,
   );
   mindar._startVideo = async () => {
     const video = document.createElement("video");

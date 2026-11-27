@@ -4,6 +4,8 @@ import {
   cornerProjectionMatrix,
   createCornerFilter,
   estimatePlanarQuad,
+  estimatePlanarObservation,
+  partialPoseFollows,
   fitHomography,
   PLANAR_HOLD_MS,
   projectPoint,
@@ -44,6 +46,31 @@ function measurements(corners = tilted) {
 }
 
 describe("four-corner planar tracking", () => {
+  it.each(["left", "right", "top", "bottom"] as const)("solves from spread features on the visible %s half", (side) => {
+    const x0 = side === "right" ? -0.95 : 0.1;
+    const x1 = side === "left" ? 1.95 : 0.9;
+    const y0 = side === "bottom" ? -0.95 : 0.1;
+    const y1 = side === "top" ? 1.95 : 0.9;
+    const expected: Quad = [
+      { x: x0, y: y0 },
+      { x: x1, y: y0 },
+      { x: x1, y: y1 },
+      { x: x0, y: y1 },
+    ];
+    const all = measurements(expected);
+    const visible = all.world.flatMap((point, i) => {
+      const p = all.screen[i];
+      return p.x > 0 && p.x < input.width && p.y > 0 && p.y < input.height ? [{ point, p }] : [];
+    });
+    const world = visible.map(({ point }) => point);
+    const screen = visible.map(({ p }) => p);
+    expect(estimatePlanarQuad(world, screen, marker, input)).toBeNull();
+    const estimate = estimatePlanarObservation(world, screen, marker, input, true);
+    expect(estimate?.partial).toBe(true);
+    expect(error(estimate!.corners, expected)).toBeLessThan(6);
+    expect(partialPoseFollows(expected, estimate!.corners)).toBe(true);
+    expect(partialPoseFollows(expected, tilted)).toBe(false);
+  });
   it("recovers all corners under perspective from noisy feature measurements and 25% outliers", () => {
     const { world, screen } = measurements();
     for (let i = 0; i < 12; i++) screen[i] = { x: 650 - i * 10, y: 150 + i * 3 };
