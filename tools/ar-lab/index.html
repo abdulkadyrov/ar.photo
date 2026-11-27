@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>KHANZAMA · AR laboratory</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <p>KHANZAMA / ИНЖЕНЕРНЫЙ СТЕНД</p>
+          <h1>Виртуальная камера AR</h1>
+        </div>
+        <strong id="status">Подготовка…</strong>
+      </header>
+      <p class="intro">
+        Настоящий MindAR анализирует изображение виртуальной открытки. Зелёный контур — точная геометрия сцены;
+        фиолетовый — результат рабочего трекера. Видео не попадает обратно в виртуальную камеру.
+      </p>
+      <div class="workspace">
+        <section>
+          <div id="viewport"></div>
+          <div class="legend"><span>🟩 Истинное положение</span><span>🟪 Распознанное положение</span></div>
+          <pre id="metrics">Загрузка модулей…</pre>
+        </section>
+        <aside>
+          <label
+            >Амплитуда движения <output id="motionStrengthValue">1</output>×<input
+              id="motionStrength"
+              type="range"
+              min="0"
+              max="3"
+              step="0.1"
+              value="1"
+          /></label>
+          <label
+            >Скорость движения <output id="motionSpeedValue">1</output>×<input
+              id="motionSpeed"
+              type="range"
+              min="0.25"
+              max="4"
+              step="0.25"
+              value="1"
+          /></label>
+          <label
+            >Повтор открытки рядом<select id="duplicate">
+              <option value="0">Нет</option>
+              <option value="1">Две одинаковые</option>
+            </select></label
+          >
+          <label
+            >Расфокусировка <output id="defocusValue">0</output> px<input
+              id="defocus"
+              type="range"
+              min="0"
+              max="2"
+              step="0.25"
+              value="0"
+          /></label>
+          <label
+            >Шум камеры ± <output id="noiseValue">0</output> /255<input
+              id="noise"
+              type="range"
+              min="0"
+              max="8"
+              step="1"
+              value="0"
+          /></label>
+          <button id="stop" disabled>Остановить</button>
+          <button id="start">Запустить распознавание</button
+          ><label
+            >Сценарий<select id="scenario">
+              <option value="manual">Ручное управление</option>
+              <option value="front">Штатив · прямо</option>
+              <option value="tilt30">Штатив · 30°</option>
+              <option value="tilt50">Штатив · 50°</option>
+              <option value="duplicate">Две открытки · 30°</option>
+              <option value="hand">Рука · мелкое дрожание и дрейф</option>
+              <option value="fast">Стресс · быстрые движения и остановки</option>
+              <option value="pan">Плавное перемещение</option>
+              <option value="tilt">Изменение наклона</option>
+              <option value="zoom">Приближение</option>
+            </select></label
+          ><label
+            >Наклон X <output id="pitchValue">0</output>°<input
+              id="pitch"
+              type="range"
+              min="-65"
+              max="65"
+              value="0" /></label
+          ><label
+            >Наклон Y <output id="yawValue">0</output>°<input
+              id="yaw"
+              type="range"
+              min="-60"
+              max="60"
+              value="0" /></label
+          ><label
+            >Поворот <output id="rollValue">0</output>°<input
+              id="roll"
+              type="range"
+              min="-40"
+              max="40"
+              value="0" /></label
+          ><label
+            >Расстояние <output id="distanceValue">3</output
+            ><input id="distance" type="range" min="1.9" max="5" step="0.05" value="3" /></label
+          ><label>Сдвиг X<input id="offset" type="range" min="-0.8" max="0.8" step="0.01" value="0" /></label
+          ><label
+            >Перекрытие <output id="occlusionValue">0</output>%<input
+              id="occlusion"
+              type="range"
+              min="0"
+              max="55"
+              value="0" /></label
+          ><label>Видео для наложения<input id="videoFile" type="file" accept="video/*" /></label
+          ><label class="check"><input id="showVideo" type="checkbox" checked /> Показывать видео</label
+          ><button id="export">Скачать измерения JSON</button>
+          <p class="note">
+            Стенд работает локально. WebGL ноутбука не воспроизводит производительность iPhone, автофокус, оптику и
+            блики печати. «Стабильно в симуляторе» не означает «проверено на телефоне».
+          </p>
+        </aside>
+      </div>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,1182 @@
+{
+  "date": "2026-11-28",
+  "baseline": "0846a3a",
+  "sourceHashes": {
+    "src/features/public-ar/planarTracking.ts": "7c55b295ea8b79596d307833c9b9d22f152c9ea6c347e6c330f7fd90fa9e9e3b",
+    "src/features/public-ar/planarTrackingBridge.ts": "e6a3363fb7980a8a31e28713785545815dea53aa007986545b4ba148136fe3d5",
+    "tools/ar-lab/main.ts": "5f189f9dcf21541cd76d8d385e96ecfca55b46dffc2a9050faf6358db79cdb3a"
+  },
+  "runs": {
+    "ar-lab-noisy": {
+      "commit": "0846a3a8da8bdb9c259bdbe0e7dc56c76d6ec811",
+      "dirty": true,
+      "recordedAt": "2026-11-27T22:27:31.858Z",
+      "durationMs": 10000,
+      "baselineRef": "0846a3a",
+      "results": [
+        {
+          "version": 1,
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5
+          },
+          "effectiveParameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "trackAttempts": 594,
+          "estimateRejects": 0,
+          "foundEvents": 0,
+          "lostEvents": 0,
+          "scenario": "front",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 230,
+          "visibleFraction": 1,
+          "rawRmsPx": 0.9259610060064495,
+          "filteredRmsPx": 0.9485463326978368,
+          "filteredP95Px": 0.9485463326978394,
+          "replay": {
+            "baseline": {
+              "accepted": 230,
+              "rmsPx": 0.9259610060064495,
+              "residualStepP95Px": 0,
+              "residualStepMaxPx": 1.3322676295501878e-14
+            },
+            "current": {
+              "accepted": 230,
+              "rmsPx": 0.9259610060064495,
+              "residualStepP95Px": 0,
+              "residualStepMaxPx": 1.3322676295501878e-14
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        },
+        {
+          "version": 1,
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5
+          },
+          "effectiveParameters": {
+            "pitch": 30,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "trackAttempts": 600,
+          "estimateRejects": 0,
+          "foundEvents": 0,
+          "lostEvents": 0,
+          "scenario": "tilt30",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 230,
+          "visibleFraction": 1,
+          "rawRmsPx": 0.5763130952121278,
+          "filteredRmsPx": 0.5368464045089786,
+          "filteredP95Px": 0.5368464045089785,
+          "replay": {
+            "baseline": {
+              "accepted": 230,
+              "rmsPx": 0.5763130952121278,
+              "residualStepP95Px": 0,
+              "residualStepMaxPx": 0
+            },
+            "current": {
+              "accepted": 230,
+              "rmsPx": 0.5763130952121278,
+              "residualStepP95Px": 0,
+              "residualStepMaxPx": 0
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        },
+        {
+          "version": 1,
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5
+          },
+          "effectiveParameters": {
+            "pitch": 50,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "trackAttempts": 591,
+          "estimateRejects": 0,
+          "foundEvents": 0,
+          "lostEvents": 0,
+          "scenario": "tilt50",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 224,
+          "visibleFraction": 1,
+          "rawRmsPx": 0.5965628094670563,
+          "filteredRmsPx": 0.5657447752908534,
+          "filteredP95Px": 0.5657447752908533,
+          "replay": {
+            "baseline": {
+              "accepted": 224,
+              "rmsPx": 0.5965628094670563,
+              "residualStepP95Px": 0,
+              "residualStepMaxPx": 0
+            },
+            "current": {
+              "accepted": 224,
+              "rmsPx": 0.5965628094670563,
+              "residualStepP95Px": 0,
+              "residualStepMaxPx": 0
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        },
+        {
+          "version": 1,
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5
+          },
+          "effectiveParameters": {
+            "pitch": 30,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0.3436582936785744,
+            "occlusion": 0,
+            "noise": 5
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "trackAttempts": 600,
+          "estimateRejects": 0,
+          "foundEvents": 0,
+          "lostEvents": 0,
+          "scenario": "pan",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 226,
+          "visibleFraction": 1,
+          "rawRmsPx": 0.7559171051706534,
+          "filteredRmsPx": 0.791593155421968,
+          "filteredP95Px": 1.1296152058352267,
+          "replay": {
+            "baseline": {
+              "accepted": 226,
+              "rmsPx": 0.7975579044643438,
+              "residualStepP95Px": 1.0809082497975633,
+              "residualStepMaxPx": 1.4651895726639188
+            },
+            "current": {
+              "accepted": 226,
+              "rmsPx": 0.8041397939937338,
+              "residualStepP95Px": 1.0609178901482808,
+              "residualStepMaxPx": 1.4697470483057498
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        },
+        {
+          "version": 1,
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5
+          },
+          "effectiveParameters": {
+            "pitch": 41.45668206493553,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "trackAttempts": 594,
+          "estimateRejects": 0,
+          "foundEvents": 0,
+          "lostEvents": 0,
+          "scenario": "tilt",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 226,
+          "visibleFraction": 1,
+          "rawRmsPx": 0.9917338102317996,
+          "filteredRmsPx": 1.27469907152647,
+          "filteredP95Px": 1.6394202143301093,
+          "replay": {
+            "baseline": {
+              "accepted": 226,
+              "rmsPx": 1.139529692082184,
+              "residualStepP95Px": 1.095552460345121,
+              "residualStepMaxPx": 2.1485408840722937
+            },
+            "current": {
+              "accepted": 226,
+              "rmsPx": 1.2642311047727313,
+              "residualStepP95Px": 0.7396374741528222,
+              "residualStepMaxPx": 2.1485408840722937
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        },
+        {
+          "version": 1,
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5
+          },
+          "effectiveParameters": {
+            "pitch": 30,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3.594724256384829,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "trackAttempts": 587,
+          "estimateRejects": 0,
+          "foundEvents": 0,
+          "lostEvents": 0,
+          "scenario": "zoom",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 230,
+          "visibleFraction": 1,
+          "rawRmsPx": 0.9047382109592436,
+          "filteredRmsPx": 0.948888843065351,
+          "filteredP95Px": 1.521841984764269,
+          "replay": {
+            "baseline": {
+              "accepted": 230,
+              "rmsPx": 0.9544004152894122,
+              "residualStepP95Px": 1.1719877281862854,
+              "residualStepMaxPx": 1.6927574590155576
+            },
+            "current": {
+              "accepted": 230,
+              "rmsPx": 0.949177128551383,
+              "residualStepP95Px": 1.171911004891586,
+              "residualStepMaxPx": 1.6927574590155576
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        }
+      ],
+      "errors": [],
+      "limitation": "Synthetic WebGL camera on this computer; not physical iPhone performance or optical validation."
+    },
+    "ar-lab-stress": {
+      "commit": "0846a3a8da8bdb9c259bdbe0e7dc56c76d6ec811",
+      "dirty": true,
+      "recordedAt": "2026-11-27T22:29:27.854Z",
+      "durationMs": 8000,
+      "baselineRef": "0846a3a",
+      "results": [
+        {
+          "version": 1,
+          "marker": {
+            "width": 1024,
+            "height": 1536,
+            "aspect": 0.6666666666666666
+          },
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 2
+          },
+          "effectiveParameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 2
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "trackAttempts": 481,
+          "estimateRejects": 0,
+          "foundEvents": 0,
+          "lostEvents": 0,
+          "scenario": "front",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 184,
+          "visibleFraction": 1,
+          "rawRmsPx": 0.7013283243962976,
+          "filteredRmsPx": 0.7052302181737963,
+          "filteredP95Px": 0.7062608968850971,
+          "replay": {
+            "baseline": {
+              "accepted": 184,
+              "rmsPx": 0.7013661158095039,
+              "residualStepP95Px": 0.0032125164773187005,
+              "residualStepMaxPx": 0.03465738228212969
+            },
+            "current": {
+              "accepted": 184,
+              "rmsPx": 0.7013661158095039,
+              "residualStepP95Px": 0.0032125164773187005,
+              "residualStepMaxPx": 0.03465738228212969
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        },
+        {
+          "version": 1,
+          "marker": {
+            "width": 1024,
+            "height": 1536,
+            "aspect": 0.6666666666666666
+          },
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 2
+          },
+          "effectiveParameters": {
+            "pitch": 30,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 1,
+            "defocus": 2
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "trackAttempts": 452,
+          "estimateRejects": 0,
+          "foundEvents": 0,
+          "lostEvents": 0,
+          "scenario": "duplicate",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 178,
+          "visibleFraction": 1,
+          "rawRmsPx": 0.6057092257421846,
+          "filteredRmsPx": 0.5375817542621841,
+          "filteredP95Px": 0.6662384746010866,
+          "replay": {
+            "baseline": {
+              "accepted": 178,
+              "rmsPx": 0.5646527594848362,
+              "residualStepP95Px": 0.31558752631838344,
+              "residualStepMaxPx": 0.5695880256723715
+            },
+            "current": {
+              "accepted": 178,
+              "rmsPx": 0.5644061850367397,
+              "residualStepP95Px": 0.31558752631838344,
+              "residualStepMaxPx": 0.5082814344518972
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        },
+        {
+          "version": 1,
+          "marker": {
+            "width": 1024,
+            "height": 1536,
+            "aspect": 0.6666666666666666
+          },
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 2
+          },
+          "effectiveParameters": {
+            "pitch": 50,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 2
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "trackAttempts": 474,
+          "estimateRejects": 0,
+          "foundEvents": 0,
+          "lostEvents": 0,
+          "scenario": "tilt50",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 183,
+          "visibleFraction": 1,
+          "rawRmsPx": 1.0978478507236198,
+          "filteredRmsPx": 0.9390127268700152,
+          "filteredP95Px": 1.173499046600129,
+          "replay": {
+            "baseline": {
+              "accepted": 183,
+              "rmsPx": 0.9722463809846914,
+              "residualStepP95Px": 0.7209561843146736,
+              "residualStepMaxPx": 1.3558756741194813
+            },
+            "current": {
+              "accepted": 183,
+              "rmsPx": 0.9722463809846914,
+              "residualStepP95Px": 0.7209561843146736,
+              "residualStepMaxPx": 1.3558756741194813
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        }
+      ],
+      "errors": [],
+      "limitation": "Synthetic WebGL camera on this computer; not physical iPhone performance or optical validation."
+    },
+    "ar-lab-hand": {
+      "commit": "0846a3a8da8bdb9c259bdbe0e7dc56c76d6ec811",
+      "dirty": true,
+      "recordedAt": "2026-11-27T22:32:39.696Z",
+      "durationMs": 10000,
+      "baselineRef": "0846a3a",
+      "sourceHashes": {
+        "tools/ar-lab/main.ts": "81f06379f6219f8a5a5ef6546731f999717da6a8d78027d64db3054a83ca15d1",
+        "tools/ar-lab/motion.ts": "ba715f521521c9997146819d7719e8845460901174b284f2c7226986f5473c37",
+        "src/features/public-ar/planarTracking.ts": "7c55b295ea8b79596d307833c9b9d22f152c9ea6c347e6c330f7fd90fa9e9e3b",
+        "src/features/public-ar/planarTrackingBridge.ts": "e6a3363fb7980a8a31e28713785545815dea53aa007986545b4ba148136fe3d5"
+      },
+      "results": [
+        {
+          "version": 1,
+          "marker": {
+            "width": 1024,
+            "height": 1536,
+            "aspect": 0.6666666666666666
+          },
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 1,
+            "motionStrength": 1,
+            "motionSpeed": 1
+          },
+          "effectiveParameters": {
+            "pitch": 29.492720996659628,
+            "yaw": 0.4339015145328757,
+            "roll": 0.027635754824875795,
+            "distance": 3.013836914133175,
+            "offset": -0.003960524999047714,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 1,
+            "motionStrength": 1,
+            "motionSpeed": 1
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "motionTime": 14.00040000001197,
+          "tremorTime": 14.00040000001197,
+          "trackAttempts": 592,
+          "estimateRejects": 0,
+          "foundEvents": 0,
+          "lostEvents": 0,
+          "scenario": "hand",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 229,
+          "visibleFraction": 1,
+          "rawRmsPx": 0.6247766577158518,
+          "filteredRmsPx": 0.60727600284094,
+          "filteredP95Px": 0.8718578098694193,
+          "replay": {
+            "baseline": {
+              "accepted": 229,
+              "rmsPx": 0.6164151649613522,
+              "residualStepP95Px": 0.9669210495825799,
+              "residualStepMaxPx": 1.4197053294599098
+            },
+            "current": {
+              "accepted": 229,
+              "rmsPx": 0.616866198779523,
+              "residualStepP95Px": 0.9669210495825799,
+              "residualStepMaxPx": 1.419703706501722
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        },
+        {
+          "version": 1,
+          "marker": {
+            "width": 1024,
+            "height": 1536,
+            "aspect": 0.6666666666666666
+          },
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 1,
+            "motionStrength": 1,
+            "motionSpeed": 1
+          },
+          "effectiveParameters": {
+            "pitch": 45,
+            "yaw": 12,
+            "roll": 3,
+            "distance": 2.8,
+            "offset": 0.3,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 1,
+            "motionStrength": 1,
+            "motionSpeed": 1
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "motionTime": 13.974500000035793,
+          "tremorTime": 13.974500000035793,
+          "trackAttempts": 586,
+          "estimateRejects": 7,
+          "foundEvents": 0,
+          "lostEvents": 0,
+          "scenario": "fast",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 224,
+          "visibleFraction": 1,
+          "rawRmsPx": 1.0328223784341297,
+          "filteredRmsPx": 6.200671740925061,
+          "filteredP95Px": 2.9613442885536445,
+          "replay": {
+            "baseline": {
+              "accepted": 222,
+              "rmsPx": 1.7596541209338303,
+              "residualStepP95Px": 4.093205489577917,
+              "residualStepMaxPx": 15.813209135441438
+            },
+            "current": {
+              "accepted": 222,
+              "rmsPx": 1.8145154247288129,
+              "residualStepP95Px": 4.911496109289402,
+              "residualStepMaxPx": 15.798797057433276
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        }
+      ],
+      "errors": [],
+      "limitation": "Synthetic WebGL camera on this computer; not physical iPhone performance or optical validation."
+    },
+    "ar-lab-fast": {
+      "commit": "0846a3a8da8bdb9c259bdbe0e7dc56c76d6ec811",
+      "dirty": true,
+      "recordedAt": "2026-11-27T22:33:13.214Z",
+      "durationMs": 10000,
+      "baselineRef": "0846a3a",
+      "sourceHashes": {
+        "tools/ar-lab/main.ts": "81f06379f6219f8a5a5ef6546731f999717da6a8d78027d64db3054a83ca15d1",
+        "tools/ar-lab/motion.ts": "ba715f521521c9997146819d7719e8845460901174b284f2c7226986f5473c37",
+        "src/features/public-ar/planarTracking.ts": "7c55b295ea8b79596d307833c9b9d22f152c9ea6c347e6c330f7fd90fa9e9e3b",
+        "src/features/public-ar/planarTrackingBridge.ts": "e6a3363fb7980a8a31e28713785545815dea53aa007986545b4ba148136fe3d5"
+      },
+      "results": [
+        {
+          "version": 1,
+          "marker": {
+            "width": 1024,
+            "height": 1536,
+            "aspect": 0.6666666666666666
+          },
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 1,
+            "motionStrength": 2,
+            "motionSpeed": 2
+          },
+          "effectiveParameters": {
+            "pitch": 30.495370802976012,
+            "yaw": 0.10712627904987408,
+            "roll": -0.2853768455440071,
+            "distance": 3.0365690272877304,
+            "offset": -0.016182452735045167,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 1,
+            "motionStrength": 2,
+            "motionSpeed": 2
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "motionTime": 27.91999999995239,
+          "tremorTime": 15.091891891866156,
+          "trackAttempts": 594,
+          "estimateRejects": 0,
+          "foundEvents": 0,
+          "lostEvents": 0,
+          "scenario": "hand",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 230,
+          "visibleFraction": 1,
+          "rawRmsPx": 0.7616320004205763,
+          "filteredRmsPx": 0.822272467098576,
+          "filteredP95Px": 1.270116582366247,
+          "replay": {
+            "baseline": {
+              "accepted": 230,
+              "rmsPx": 0.8347053408990319,
+              "residualStepP95Px": 1.5273040437911352,
+              "residualStepMaxPx": 1.8442553078753792
+            },
+            "current": {
+              "accepted": 230,
+              "rmsPx": 0.8347053408990319,
+              "residualStepP95Px": 1.5273040437911352,
+              "residualStepMaxPx": 1.8442553078753792
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        },
+        {
+          "version": 1,
+          "marker": {
+            "width": 1024,
+            "height": 1536,
+            "aspect": 0.6666666666666666
+          },
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 1,
+            "motionStrength": 2,
+            "motionSpeed": 2
+          },
+          "effectiveParameters": {
+            "pitch": 20.730166085542564,
+            "yaw": -7.41586713156595,
+            "roll": -1.8539667828914874,
+            "distance": 3.1235977855260995,
+            "offset": -0.1853966782891487,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 1,
+            "motionStrength": 2,
+            "motionSpeed": 2
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "motionTime": 27.970599999976187,
+          "tremorTime": 15.119243243230391,
+          "trackAttempts": 421,
+          "estimateRejects": 36,
+          "foundEvents": 7,
+          "lostEvents": 6,
+          "scenario": "fast",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 171,
+          "visibleFraction": 0.7240802675585284,
+          "rawRmsPx": 1.0095319885608327,
+          "filteredRmsPx": 10.754647674720372,
+          "filteredP95Px": 10.72574655708683,
+          "replay": {
+            "baseline": {
+              "accepted": 159,
+              "rmsPx": 3.206711630245454,
+              "residualStepP95Px": 11.311414965200981,
+              "residualStepMaxPx": 15.48967179398925
+            },
+            "current": {
+              "accepted": 159,
+              "rmsPx": 3.6263271483065314,
+              "residualStepP95Px": 10.719682786880883,
+              "residualStepMaxPx": 14.453854869699256
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        }
+      ],
+      "errors": [],
+      "limitation": "Synthetic WebGL camera on this computer; not physical iPhone performance or optical validation."
+    },
+    "ar-lab-hand-final": {
+      "commit": "0846a3a8da8bdb9c259bdbe0e7dc56c76d6ec811",
+      "dirty": true,
+      "recordedAt": "2026-11-27T22:35:56.725Z",
+      "durationMs": 10000,
+      "baselineRef": "0846a3a",
+      "sourceHashes": {
+        "tools/ar-lab/main.ts": "81f06379f6219f8a5a5ef6546731f999717da6a8d78027d64db3054a83ca15d1",
+        "tools/ar-lab/motion.ts": "ba715f521521c9997146819d7719e8845460901174b284f2c7226986f5473c37",
+        "src/features/public-ar/planarTracking.ts": "7d4ff943672d7d0ad6b02bf7fe687ff51bbe6cd83228f952a35557eafe6ab52e",
+        "src/features/public-ar/planarTrackingBridge.ts": "e6a3363fb7980a8a31e28713785545815dea53aa007986545b4ba148136fe3d5"
+      },
+      "results": [
+        {
+          "version": 1,
+          "marker": {
+            "width": 1024,
+            "height": 1536,
+            "aspect": 0.6666666666666666
+          },
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 1,
+            "motionStrength": 1,
+            "motionSpeed": 1
+          },
+          "effectiveParameters": {
+            "pitch": 29.53764869456262,
+            "yaw": 0.4417477743321672,
+            "roll": 0.04896928241119872,
+            "distance": 3.014335955201264,
+            "offset": -0.00340905751924922,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 1,
+            "motionStrength": 1,
+            "motionSpeed": 1
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "motionTime": 13.990500000000043,
+          "tremorTime": 13.990500000000043,
+          "trackAttempts": 595,
+          "estimateRejects": 0,
+          "foundEvents": 0,
+          "lostEvents": 0,
+          "scenario": "hand",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 227,
+          "visibleFraction": 1,
+          "rawRmsPx": 0.6599694015435518,
+          "filteredRmsPx": 0.6524632182222514,
+          "filteredP95Px": 0.883612779178978,
+          "replay": {
+            "baseline": {
+              "accepted": 227,
+              "heldFrames": 0,
+              "visibleSamples": 227,
+              "visibleRmsPx": 0.6596780280633467,
+              "maxVisibleErrorPx": 1.0639602307023535,
+              "rmsPx": 0.6596780280633467,
+              "residualStepP95Px": 1.0063935271457698,
+              "residualStepMaxPx": 1.3202607419852441
+            },
+            "current": {
+              "accepted": 227,
+              "heldFrames": 0,
+              "visibleSamples": 227,
+              "visibleRmsPx": 0.6596780280633467,
+              "maxVisibleErrorPx": 1.0639602307023535,
+              "rmsPx": 0.6596780280633467,
+              "residualStepP95Px": 1.0063935271457698,
+              "residualStepMaxPx": 1.3202607419852441
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        },
+        {
+          "version": 1,
+          "marker": {
+            "width": 1024,
+            "height": 1536,
+            "aspect": 0.6666666666666666
+          },
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 1,
+            "motionStrength": 1,
+            "motionSpeed": 1
+          },
+          "effectiveParameters": {
+            "pitch": 45,
+            "yaw": 12,
+            "roll": 3,
+            "distance": 2.8,
+            "offset": 0.3,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 1,
+            "motionStrength": 1,
+            "motionSpeed": 1
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "motionTime": 13.962499999988115,
+          "tremorTime": 13.962499999988115,
+          "trackAttempts": 585,
+          "estimateRejects": 9,
+          "foundEvents": 0,
+          "lostEvents": 0,
+          "scenario": "fast",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 223,
+          "visibleFraction": 1,
+          "rawRmsPx": 0.7480719083147884,
+          "filteredRmsPx": 1.7741681298209977,
+          "filteredP95Px": 3.4515940683277004,
+          "replay": {
+            "baseline": {
+              "accepted": 220,
+              "heldFrames": 3,
+              "visibleSamples": 223,
+              "visibleRmsPx": 7.394355295862515,
+              "maxVisibleErrorPx": 67.32080917791681,
+              "rmsPx": 1.6490473142938118,
+              "residualStepP95Px": 3.3546582822303717,
+              "residualStepMaxPx": 14.423547980436956
+            },
+            "current": {
+              "accepted": 223,
+              "heldFrames": 0,
+              "visibleSamples": 223,
+              "visibleRmsPx": 1.8114553978820829,
+              "maxVisibleErrorPx": 11.076658871757644,
+              "rmsPx": 1.8114553978820829,
+              "residualStepP95Px": 4.687116453272199,
+              "residualStepMaxPx": 14.421136833307271
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        }
+      ],
+      "errors": [],
+      "limitation": "Synthetic WebGL camera on this computer; not physical iPhone performance or optical validation."
+    },
+    "ar-lab-fast-final": {
+      "commit": "0846a3a8da8bdb9c259bdbe0e7dc56c76d6ec811",
+      "dirty": true,
+      "recordedAt": "2026-11-27T22:36:30.373Z",
+      "durationMs": 10000,
+      "baselineRef": "0846a3a",
+      "sourceHashes": {
+        "tools/ar-lab/main.ts": "81f06379f6219f8a5a5ef6546731f999717da6a8d78027d64db3054a83ca15d1",
+        "tools/ar-lab/motion.ts": "ba715f521521c9997146819d7719e8845460901174b284f2c7226986f5473c37",
+        "src/features/public-ar/planarTracking.ts": "7d4ff943672d7d0ad6b02bf7fe687ff51bbe6cd83228f952a35557eafe6ab52e",
+        "src/features/public-ar/planarTrackingBridge.ts": "e6a3363fb7980a8a31e28713785545815dea53aa007986545b4ba148136fe3d5"
+      },
+      "results": [
+        {
+          "version": 1,
+          "marker": {
+            "width": 1024,
+            "height": 1536,
+            "aspect": 0.6666666666666666
+          },
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 1,
+            "motionStrength": 2,
+            "motionSpeed": 2
+          },
+          "effectiveParameters": {
+            "pitch": 30.584056391561134,
+            "yaw": -0.12016181782958339,
+            "roll": -0.1733025706599136,
+            "distance": 3.0367518687295925,
+            "offset": -0.018395487395778756,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 1,
+            "motionStrength": 2,
+            "motionSpeed": 2
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "motionTime": 27.95380000000008,
+          "tremorTime": 15.110162162162199,
+          "trackAttempts": 600,
+          "estimateRejects": 0,
+          "foundEvents": 0,
+          "lostEvents": 0,
+          "scenario": "hand",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 226,
+          "visibleFraction": 1,
+          "rawRmsPx": 0.7544931631744465,
+          "filteredRmsPx": 0.7965026483613835,
+          "filteredP95Px": 1.1554215161691106,
+          "replay": {
+            "baseline": {
+              "accepted": 226,
+              "heldFrames": 0,
+              "visibleSamples": 226,
+              "visibleRmsPx": 0.8089507793198781,
+              "maxVisibleErrorPx": 1.549497187109888,
+              "rmsPx": 0.8089507793198781,
+              "residualStepP95Px": 1.6059670300189433,
+              "residualStepMaxPx": 2.249035657433024
+            },
+            "current": {
+              "accepted": 226,
+              "heldFrames": 0,
+              "visibleSamples": 226,
+              "visibleRmsPx": 0.8080385592942946,
+              "maxVisibleErrorPx": 1.549497187109888,
+              "rmsPx": 0.8080385592942946,
+              "residualStepP95Px": 1.6059670300189433,
+              "residualStepMaxPx": 2.249035657433024
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        },
+        {
+          "version": 1,
+          "marker": {
+            "width": 1024,
+            "height": 1536,
+            "aspect": 0.6666666666666666
+          },
+          "parameters": {
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "distance": 3,
+            "offset": 0,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 1,
+            "motionStrength": 2,
+            "motionSpeed": 2
+          },
+          "effectiveParameters": {
+            "pitch": 23.498388250945844,
+            "yaw": -5.201289399243326,
+            "roll": -1.3003223498108314,
+            "distance": 3.0866881566540556,
+            "offset": -0.13003223498108313,
+            "occlusion": 0,
+            "noise": 5,
+            "duplicate": 0,
+            "defocus": 1,
+            "motionStrength": 2,
+            "motionSpeed": 2
+          },
+          "noiseSeed": 1,
+          "cameraFps": 30,
+          "motionTime": 27.99479999995239,
+          "tremorTime": 15.132324324298581,
+          "trackAttempts": 431,
+          "estimateRejects": 36,
+          "foundEvents": 8,
+          "lostEvents": 7,
+          "scenario": "fast",
+          "source": "real MindAR features + production planar bridge",
+          "input": {
+            "width": 640,
+            "height": 480
+          },
+          "samples": 175,
+          "visibleFraction": 0.7520798668885191,
+          "rawRmsPx": 0.8664994167284876,
+          "filteredRmsPx": 14.602365481646359,
+          "filteredP95Px": 9.904417574487873,
+          "replay": {
+            "baseline": {
+              "accepted": 159,
+              "heldFrames": 16,
+              "visibleSamples": 175,
+              "visibleRmsPx": 35.33580944044743,
+              "maxVisibleErrorPx": 193.59631062442597,
+              "rmsPx": 2.6761478497884785,
+              "residualStepP95Px": 10.361031251658558,
+              "residualStepMaxPx": 14.869357778171116
+            },
+            "current": {
+              "accepted": 164,
+              "heldFrames": 11,
+              "visibleSamples": 175,
+              "visibleRmsPx": 33.849411338959776,
+              "maxVisibleErrorPx": 193.59631062442597,
+              "rmsPx": 3.71401845019587,
+              "residualStepP95Px": 9.175353954488326,
+              "residualStepMaxPx": 25.531381843256142
+            },
+            "scope": "Same observed quads replayed through filters, not a second camera run"
+          }
+        }
+      ],
+      "errors": [],
+      "limitation": "Synthetic WebGL camera on this computer; not physical iPhone performance or optical validation."
+    }
+  },
+  "conclusion": "Normal rapid-turn captured replay: baseline max visible error67.32px -> candidate11.08px on same223observations. 2x speed/strength still loses target (live visible render-frame fraction0.752). Original stationary phone jumping not fully reproduced; physical iPhone not verified."
+}
