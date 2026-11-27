@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import PostcardPrintReview, { type PostcardReview } from "./PostcardPrintReview";
 import { Download, Printer } from "lucide-react";
 import { getSupabaseBrowserClient } from "../../shared/api/supabase";
 import { Button, Input, Panel } from "../../shared/ui";
@@ -45,6 +47,15 @@ export default function PostcardPrintPanel({
   demo: boolean;
   onUpdated: () => Promise<unknown>;
 }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [review, setReview] = useState<PostcardReview | null>(null);
+  useEffect(
+    () => () => {
+      if (review) for (const card of review.cards) URL.revokeObjectURL(card.url);
+    },
+    [review],
+  );
   const [start, setStart] = useState("1");
   const [count, setCount] = useState(String(Math.min(cards.length, 10)));
   const [pending, setPending] = useState(false);
@@ -77,8 +88,9 @@ export default function PostcardPrintPanel({
     Number(count) >= 1 &&
     Number(count) <= 20 &&
     selected.length === Number(count);
-  const exportCards = async (format: "zip" | "photo" | "a4") => {
-    const preview = format !== "zip" ? window.open("about:blank", "_blank") : null;
+  const exportCards = async (format: "zip" | "photo" | "a4", trigger?: HTMLElement) => {
+    const originFocus = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    const originScroll = window.scrollY;
     setPending(true);
     setCanCancel(true);
     setError("");
@@ -95,7 +107,7 @@ export default function PostcardPrintPanel({
       if (batchError || !preparedBatch?.project_id || !preparedBatch.group_id)
         throw new Error("Не удалось подготовить тираж. Проверьте права и доступные проекты/группы в пакете.");
       const printing = await import("./postcardPrint");
-      const canonical: Array<{ publicToken: string; blob: Blob }> = [];
+      const canonical: Array<{ publicToken: string; ordinal: number; blob: Blob }> = [];
       for (const [index, card] of selected.entries()) {
         if (controller.current.signal.aborted) throw new DOMException("Aborted", "AbortError");
         setProgress(`Готовим открытку ${index + 1} из ${selected.length}`);
@@ -165,9 +177,10 @@ export default function PostcardPrintPanel({
           if (attached.error)
             throw new Error("Не удалось закрепить печатное изображение за открыткой. Обновите список и повторите.");
         }
-        canonical.push({ publicToken: card.public_token, blob });
+        canonical.push({ publicToken: card.public_token, ordinal: card.ordinal, blob });
       }
-      setProgress("Собираем файл…");
+      controller.current.signal.throwIfAborted();
+      setProgress(format === "zip" ? "Собираем файл…" : "Открываем проверку печати…");
       if (format === "zip") {
         const blob = await printing.createPostcardZip(batch.template_code, canonical);
         if (controller.current.signal.aborted) throw new DOMException("Aborted", "AbortError");
@@ -182,20 +195,24 @@ export default function PostcardPrintPanel({
         document.body.append(link);
         link.click();
         link.remove();
-      } else
-        showPrint(
-          await printing.createPostcardPrintHtml(batch.template_code, canonical, format),
-          preview,
-          `postcards-${batch.id}.html`,
+      } else {
+        const id = crypto.randomUUID();
+        setReview({
+          id,
+          selection,
+          cards: canonical.map((card) => ({ ...card, url: URL.createObjectURL(card.blob) })),
+          pageSize: format,
+          originFocus,
+          originScroll,
+        });
+        navigate(
+          { pathname: location.pathname, search: location.search, hash: location.hash },
+          { state: { ...location.state, postcardPrintReview: id } },
         );
-      setProgress(
-        format === "zip"
-          ? "Архив готов. Если скачивание не началось, нажмите «Скачать готовый ZIP»."
-          : `Готово: ${canonical.length} открыток с настоящими QR.`,
-      );
+      }
+      setProgress(format === "zip" ? "Архив готов. Если скачивание не началось, нажмите «Скачать готовый ZIP»." : "");
       await onUpdated();
     } catch (e) {
-      preview?.close();
       setError(
         e instanceof Error && e.name !== "AbortError"
           ? e.message
@@ -229,76 +246,101 @@ export default function PostcardPrintPanel({
     }
   };
   return (
-    <Panel className="postcards-print-panel">
-      <h2>Печать открыток 10 × 15 см</h2>
-      <fieldset disabled={pending || !canManage} className="postcards-print-options">
-        <label>
-          Начать с номера
-          <Input
-            type="number"
-            min={1}
-            max={cards.length}
-            value={start}
-            onValueChange={(value) => {
-              setStart(value);
-              setArchive(null);
-              setProgress("");
-            }}
-          />
-        </label>
-        <label>
-          Количество для печати (1–20)
-          <Input
-            type="number"
-            min={1}
-            max={20}
-            value={count}
-            onValueChange={(value) => {
-              setCount(value);
-              setArchive(null);
-              setProgress("");
-            }}
-          />
-        </label>
-        <div className="postcards-actions">
-          {readyArchive && !pending && canManage && valid ? (
-            <a className="btn btn-primary" href={readyArchive.url} download={readyArchive.name}>
-              <Download size={17} aria-hidden="true" />
-              Скачать готовый ZIP
-            </a>
-          ) : (
-            <Button icon={<Download size={17} />} disabled={!valid || demo} onClick={() => void exportCards("zip")}>
-              {pending && canCancel ? "Готовим файл…" : "Скачать PNG в ZIP"}
+    <>
+      <Panel className="postcards-print-panel">
+        <h2>Печать открыток 10 × 15 см</h2>
+        <fieldset disabled={pending || !canManage} className="postcards-print-options">
+          <label>
+            Начать с номера
+            <Input
+              type="number"
+              min={1}
+              max={cards.length}
+              value={start}
+              onValueChange={(value) => {
+                setStart(value);
+                setArchive(null);
+                setReview(null);
+                setProgress("");
+              }}
+            />
+          </label>
+          <label>
+            Количество для печати (1–20)
+            <Input
+              type="number"
+              min={1}
+              max={20}
+              value={count}
+              onValueChange={(value) => {
+                setCount(value);
+                setArchive(null);
+                setReview(null);
+                setProgress("");
+              }}
+            />
+          </label>
+          <div className="postcards-actions">
+            <Button
+              icon={<Printer size={17} />}
+              disabled={!valid || demo}
+              onClick={(event) => void exportCards("photo", event.currentTarget)}
+            >
+              Печать / PDF
             </Button>
-          )}
-          <Button
-            variant="ghost"
-            icon={<Printer size={17} />}
-            disabled={!valid || demo}
-            onClick={() => void exportCards("photo")}
-          >
-            Печать 10 × 15
+            {readyArchive && !pending && canManage && valid ? (
+              <a className="btn btn-ghost" href={readyArchive.url} download={readyArchive.name}>
+                <Download size={17} aria-hidden="true" />
+                Скачать готовый ZIP
+              </a>
+            ) : (
+              <Button
+                variant="ghost"
+                icon={<Download size={17} />}
+                disabled={!valid || demo}
+                onClick={() => void exportCards("zip")}
+              >
+                {pending && canCancel ? "Готовим файл…" : "Скачать PNG в ZIP"}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              disabled={!valid || demo}
+              onClick={(event) => void exportCards("a4", event.currentTarget)}
+            >
+              Печать на A4
+            </Button>
+          </div>
+          <Button variant="quiet" disabled={!shop || !valid || demo} onClick={() => void inserts()}>
+            Вкладыши с кодом магазина
           </Button>
-          <Button variant="ghost" disabled={!valid || demo} onClick={() => void exportCards("a4")}>
-            Печать на A4
+        </fieldset>
+        {pending && canCancel && (
+          <Button variant="quiet" onClick={() => controller.current?.abort()}>
+            Остановить подготовку
           </Button>
-        </div>
-        <Button variant="quiet" disabled={!shop || !valid || demo} onClick={() => void inserts()}>
-          Вкладыши с кодом магазина
-        </Button>
-      </fieldset>
-      {pending && canCancel && (
-        <Button variant="quiet" onClick={() => controller.current?.abort()}>
-          Остановить подготовку
-        </Button>
+        )}
+        {progress && (
+          <p role="status" className="postcards-muted">
+            {progress}
+          </p>
+        )}
+        {error && <p role="alert">{error}</p>}
+        {demo && <p className="postcards-muted">Выпуск рабочих QR доступен в подключённом кабинете.</p>}
+      </Panel>
+      {review && (
+        <PostcardPrintReview
+          key={review.id}
+          review={review}
+          open={review.selection === selection && location.state?.postcardPrintReview === review.id}
+          templateCode={batch.template_code}
+          batchId={batch.id}
+          batchName={batch.name}
+          onClose={() => {
+            if (location.state?.postcardPrintReview === review.id) navigate(-1);
+          }}
+        />
       )}
-      {progress && (
-        <p role="status" className="postcards-muted">
-          {progress}
-        </p>
-      )}
-      {error && <p role="alert">{error}</p>}
-      {demo && <p className="postcards-muted">Выпуск рабочих QR доступен в подключённом кабинете.</p>}
-    </Panel>
+    </>
   );
 }

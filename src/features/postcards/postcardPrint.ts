@@ -188,11 +188,72 @@ export async function createPostcardZip(templateCode: string, cards: readonly Re
   return zip.generateAsync({ type: "blob", compression: "STORE" });
 }
 
+/** Embed canonical PNG pixels losslessly at their physical print size. */
+export async function createPostcardPdf(
+  templateCode: string,
+  cards: readonly RenderedPostcard[],
+  pageSize: PostcardPrintPageSize = "photo",
+  options: { signal?: AbortSignal; onProgress?: (done: number, total: number) => void } = {},
+): Promise<Blob> {
+  validateRenderedCards(templateCode, cards);
+  if (pageSize !== "photo" && pageSize !== "a4") throw new Error("Неподдерживаемый формат печати.");
+  const { PDFDocument, PrintScaling } = await import("pdf-lib");
+  const pdf = await PDFDocument.create();
+  pdf.setTitle("KHANZAMA postcards");
+  pdf.catalog.getOrCreateViewerPreferences().setPrintScaling(PrintScaling.None);
+  const mm = 72 / 25.4;
+  const perPage = pageSize === "a4" ? 2 : 1;
+  for (const [index, card] of cards.entries()) {
+    options.signal?.throwIfAborted();
+    const image = await pdf.embedPng(await card.blob.arrayBuffer());
+    if (image.width !== POSTCARD_PRINT_WIDTH || image.height !== POSTCARD_PRINT_HEIGHT)
+      throw new Error("Размер печатного изображения должен быть 1200 × 1800 пикселей.");
+    const page =
+      index % perPage === 0
+        ? pdf.addPage(pageSize === "a4" ? [210 * mm, 297 * mm] : [100 * mm, 150 * mm])
+        : pdf.getPage(pdf.getPageCount() - 1);
+    page.drawImage(image, {
+      x: pageSize === "a4" ? (5 + (index % 2) * 100) * mm : 0,
+      y: pageSize === "a4" ? (297 - 5 - 150) * mm : 0,
+      width: 100 * mm,
+      height: 150 * mm,
+    });
+    options.onProgress?.(index + 1, cards.length);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  }
+  options.signal?.throwIfAborted();
+  const bytes = await pdf.save();
+  options.signal?.throwIfAborted();
+  return new Blob([Uint8Array.from(bytes)], { type: "application/pdf" });
+}
+
 function escapeHtml(text: string) {
   return text.replace(
     /[&<>"']/g,
     (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!,
   );
+}
+
+/** Same-origin object URLs avoid duplicating full-size PNGs as base64 in the print frame. */
+export function createPostcardPrintFrameHtml(
+  cards: readonly { publicToken: string; url: string }[],
+  pageSize: PostcardPrintPageSize,
+) {
+  if (!cards.length || cards.length > MAX_POSTCARD_EXPORT_COUNT) throw new Error("Выберите открытки для печати.");
+  if (pageSize !== "photo" && pageSize !== "a4") throw new Error("Неподдерживаемый формат печати.");
+  const pictures = cards.map((card) => {
+    postcardPublicUrl(card.publicToken);
+    if (!card.url.startsWith(`blob:${window.location.origin}/`)) throw new Error("Печатное изображение недоступно.");
+    return `<img src="${escapeHtml(card.url)}" width="1200" height="1800" alt="Открытка">`;
+  });
+  const perPage = pageSize === "a4" ? 2 : 1;
+  const sheets: string[] = [];
+  for (let index = 0; index < pictures.length; index += perPage)
+    sheets.push(`<section>${pictures.slice(index, index + perPage).join("")}</section>`);
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>KHANZAMA — печать открыток</title><style>
+@page{size:${pageSize === "a4" ? "A4 portrait" : "100mm 150mm"};margin:${pageSize === "a4" ? "5mm" : "0"}}
+*{box-sizing:border-box}html,body{margin:0;padding:0;background:white}section{display:flex;width:${perPage * 100}mm;height:150mm;break-inside:avoid;break-after:page}section:last-child{break-after:auto}img{display:block;width:100mm;height:150mm;max-width:none;object-fit:fill;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+</style></head><body>${sheets.join("")}</body></html>`;
 }
 
 export async function createPostcardPrintHtml(

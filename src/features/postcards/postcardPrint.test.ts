@@ -7,6 +7,7 @@ import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 import {
   createPostcardPrintHtml,
+  createPostcardPdf,
   createPostcardZip,
   createShopActivationInsertHtml,
   MAX_POSTCARD_EXPORT_COUNT,
@@ -137,5 +138,38 @@ describe("postcard printing", () => {
     expect(html).not.toContain('<script>alert("x")</script>');
     expect(html.match(/ABCD · EF12 · 3456/g)).toHaveLength(3);
     expect(html).not.toContain("/card/");
+  });
+});
+
+describe("postcard PDF physical print layout", () => {
+  it("embeds each QR photograph on a separate true 100 by 150 mm page", async () => {
+    const { PDFDocument, PrintScaling } = await import("pdf-lib");
+    const { png } = await paintedCard();
+    const cards = [token, "f".repeat(32), "e".repeat(32)].map((publicToken) => ({ publicToken, blob: png }));
+    const progress: number[] = [];
+    const blob = await createPostcardPdf("new-year", cards, "photo", { onProgress: (done) => progress.push(done) });
+    expect(blob.type).toBe("application/pdf");
+    const pdf = await PDFDocument.load(await blob.arrayBuffer());
+    expect(pdf.getPageCount()).toBe(3);
+    for (const page of pdf.getPages()) {
+      expect(page.getWidth()).toBeCloseTo((100 * 72) / 25.4, 5);
+      expect(page.getHeight()).toBeCloseTo((150 * 72) / 25.4, 5);
+    }
+    expect(pdf.catalog.getOrCreateViewerPreferences().getPrintScaling()).toBe(PrintScaling.None);
+    expect(progress).toEqual([1, 2, 3]);
+  });
+  it("puts two full-size postcards on A4 and keeps an odd final card", async () => {
+    const { PDFDocument } = await import("pdf-lib");
+    const { png } = await paintedCard();
+    const cards = [token, "f".repeat(32), "e".repeat(32)].map((publicToken) => ({ publicToken, blob: png }));
+    const pdf = await PDFDocument.load(await (await createPostcardPdf("new-year", cards, "a4")).arrayBuffer());
+    expect(pdf.getPageCount()).toBe(2);
+    for (const page of pdf.getPages()) {
+      expect(page.getWidth()).toBeCloseTo((210 * 72) / 25.4, 5);
+      expect(page.getHeight()).toBeCloseTo((297 * 72) / 25.4, 5);
+    }
+    const aborted = new AbortController();
+    aborted.abort();
+    await expect(createPostcardPdf("new-year", cards, "photo", { signal: aborted.signal })).rejects.toThrow();
   });
 });
