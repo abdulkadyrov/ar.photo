@@ -34,6 +34,28 @@ export const PUBLIC_AR_START_TIMEOUT_MS = 45_000;
 
 export type MarkerDimensions = { width: number; height: number };
 
+export function roundedPostcardGeometry(three: typeof ThreeModule) {
+  const shape = new three.Shape();
+  const x = 0.5;
+  const y = 0.5;
+  const rx = 0.07;
+  const ry = 0.1;
+  shape.moveTo(-x + rx, -y);
+  shape.lineTo(x - rx, -y);
+  shape.quadraticCurveTo(x, -y, x, -y + ry);
+  shape.lineTo(x, y - ry);
+  shape.quadraticCurveTo(x, y, x - rx, y);
+  shape.lineTo(-x + rx, y);
+  shape.quadraticCurveTo(-x, y, -x, y - ry);
+  shape.lineTo(-x, -y + ry);
+  shape.quadraticCurveTo(-x, -y, -x + rx, -y);
+  const geometry = new three.ShapeGeometry(shape, 6);
+  const uv = geometry.getAttribute("uv");
+  const position = geometry.getAttribute("position");
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, position.getX(i) + x, position.getY(i) + y);
+  return geometry;
+}
+
 type ColorManagedRenderer = { outputColorSpace: string };
 type ColorManagedTexture = { colorSpace: string };
 type LegacyThreeColorModule = {
@@ -257,14 +279,18 @@ export async function startPublicMindAr(options: {
   observer.observe(container);
   window.addEventListener("resize", resize);
   window.visualViewport?.addEventListener("resize", resize);
-  renderer.setPixelRatio?.(Math.min(window.devicePixelRatio || 1, 2));
+  const postcard = manifest.version === 1 && Boolean(manifest.videoViewport);
+  renderer.setPixelRatio?.(Math.min(window.devicePixelRatio || 1, postcard && isIosWebKit() ? 1 : 2));
   renderer.setClearColor(0x000000, 0);
   let stopped = false;
   let activeTargetIndex = 0;
   let targetVisible = false;
   const texture = new Three.VideoTexture(video);
   configureSrgbVideoOutput(renderer, texture, Three.SRGBColorSpace);
-  const geometry = new Three.PlaneGeometry(1, 1);
+  const geometry =
+    manifest.version === 1 && manifest.postcardFrameTemplate
+      ? roundedPostcardGeometry(Three)
+      : new Three.PlaneGeometry(1, 1);
   const material = new Three.MeshBasicMaterial({
     map: texture,
     transparent: false,

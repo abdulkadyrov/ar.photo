@@ -291,6 +291,16 @@
   transform: scale(0.9);
 }
 
+.ar-viewer[data-postcard="true"] .ar-status-pill,
+.ar-viewer[data-postcard="true"] .ar-viewer-controls button,
+.ar-viewer[data-postcard="true"] .ar-record-button,
+.ar-viewer[data-postcard="true"] .ar-record-timer,
+.ar-viewer[data-postcard="true"] .ar-record-notice {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background-color: rgba(7, 9, 13, 0.84);
+}
+
 .ar-record-notice {
   position: absolute;
   z-index: 7;

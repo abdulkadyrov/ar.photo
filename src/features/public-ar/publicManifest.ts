@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getPublicRuntimeConfig } from "../../shared/config/env";
+import { getPostcardTemplate } from "../postcards/postcardTemplates";
 
 const assetUrl = z.string().url();
 export const videoViewportSchema = z
@@ -57,7 +58,13 @@ const commonManifestShape = {
   signedUrlsExpireAt: z.string().datetime({ offset: true }),
 };
 const publicManifestSchema = z.union([
-  z.object({ version: z.literal(1), ...commonManifestShape }).strict(),
+  z
+    .object({
+      version: z.literal(1),
+      ...commonManifestShape,
+      postcardFrameTemplate: z.literal("milka-gift").optional(),
+    })
+    .strict(),
   z.object({ version: z.literal(2), ...commonManifestShape, targets: z.array(targetSchema).min(2).max(50) }).strict(),
 ]);
 
@@ -81,6 +88,10 @@ export function initialArMuted(manifest: PublicArManifest) {
 
 export function publicArTargets(manifest: PublicArManifest): PublicArTarget[] {
   if (manifest.version === 2) return manifest.targets;
+  const calibrated = manifest.postcardFrameTemplate && getPostcardTemplate(manifest.postcardFrameTemplate).previewFrame;
+  const viewport = calibrated
+    ? { x: calibrated.x, y: calibrated.y, width: calibrated.width, height: calibrated.height }
+    : manifest.videoViewport;
   return [
     {
       targetId: "target-0",
@@ -89,7 +100,7 @@ export function publicArTargets(manifest: PublicArManifest): PublicArTarget[] {
       behavior: manifest.behavior,
       fallbackEnabled: manifest.fallbackEnabled,
       assets: manifest.assets,
-      ...(manifest.videoViewport ? { videoViewport: manifest.videoViewport } : {}),
+      ...(viewport ? { videoViewport: viewport } : {}),
     },
   ];
 }
@@ -101,7 +112,7 @@ export async function loadPublicManifest(publicSlug: string, signal?: AbortSigna
     throw new PublicManifestError("unavailable", "AR Photo временно не настроен");
   }
 
-  const endpoint = `${config.supabaseUrl.replace(/\/$/, "")}/functions/v1/public-ar-manifest/${encodeURIComponent(publicSlug)}`;
+  const endpoint = `${config.supabaseUrl.replace(/\/$/, "")}/functions/v1/public-ar-manifest/${encodeURIComponent(publicSlug)}?postcardFrame=1`;
   let response: Response;
   try {
     response = await fetch(endpoint, {

@@ -73,11 +73,12 @@ Deno.serve(async (request) => {
   // A postcard changes only its video's printed window; no shop or purchaser
   // information is exposed and legacy works keep their full-marker geometry.
   const item = await client.from("ar_items").select("id").eq("public_slug", publicSlug).maybeSingle();
+  let postcardFrameTemplate: "milka-gift" | undefined;
   if (item.error) return json({ code: "manifest_unavailable" }, 503, cors);
   if (item.data) {
     const card = await client
       .from("postcard_cards")
-      .select("video_viewport")
+      .select("video_viewport,display_mode,postcard_batches(template_code)")
       .eq("ar_item_id", item.data.id)
       .maybeSingle();
     if (card.error) {
@@ -90,6 +91,14 @@ Deno.serve(async (request) => {
         const viewport = parseVideoViewport(card.data.video_viewport);
         if (viewport && sources.length !== 1) return json({ code: "manifest_unavailable" }, 503, cors);
         if (viewport) sources[0] = { ...sources[0], video_viewport: viewport };
+        const batch = card.data.postcard_batches as { template_code?: string } | null;
+        if (
+          viewport &&
+          card.data.display_mode === "frame" &&
+          batch?.template_code === "milka-gift" &&
+          new URL(request.url).searchParams.get("postcardFrame") === "1"
+        )
+          postcardFrameTemplate = "milka-gift";
       } catch {
         return json({ code: "manifest_unavailable" }, 503, cors);
       }
@@ -105,7 +114,14 @@ Deno.serve(async (request) => {
   }
 
   const expiresAt = new Date(Date.now() + SIGNED_URL_TTL_SECONDS * 1000).toISOString();
-  return json(createPublicManifest(sources, signedTargets, expiresAt), 200, cors);
+  return json(
+    {
+      ...createPublicManifest(sources, signedTargets, expiresAt),
+      ...(postcardFrameTemplate ? { postcardFrameTemplate } : {}),
+    },
+    200,
+    cors,
+  );
 });
 
 function json(payload: Record<string, unknown>, status: number, extraHeaders: Record<string, string> = {}) {

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { decode } from "@msgpack/msgpack";
+import * as Three from "three";
 import {
   boundedCameraConstraints,
   configureSrgbVideoOutput,
@@ -11,6 +12,7 @@ import {
   keepCameraVisible,
   markerPlaneGeometry,
   videoPlaneGeometry,
+  roundedPostcardGeometry,
   mergeTrackingAssets,
   publicArTrackingConfig,
   resolveMarkerDimensions,
@@ -18,6 +20,20 @@ import {
 } from "./mindArAdapter";
 
 describe("public AR alignment contract", () => {
+  it("cuts the four corners without shrinking or stretching video UVs", () => {
+    const geometry = roundedPostcardGeometry(Three);
+    const position = geometry.getAttribute("position");
+    const uv = geometry.getAttribute("uv");
+    geometry.computeBoundingBox();
+    expect(geometry.boundingBox?.min.toArray()).toEqual([-0.5, -0.5, 0]);
+    expect(geometry.boundingBox?.max.toArray()).toEqual([0.5, 0.5, 0]);
+    for (let i = 0; i < position.count; i++) {
+      expect(Math.abs(position.getX(i)) === 0.5 && Math.abs(position.getY(i)) === 0.5).toBe(false);
+      expect(uv.getX(i)).toBeCloseTo(position.getX(i) + 0.5);
+      expect(uv.getY(i)).toBeCloseTo(position.getY(i) + 0.5);
+    }
+    geometry.dispose();
+  });
   it("bridges MindAR's legacy renderer encoding to the current Three.js color space", () => {
     class Renderer {
       outputColorSpace = "linear-srgb";

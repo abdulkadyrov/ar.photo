@@ -366,7 +366,11 @@ export function PublicArViewerRoute() {
   const active = mode === "starting" || mode === "searching" || mode === "tracking";
   const pairing = mode === "pairing" || mode === "caching";
   return (
-    <main className="ar-viewer" data-mode={mode}>
+    <main
+      className="ar-viewer"
+      data-mode={mode}
+      data-postcard={manifest.version === 1 && Boolean(manifest.videoViewport) ? "true" : undefined}
+    >
       <div ref={containerRef} className={active ? "ar-viewer-stage" : "hidden"} aria-hidden={!active} />
 
       {mode === "intro" ? (
