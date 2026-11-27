@@ -465,7 +465,12 @@ export function PostcardBuyerPage({ publicToken }: { publicToken: string }) {
                 <PostcardPreview
                   imageUrl={snapshot.previewImageUrl}
                   videoUrl={owned ? videoUrl : null}
-                  frame={snapshot.card.frame}
+                  frame={
+                    snapshot.card.templateCode === "milka-gift"
+                      ? { x: 0.053, y: 0.242, width: 0.894, height: 0.423 }
+                      : snapshot.card.frame
+                  }
+                  roundedFrame={snapshot.card.templateCode === "milka-gift"}
                   mode={mode}
                   onVideoError={() => setFailedPreviewUrl(videoUrl)}
                   onVideoReady={() => setFailedPreviewUrl(null)}
@@ -679,6 +684,7 @@ function PostcardPreview({
   imageUrl,
   videoUrl,
   frame,
+  roundedFrame,
   mode,
   onVideoError,
   onVideoReady,
@@ -686,6 +692,7 @@ function PostcardPreview({
   imageUrl?: string | null;
   videoUrl: string | null;
   frame: BuyerSnapshot["card"]["frame"];
+  roundedFrame: boolean;
   mode: BuyerMode;
   onVideoError: () => void;
   onVideoReady: () => void;
@@ -696,6 +703,7 @@ function PostcardPreview({
     top: `${viewport.y * 100}%`,
     width: `${viewport.width * 100}%`,
     height: `${viewport.height * 100}%`,
+    borderRadius: roundedFrame && mode === "frame" ? "7% / 10%" : undefined,
   };
   return (
     <div className="postcard-buyer-preview">

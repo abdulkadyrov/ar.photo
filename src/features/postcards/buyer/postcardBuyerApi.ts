@@ -223,12 +223,29 @@ export function uploadSignedBlob(
   return new Promise<void>((resolve, reject) => {
     const request = new XMLHttpRequest();
     const abort = () => request.abort();
-    const cleanup = () => signal.removeEventListener("abort", abort);
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    let uploadedBytes = 0;
+    const cleanup = () => {
+      clearTimeout(idleTimer);
+      signal.removeEventListener("abort", abort);
+    };
+    const restartIdleTimer = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        cleanup();
+        reject(new PostcardBuyerError("upload_failed"));
+        request.abort();
+      }, 90_000);
+    };
     request.open("PUT", url);
     request.setRequestHeader("content-type", blob.type || "application/octet-stream");
     for (const [name, value] of Object.entries(headers)) request.setRequestHeader(name, value);
     request.timeout = 15 * 60_000;
     request.upload.onprogress = (event) => {
+      if (event.loaded > uploadedBytes) {
+        uploadedBytes = event.loaded;
+        restartIdleTimer();
+      }
       if (event.lengthComputable) onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
     };
     request.onload = () => {
@@ -251,6 +268,7 @@ export function uploadSignedBlob(
       return;
     }
     signal.addEventListener("abort", abort, { once: true });
+    restartIdleTimer();
     request.send(blob);
   });
 }
