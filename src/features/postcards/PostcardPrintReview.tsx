@@ -93,7 +93,8 @@ export default function PostcardPrintReview({
       });
       abort.signal.throwIfAborted();
       const url = URL.createObjectURL(blob);
-      const name = `postcards-${batchId}-${pageSize === "a4" ? "A4" : "10x15"}-${selected.length}.pdf`;
+      const format = pageSize === "photo" ? "10x15" : pageSize === "a4" ? "A4-2up" : "A4-4up";
+      const name = `postcards-${batchId}-${format}-${selected.length}.pdf`;
       setPdf({ url, name, key: selectionKey });
       setProgress("PDF готов к скачиванию.");
       const anchor = document.createElement("a");
@@ -159,6 +160,7 @@ export default function PostcardPrintReview({
           options={[
             { value: "photo", label: "10 × 15 см · одна открытка на листе" },
             { value: "a4", label: "A4 · две открытки на листе" },
+            { value: "a4-four", label: "A4 · четыре открытки на листе · 95%" },
           ]}
           onChange={(event) => {
             setPageSize(event.target.value as PostcardPrintPageSize);
@@ -231,9 +233,10 @@ export default function PostcardPrintReview({
         </div>
         <p className="postcards-muted">
           {pageSize === "a4"
-            ? `A4 · листов: ${Math.ceil(selected.length / 2)}`
-            : `10 × 15 см · листов: ${selected.length}`}{" "}
-          · масштаб 100%
+            ? `A4 · две открытки на листе · листов: ${Math.ceil(selected.length / 2)} · масштаб 100%`
+            : pageSize === "a4-four"
+              ? `A4 · четыре открытки на листе · листов: ${Math.ceil(selected.length / 4)} · масштаб 95% (95 × 142,5 мм)`
+              : `10 × 15 см · листов: ${selected.length} · масштаб 100%`}
         </p>
         {progress && <p role="status">{progress}</p>}
         {error && <p role="alert">{error}</p>}

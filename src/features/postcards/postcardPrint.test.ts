@@ -112,6 +112,9 @@ describe("postcard printing", () => {
     expect(photoHtml).toContain("data:image/png;base64,");
     const a4Html = await (await createPostcardPrintHtml("new-year", cards, "a4")).text();
     expect(a4Html).toContain("size:A4 portrait");
+    const a4FourHtml = await (await createPostcardPrintHtml("new-year", cards, "a4-four")).text();
+    expect(a4FourHtml).toContain("95 × 142,5 мм (масштаб 95%)");
+    expect(a4FourHtml).toContain("grid-template-columns:repeat(2,95mm)");
   });
 
   it("rejects duplicate IDs, bad tokens and oversized export selections", async () => {
@@ -171,5 +174,19 @@ describe("postcard PDF physical print layout", () => {
     const aborted = new AbortController();
     aborted.abort();
     await expect(createPostcardPdf("new-year", cards, "photo", { signal: aborted.signal })).rejects.toThrow();
+  });
+  it("puts four 95-percent postcards on portrait A4 and keeps an odd final page", async () => {
+    const { PDFDocument } = await import("pdf-lib");
+    const { png } = await paintedCard();
+    const cards = [token, "f".repeat(32), "e".repeat(32), "d".repeat(32), "c".repeat(32)].map((publicToken) => ({
+      publicToken,
+      blob: png,
+    }));
+    const pdf = await PDFDocument.load(await (await createPostcardPdf("new-year", cards, "a4-four")).arrayBuffer());
+    expect(pdf.getPageCount()).toBe(2);
+    for (const page of pdf.getPages()) {
+      expect(page.getWidth()).toBeCloseTo((210 * 72) / 25.4, 5);
+      expect(page.getHeight()).toBeCloseTo((297 * 72) / 25.4, 5);
+    }
   });
 });

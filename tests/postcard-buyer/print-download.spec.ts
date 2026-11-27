@@ -6,7 +6,7 @@ import { PDFDocument } from "pdf-lib";
 
 const origin = process.env.POSTCARD_BUYER_TEST_ORIGIN ?? "http://127.0.0.1:4182";
 const canonical = createCanvas(1200, 1800).toBuffer("image/png");
-for (const width of [319, 390, 1440]) {
+for (const width of [319, 390, 436, 1440]) {
   test(`downloads a prepared archive with a fresh click at ${width}px even if automatic saving is blocked`, async ({
     page,
     browserName,
@@ -66,7 +66,7 @@ for (const width of [319, 390, 1440]) {
   });
 }
 
-for (const width of [319, 390, 1440]) {
+for (const width of [319, 390, 436, 1440]) {
   test(`reviews postcard selection, saves real PDFs and restores Back at ${width}px`, async ({ page, browserName }) => {
     await page.setViewportSize({ width, height: width === 319 ? 619 : 1000 });
     await page.addInitScript(() => {
@@ -148,9 +148,24 @@ for (const width of [319, 390, 1440]) {
     expect(a4Pdf.getPageCount()).toBe(2);
     expect(a4Pdf.getPage(0).getWidth()).toBeCloseTo((210 * 72) / 25.4, 5);
     expect(a4Pdf.getPage(0).getHeight()).toBeCloseTo((297 * 72) / 25.4, 5);
+    await dialog.getByRole("combobox", { name: "Формат печати", exact: true }).selectOption("a4-four");
+    await expect(
+      dialog.getByText("A4 · четыре открытки на листе · листов: 1 · масштаб 95% (95 × 142,5 мм)"),
+    ).toBeVisible();
+    await dialog.getByRole("button", { name: "Скачать PDF", exact: true }).click();
+    await expect(readyPdf).toBeVisible();
+    const a4FourDownload = page.waitForEvent("download");
+    await readyPdf.click();
+    const a4Four = await a4FourDownload;
+    const a4FourBytes = await readFile((await a4Four.path())!);
+    const a4FourPdf = await PDFDocument.load(a4FourBytes);
+    expect(a4FourPdf.getPageCount()).toBe(1);
+    expect(a4FourPdf.getPage(0).getWidth()).toBeCloseTo((210 * 72) / 25.4, 5);
+    expect(a4FourPdf.getPage(0).getHeight()).toBeCloseTo((297 * 72) / 25.4, 5);
     await mkdir("artifacts/crm-print-20261127", { recursive: true });
     await writeFile(`artifacts/crm-print-20261127/${browserName}-${width}-photo.pdf`, photoBytes);
     await writeFile(`artifacts/crm-print-20261127/${browserName}-${width}-a4.pdf`, a4Bytes);
+    await writeFile(`artifacts/crm-print-20261127/${browserName}-${width}-a4-four.pdf`, a4FourBytes);
     await page.screenshot({ path: `artifacts/crm-print-20261127/${browserName}-${width}-review.png`, fullPage: false });
     await dialog.getByRole("button", { name: "Снять выбор", exact: true }).click();
     await expect(dialog.getByRole("button", { name: "Скачать PDF", exact: true })).toBeDisabled();
