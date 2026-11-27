@@ -119,6 +119,37 @@ describe("local AR diagnostic recording", () => {
     expect(track.stop).not.toHaveBeenCalled();
   });
 
+  it("preserves raw files when ZIP packaging fails", async () => {
+    const { engine, states } = setup();
+    const pack = vi.spyOn(JSZip.prototype, "generateAsync").mockRejectedValueOnce(new Error("packaging unavailable"));
+    engine.start();
+    const result = await engine.stop();
+    expect(result.warning).toContain("ARCHIVE_FAILED");
+    expect(result.files.map((f) => f.fileName)).toEqual(["camera.mp4", "target-0.mind", "diagnostics.json"]);
+    expect(await result.files[0].blob.text()).toBe("encoded camera pixels");
+    expect(result.fileName).toBe("diagnostics.json");
+    expect(JSON.parse(await result.blob.text()).archiveFailure.stage).toBe("generate-zip");
+    expect(states.at(-1)?.status).toBe("ready");
+    pack.mockRestore();
+    engine.dispose();
+  });
+
+  it("exports diagnostic evidence even if Safari produces no camera bytes", async () => {
+    const { engine, states } = setup();
+    engine.start();
+    FakeRecorder.last.stop = () => {
+      FakeRecorder.last.state = "inactive";
+      FakeRecorder.last.onstop?.();
+    };
+    const result = await engine.stop();
+    expect(result.warning).toContain("CAMERA_EMPTY");
+    const report = JSON.parse(await result.blob.text());
+    expect(report.capture.status).toBe("empty");
+    expect(result.files.some((f) => f.fileName.startsWith("camera."))).toBe(false);
+    expect(states.at(-1)?.status).toBe("ready");
+    engine.dispose();
+  });
+
   it("automatically stops at the duration limit and rate-limits samples", async () => {
     vi.useFakeTimers();
     const { engine, track } = setup();

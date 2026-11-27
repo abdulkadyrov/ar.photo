@@ -16,3 +16,7 @@ Limits: 45 seconds, 40 MiB raw video, 20 MiB recognition targets, 15 Hz/1000 sam
 Timestamps: sample elapsedMs is relative to recordingStart (performance.now); frameTime is the AR input timestamp on that same performance clock. Camera currentTime/mediaTime and initialCameraTime aid alignment. Native MediaRecorder encoding introduces an approximate offset; this is not frame-exact synchronization. Recording itself adds encoder load, so compare recording and non-recording behavior on device. This is diagnostic instrumentation, not a tracking algorithm change.
 
 Verified locally: recorder produced a readable MP4/JSON/Mind ZIP in Chromium using a generated camera stream; camera track remained live after stop. Landing page tested at 319/390/1280 widths. Real iPhone capture/share remains a device validation step.
+
+## Safari export recovery (version 2)
+
+MP4 uses browser-selected codec profile. ZIP output is generated as Uint8Array then wrapped in a native Blob. The recorder retains raw video, targets and JSON as separately downloadable files; packaging failure no longer discards captured media. If the encoder yields no bytes, a CAMERA_EMPTY report is still available. ARCHIVE_FAILED means separate files are available. These states are covered by regression tests; native recording/export also passed in desktop Playwright WebKit and Chromium. This does not prove physical iPhone behavior.

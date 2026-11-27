@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ArDiagnosticsEngine, ArDiagnosticState } from "./arDiagnostics";
+import type { ArDiagnosticFile, ArDiagnosticsEngine, ArDiagnosticState } from "./arDiagnostics";
 import "./ArDiagnosticPanel.css";
 
 export function ArDiagnosticPanel({
@@ -20,13 +20,15 @@ export function ArDiagnosticPanel({
   }, [result]);
   const share = async () => {
     if (!result) return;
-    const file = new File([result.blob], result.fileName, { type: "application/zip" });
-    if (!navigator.canShare?.({ files: [file] })) {
+    const files = (result.warning ? result.files : [result]).map(
+      (file) => new File([file.blob], file.fileName, { type: file.blob.type }),
+    );
+    if (!navigator.canShare?.({ files })) {
       setNotice("Нажмите «Скачать файл» и сохраните его в «Файлы».");
       return;
     }
     try {
-      await navigator.share({ files: [file], title: "Диагностика AR" });
+      await navigator.share({ files, title: "Диагностика AR" });
     } catch (error) {
       if (!(error instanceof DOMException && error.name === "AbortError"))
         setNotice("Не удалось поделиться. Скачайте файл по ссылке ниже.");
@@ -44,19 +46,19 @@ export function ArDiagnosticPanel({
     try {
       await engine?.stop();
     } catch {
-      setNotice("Не удалось сохранить запись. Попробуйте короткую запись ещё раз.");
+      setNotice("Не удалось завершить запись. Сообщите код ошибки ниже в чат.");
     }
   };
   return (
     <section className="ar-diagnostic-panel" aria-label="Диагностика AR">
-      <strong>Диагностика камеры</strong>
+      <strong>Диагностика камеры · 2</strong>
       <p role="status">
         {state?.status === "recording"
           ? `Запись · ${Math.floor(state.elapsedMs / 1000)} / 45 с. Прямо → наклон → ближе → движение.`
           : state?.status === "processing"
             ? "Готовим файл… Не закрывайте страницу."
             : result
-              ? "Запись готова. Сохраните файл и прикрепите его в чат."
+              ? result.warning || "Запись готова. Сохраните файл и прикрепите его в чат."
               : "Снимите открытку 30 секунд. Без микрофона; файл остаётся на телефоне."}
       </p>
       {state?.status === "recording" ? (
@@ -69,8 +71,13 @@ export function ArDiagnosticPanel({
             Поделиться файлом
           </button>
           <a ref={downloadRef} download={result.fileName}>
-            Скачать файл
+            {result.warning ? "Скачать журнал" : "Скачать архив"}
           </a>
+          {result.files
+            .filter((file) => file.fileName !== result.fileName)
+            .map((file) => (
+              <DiagnosticFileLink key={file.fileName} file={file} />
+            ))}
           <button type="button" onClick={start}>
             Записать ещё раз
           </button>
@@ -83,7 +90,25 @@ export function ArDiagnosticPanel({
       {engine && !engine.supported ? (
         <p role="alert">Запись камеры недоступна в этом браузере. Откройте ссылку в Safari.</p>
       ) : null}
-      {notice || state?.message ? <p role="alert">{notice || state?.message}</p> : null}
+      {notice || state?.message ? <p role="alert">{state?.message || notice}</p> : null}
     </section>
+  );
+}
+
+function DiagnosticFileLink({ file }: { file: ArDiagnosticFile }) {
+  const ref = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    const url = URL.createObjectURL(file.blob);
+    if (ref.current) ref.current.href = url;
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  return (
+    <a ref={ref} download={file.fileName}>
+      {file.fileName.startsWith("camera.")
+        ? "Скачать видео"
+        : file.fileName === "diagnostics.json"
+          ? "Скачать журнал"
+          : "Данные распознавания"}
+    </a>
   );
 }

@@ -20,7 +20,12 @@ export type ArDiagnosticSample = {
   partial?: boolean;
   targetIndex?: number;
 };
-export type ArDiagnosticRecording = { blob: Blob; durationMs: number; fileName: string };
+export type ArDiagnosticFile = { blob: Blob; fileName: string };
+export type ArDiagnosticRecording = ArDiagnosticFile & {
+  durationMs: number;
+  files: ArDiagnosticFile[];
+  warning?: string;
+};
 export type ArDiagnosticState = {
   status: "idle" | "recording" | "processing" | "ready" | "error";
   elapsedMs: number;
@@ -71,11 +76,7 @@ export function sanitizeDiagnosticSample(sample: ArDiagnosticSample): ArDiagnost
 
 export function diagnosticRecordingMimeType(recorder = globalThis.MediaRecorder) {
   if (!recorder) return null;
-  return (
-    ["video/mp4;codecs=avc1.42E01E", "video/mp4", "video/webm;codecs=vp8", "video/webm"].find((value) =>
-      recorder.isTypeSupported(value),
-    ) ?? ""
-  );
+  return ["video/mp4", "video/webm;codecs=vp8", "video/webm"].find((value) => recorder.isTypeSupported(value)) ?? "";
 }
 
 export function createArDiagnostics(options: {
@@ -173,17 +174,13 @@ export function createArDiagnostics(options: {
     state = "processing";
     emit();
     try {
-      if (!bytes) throw new Error("empty");
       const type = recorder?.mimeType || mimeType || "video/webm";
       const extension = type.includes("mp4") ? "mp4" : "webm";
       const videoBlob = new Blob(chunks, { type });
       chunks = [];
-      const { default: JSZip } = await import("jszip");
-      if (disposed) return;
-      const zip = new JSZip();
-      zip.file(`camera.${extension}`, new Uint8Array(await videoBlob.arrayBuffer()));
+      const files: ArDiagnosticFile[] = bytes ? [{ blob: videoBlob, fileName: `camera.${extension}` }] : [];
       for (const [index, asset] of (options.trackingAssets ?? []).entries()) {
-        zip.file(`target-${index}.mind`, new Uint8Array(await asset.arrayBuffer()));
+        files.push({ blob: asset, fileName: `target-${index}.mind` });
       }
       const settings = sourceTrack?.getSettings?.() ?? {};
       const targets = options.metadata?.targets.slice(0, 100).map((target) => {
@@ -202,45 +199,79 @@ export function createArDiagnostics(options: {
             : {}),
         };
       });
-      zip.file(
-        "diagnostics.json",
-        JSON.stringify({
-          version: 1,
-          source: "native-camera-track-no-overlay-no-audio",
-          clock: {
-            unit: "milliseconds",
-            samples: "relative-to-recording-start",
-            frameTime: "performance.now",
-            recordingStart: startedAt,
-          },
-          durationMs,
-          stoppedBecause,
-          mimeType: type,
-          camera: {
-            width: camera.videoWidth,
-            height: camera.videoHeight,
-            ...(finite(settings.frameRate) ? { frameRate: settings.frameRate } : {}),
-          },
-          initialCameraTime: cameraStartTime,
-          initialPlaybackTime: playbackStartTime,
-          frameTimingAvailable: typeof camera.requestVideoFrameCallback === "function",
-          targets,
-          samples,
-          frames,
-          playbackEvents: events,
-          limits: { durationMs: DIAGNOSTIC_DURATION_MS, samplingHz: 15, maxSamples: MAX_SAMPLES },
-          note: "Video encoding can influence device load. MediaRecorder and camera frame clocks are approximate, not frame-exact synchronization.",
-        }),
-      );
-      const blob = await zip.generateAsync({ type: "blob", compression: "STORE" });
+      const report = {
+        version: 2,
+        archiveFailure: null as { stage: string; name: string } | null,
+        capture: { bytes, status: bytes ? "recorded" : "empty", exportVersion: "safari-recovery-2" },
+        source: "native-camera-track-no-overlay-no-audio",
+        clock: {
+          unit: "milliseconds",
+          samples: "relative-to-recording-start",
+          frameTime: "performance.now",
+          recordingStart: startedAt,
+        },
+        durationMs,
+        stoppedBecause,
+        mimeType: type,
+        camera: {
+          width: camera.videoWidth,
+          height: camera.videoHeight,
+          ...(finite(settings.frameRate) ? { frameRate: settings.frameRate } : {}),
+        },
+        initialCameraTime: cameraStartTime,
+        initialPlaybackTime: playbackStartTime,
+        frameTimingAvailable: typeof camera.requestVideoFrameCallback === "function",
+        targets,
+        samples,
+        frames,
+        playbackEvents: events,
+        limits: { durationMs: DIAGNOSTIC_DURATION_MS, samplingHz: 15, maxSamples: MAX_SAMPLES },
+        note: "Video encoding can influence device load. MediaRecorder and camera frame clocks are approximate, not frame-exact synchronization.",
+      };
+      const reportFile = () => ({
+        fileName: "diagnostics.json",
+        blob: new Blob([JSON.stringify(report)], { type: "application/json" }),
+      });
+      files.push(reportFile());
+      let warning = bytes
+        ? undefined
+        : "Safari не передал видеокадры (CAMERA_EMPTY). Сохраните журнал — он поможет найти причину.";
+      let primary = files[files.length - 1];
+      if (bytes) {
+        let stage = "load-zip-module";
+        try {
+          const { default: JSZip } = await import("jszip");
+          if (disposed) return;
+          const zip = new JSZip();
+          stage = "read-blob-bytes";
+          for (const file of files) zip.file(file.fileName, new Uint8Array(await file.blob.arrayBuffer()));
+          // Uint8Array output avoids JSZip's browser Blob-constructor detection.
+          stage = "generate-zip";
+          const data = await zip.generateAsync({ type: "uint8array", compression: "STORE" });
+          primary = {
+            blob: new Blob([data as BlobPart], { type: "application/zip" }),
+            fileName: "khanzama-ar-diagnostics.zip",
+          };
+        } catch (error) {
+          const name =
+            error instanceof Error &&
+            ["TypeError", "RangeError", "NotReadableError", "SecurityError", "AbortError"].includes(error.name)
+              ? error.name
+              : "ExportError";
+          report.archiveFailure = { stage, name };
+          files[files.length - 1] = reportFile();
+          primary = files[files.length - 1];
+          warning = "Архив не собрался (ARCHIVE_FAILED). Видео и журнал сохранены отдельно — отправьте все файлы.";
+        }
+      }
       if (disposed) return;
-      result = { blob, durationMs, fileName: "khanzama-ar-diagnostics.zip" };
+      result = { ...primary, durationMs, files, warning };
       state = "ready";
       recorder = undefined;
       resolveCompletion?.(result);
       emit();
     } catch {
-      fail("Не удалось сохранить диагностику. Повторите запись покороче.");
+      fail("Не удалось подготовить журнал (REPORT_FAILED). Сообщите этот код в чат.");
     }
   };
   let cameraStartTime = 0;
