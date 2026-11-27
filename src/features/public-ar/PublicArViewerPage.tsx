@@ -277,7 +277,6 @@ export function PublicArViewerRoute() {
       onPlaybackEvent: (event, valueSeconds, errorCode) => {
         if (event === "playback_started") {
           setPaused(false);
-          setAutoplayBlocked(false);
         }
         telemetry.track(event, valueSeconds, errorCode);
       },
@@ -484,6 +483,18 @@ export function PublicArViewerRoute() {
                 {muted ? <VolumeX size={18} /> : <Volume2 size={18} />} Звук
               </button>
             )}
+            {postcard && autoplayBlocked && (
+              <button
+                type="button"
+                disabled={mode !== "tracking"}
+                onClick={() => {
+                  sessionRef.current?.setMuted(false);
+                  setAutoplayBlocked(false);
+                }}
+              >
+                <Volume2 size={18} /> Включить звук
+              </button>
+            )}
             <button
               type="button"
               disabled={mode !== "tracking" || videoState === "loading" || videoState === "idle"}
@@ -495,13 +506,7 @@ export function PublicArViewerRoute() {
               }}
             >
               {paused ? <Play size={18} /> : <Pause size={18} />}{" "}
-              {videoState === "error"
-                ? "Повторить загрузку"
-                : postcard && autoplayBlocked
-                  ? "Воспроизвести со звуком"
-                  : paused
-                    ? "Продолжить"
-                    : "Пауза"}
+              {videoState === "error" ? "Повторить загрузку" : paused ? "Продолжить" : "Пауза"}
             </button>
             {typeof document.documentElement.requestFullscreen === "function" ? (
               <button

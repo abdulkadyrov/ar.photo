@@ -5,6 +5,7 @@ import {
   cornerProjectionMatrix,
   estimatePlanarObservation,
   partialPoseFollows,
+  stabilizePartialPose,
   PLANAR_HOLD_MS,
   type Point2,
   type Quad,
@@ -198,10 +199,15 @@ export function createPlanarAnchor(options: {
         !partialPoseFollows(lastObserved, sample.corners))
     )
       return;
-    const corners = cornerFilter.sample(sample.corners, frameTime);
+    const measured =
+      sample.partial && lastObserved
+        ? stabilizePartialPose(lastObserved, sample.corners, sample.input)
+        : sample.corners;
+    if (!measured) return;
+    const corners = cornerFilter.sample(measured, frameTime);
     if (!corners) return;
     acceptedAt = sample.time;
-    lastObserved = sample.corners;
+    lastObserved = measured;
     current = { ...sample, corners };
     updateMatrix();
     setVisible(true);

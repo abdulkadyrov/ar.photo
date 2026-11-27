@@ -388,7 +388,8 @@ export async function startPublicMindAr(options: {
     targets,
     load: options.loadVideo ?? ((index, signal) => loadPublicArVideo(targets[index].assets.videoUrl, signal)),
     visible: (index) => targetVisible && activeTargetIndex === index,
-    lossPauseDelayMs: postcard ? 320 : undefined,
+    lossPauseDelayMs: postcard ? 650 : undefined,
+    mutedAutoplayFallback: postcard,
     onAutoplayBlocked: options.onAutoplayBlocked,
     onReady(index) {
       if (index !== activeTargetIndex || !targetVisible) return;

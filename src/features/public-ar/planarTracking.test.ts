@@ -6,6 +6,7 @@ import {
   estimatePlanarQuad,
   estimatePlanarObservation,
   partialPoseFollows,
+  stabilizePartialPose,
   fitHomography,
   PLANAR_HOLD_MS,
   projectPoint,
@@ -46,6 +47,14 @@ function measurements(corners = tilted) {
 }
 
 describe("four-corner planar tracking", () => {
+  it("accepts partial translation but rejects a flattened window", () => {
+    const translated = tilted.map((p) => ({ x: p.x + 0.03, y: p.y - 0.02 })) as Quad;
+    const stable = stabilizePartialPose(tilted, translated, input);
+    expect(stable).not.toBeNull();
+    expect(error(stable!, translated)).toBeLessThan(0.001);
+    const flattened = tilted.map((p) => ({ x: p.x, y: 0.5 + (p.y - 0.5) * 0.6 })) as Quad;
+    expect(stabilizePartialPose(tilted, flattened, input)).toBeNull();
+  });
   it.each(["left", "right", "top", "bottom"] as const)("solves from spread features on the visible %s half", (side) => {
     const x0 = side === "right" ? -0.95 : 0.1;
     const x1 = side === "left" ? 1.95 : 0.9;

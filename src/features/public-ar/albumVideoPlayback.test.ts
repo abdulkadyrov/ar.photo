@@ -14,7 +14,7 @@ const target: PublicArTarget = {
     posterUrl: "https://album.test/poster.webp",
   },
 };
-function fixture(count = 50, lossPauseDelayMs?: number) {
+function fixture(count = 50, lossPauseDelayMs?: number, mutedAutoplayFallback = false) {
   const video = document.createElement("video");
   let paused = true,
     ready = 0;
@@ -59,6 +59,7 @@ function fixture(count = 50, lossPauseDelayMs?: number) {
     onReady,
     onState,
     lossPauseDelayMs,
+    mutedAutoplayFallback,
     onAutoplayBlocked,
   });
   return {
@@ -186,6 +187,16 @@ describe("lazy album playback", () => {
     const f = fixture(1);
     f.play.mockRejectedValueOnce(new DOMException("Autoplay blocked", "NotAllowedError"));
     await f.player.select(0);
+    expect(f.onAutoplayBlocked).toHaveBeenCalledOnce();
+    f.player.dispose();
+  });
+  it("starts a postcard silently when sound autoplay is blocked", async () => {
+    const f = fixture(1, undefined, true);
+    f.play.mockRejectedValueOnce(new DOMException("Autoplay blocked", "NotAllowedError"));
+    await f.player.select(0);
+    expect(f.video.muted).toBe(true);
+    expect(f.video.paused).toBe(false);
+    expect(f.play).toHaveBeenCalledTimes(2);
     expect(f.onAutoplayBlocked).toHaveBeenCalledOnce();
     f.player.dispose();
   });

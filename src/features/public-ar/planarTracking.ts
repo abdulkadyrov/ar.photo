@@ -160,6 +160,18 @@ export function partialPoseFollows(previous: Quad, next: Quad) {
   );
 }
 
+/** Partial observations can move a trusted plane, but cannot reshape it. */
+export function stabilizePartialPose(previous: Quad, next: Quad, input: Size): Quad | null {
+  const pixels = (quad: Quad) => quad.map((p) => ({ x: p.x * input.width, y: p.y * input.height })) as Quad;
+  const before = pixels(previous);
+  const measured = pixels(next);
+  const coherent = fitCornerSimilarity(before, measured);
+  const diagonal = Math.hypot(before[0].x - before[2].x, before[0].y - before[2].y);
+  if (!diagonal || coherent.some((p, i) => Math.hypot(p.x - measured[i].x, p.y - measured[i].y) > diagonal * 0.035))
+    return null;
+  return coherent.map((p) => ({ x: p.x / input.width, y: p.y / input.height })) as Quad;
+}
+
 export function createCornerFilter() {
   let corners: Quad | null = null,
     acceptedAt = -Infinity;

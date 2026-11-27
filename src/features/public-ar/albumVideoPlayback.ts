@@ -15,6 +15,7 @@ export function createAlbumVideoPlayback(options: {
   onState(state: AlbumVideoState): void;
   lossPauseDelayMs?: number;
   onAutoplayBlocked?(): void;
+  mutedAutoplayFallback?: boolean;
 }) {
   const { video, targets } = options;
   const hot = new Map<number, { url: string; bytes: number }>();
@@ -40,7 +41,20 @@ export function createAlbumVideoPlayback(options: {
     options.onReady(index);
     if (options.visible(index) && targets[index].behavior.autoplay && video.paused)
       void video.play().catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "NotAllowedError") options.onAutoplayBlocked?.();
+        if (
+          !(error instanceof DOMException) ||
+          error.name !== "NotAllowedError" ||
+          disposed ||
+          selected !== index ||
+          !options.visible(index)
+        )
+          return;
+        if (options.mutedAutoplayFallback && !video.muted) {
+          video.muted = true;
+          video.defaultMuted = true;
+          void video.play().catch(() => undefined);
+        }
+        options.onAutoplayBlocked?.();
       });
   };
   const setSource = async (index: number, entry: { url: string; bytes: number }, signal: AbortSignal) => {
