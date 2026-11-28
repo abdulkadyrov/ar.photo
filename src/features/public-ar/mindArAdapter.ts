@@ -188,6 +188,8 @@ export function boundedCameraConstraints(constraints: MediaStreamConstraints = {
 export async function startPublicMindAr(options: {
   container: HTMLDivElement;
   diagnostics?: boolean;
+  /** Preserve reference-only tracking for controlled comparisons. */
+  opticalFlow?: boolean;
   onDiagnosticState?(state: ArDiagnosticState): void;
   manifest: PublicArManifest;
   muted: boolean;
@@ -258,6 +260,7 @@ export async function startPublicMindAr(options: {
     isIosWebKit(),
     (error) => lifetime.abort(error),
     postcard,
+    options.opticalFlow ?? postcard,
   );
   mindar._startVideo = async () => {
     const video = document.createElement("video");

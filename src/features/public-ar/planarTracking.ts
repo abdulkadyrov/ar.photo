@@ -280,7 +280,7 @@ export function createCornerFilter() {
     fresh(now: number) {
       return now - acceptedAt <= PLANAR_HOLD_MS;
     },
-    sample(next: Quad, now: number): Quad | null {
+    sample(next: Quad, now: number, continuousFlow = false): Quad | null {
       if (!validQuad(next) || !Number.isFinite(now) || now <= acceptedAt) return null;
       if (!corners || now - acceptedAt > PLANAR_HOLD_MS) {
         corners = next.map((p) => ({ ...p })) as Quad;
@@ -309,6 +309,9 @@ export function createCornerFilter() {
           : null;
         const continuousMotion = dt > 0.05 && delta < 0.35 && predicted && distance(predicted, next) / size < 0.1;
         if (
+          // Bidirectionally checked, spatially distributed flow supplies an
+          // independent continuity check; keep the hard jump bound even then.
+          !(continuousFlow && delta < 0.35) &&
           ((delta > 0.18 && !continuousMotion) || oneCornerSlipped) &&
           (!candidate || distance(candidate, next) / size > 0.03)
         ) {

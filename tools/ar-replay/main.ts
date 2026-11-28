@@ -238,6 +238,7 @@ async function build() {
     true,
     (e) => status(`Ошибка распознавания: ${String(e)}`),
     true,
+    new URLSearchParams(location.search).get("flow") === "1",
   );
   controller = new Controller({
     inputWidth: video.videoWidth,

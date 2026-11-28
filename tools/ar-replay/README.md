@@ -17,3 +17,7 @@ Automation API `window.__arReplay`:
 JSON export contains both series. Repeated decoded source frames may still be processed more than once by MindAR. The production bridge now assigns the same frameTime to them using requestVideoFrameCallback presentedFrames; filtering consumes a decoded frame once. Fallback sources without this API use currentTime. Preserve duplicate records when comparing timelines. Computer replay throughput is not iPhone throughput. Starting at0 also differs from the recorded phone, which had already acquired its target before recording began.
 
 Checks: `npx tsc -p tools/ar-replay/tsconfig.json`; `npx eslint tools/ar-replay/main.ts --max-warnings=0`. Live camera ZIP smoke tested using actual MindAR on a local Chromium page. Private archive/media and result samples are not committed.
+
+## Optical-flow comparison
+
+Add `?flow=1` to exercise the postcard hybrid; default replay remains reference-only for comparison. Both use the same production bridge. See `docs/AR_OPTICAL_FLOW_COMPARISON.md` and `scripts/compare-planar-flow.mjs` for identical-frame offline comparison and its limits. Never compare two browser runs as if their acquisition/scheduling were identical.

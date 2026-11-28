@@ -82,6 +82,7 @@ const read = installPlanarObservations(
     status.textContent = String(e);
   },
   true,
+  new URLSearchParams(location.search).get("flow") === "1",
 );
 const localCorners = () => [
   new THREE.Vector3(-0.5, 0.5 / markerAspect, 0),
