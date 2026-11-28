@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import * as Three from "three";
+import fastMotion from "./__fixtures__/fast-motion.json";
 import {
   cornerProjectionMatrix,
   createCornerFilter,
   estimatePlanarQuad,
+  estimatePlanarObservation,
+  estimateCornerUncertainty,
+  partialPoseFollows,
+  stabilizePartialPose,
   fitHomography,
   PLANAR_HOLD_MS,
   projectPoint,
@@ -44,6 +49,249 @@ function measurements(corners = tilted) {
 }
 
 describe("four-corner planar tracking", () => {
+  it.each(fastMotion)(
+    "follows captured variable-cadence motion without holding a rejected pose: $name",
+    ({ frames }) => {
+      const filter = createCornerFilter();
+      let held: Quad | null = null;
+      let rejected = 0;
+      let maxError = 0;
+      for (const frame of frames) {
+        const raw = frame.raw.map(([x, y]) => ({ x, y })) as Quad;
+        const actual = filter.sample(raw, frame.time);
+        if (!actual) rejected++;
+        else held = actual;
+        expect(held).not.toBeNull();
+        // Include the held output on rejection, as the live anchor does. Omitting
+        // rejected observations concealed 57–76px spikes in accepted-only replay.
+        const rms = Math.sqrt(
+          held!.reduce(
+            (sum, p, i) => sum + ((p.x - frame.truth[i][0]) * 640) ** 2 + ((p.y - frame.truth[i][1]) * 480) ** 2,
+            0,
+          ) / 4,
+        );
+        maxError = Math.max(maxError, rms);
+      }
+      expect(rejected).toBe(0);
+      expect(maxError).toBeLessThan(16);
+    },
+  );
+
+  it("still rejects an unexpected opposite jump and a slipped corner after sustained motion", () => {
+    for (const corruptCorner of [false, true]) {
+      const filter = createCornerFilter();
+      filter.sample(tilted, 0);
+      let current = tilted;
+      for (let frame = 1; frame <= 4; frame++) {
+        current = tilted.map((p) => ({ x: p.x + frame * 0.05, y: p.y })) as Quad;
+        expect(filter.sample(current, frame * 33)).not.toBeNull();
+      }
+      const bad = current.map((p, i) => ({
+        x: p.x + (corruptCorner ? (i === 0 ? 0.15 : 0) : -0.25),
+        y: p.y,
+      })) as Quad;
+      expect(filter.sample(bad, 232)).toBeNull();
+      expect(filter.fresh(132 + PLANAR_HOLD_MS + 1)).toBe(false);
+    }
+  });
+
+  it("reports extrapolation uncertainty for quarter-image support despite passing the full span rule", () => {
+    const oblique: Quad = [
+      { x: 0.33, y: 0.3 },
+      { x: 0.62, y: 0.33 },
+      { x: 0.88, y: 0.8 },
+      { x: 0.08, y: 0.75 },
+    ];
+    const truth = fitHomography(source, oblique)!;
+    const diagnostic = (span: number) => {
+      let seed = 17;
+      const random = () => {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        return seed / 2 ** 32 - 0.5;
+      };
+      const points = Array.from({ length: 36 }, (_, i) => ({
+        x: 0.02 + ((i % 6) * span) / 5,
+        y: 0.02 + (Math.floor(i / 6) * span) / 5,
+      }));
+      const destinations = points.map((p) => {
+        const projected = projectPoint(truth, p);
+        return { x: projected.x + (random() * 2) / input.width, y: projected.y + (random() * 2) / input.height };
+      });
+      const estimate = estimatePlanarObservation(
+        points.map((p) => ({ x: p.x * marker.width, y: p.y * marker.height })),
+        destinations.map((p) => ({ x: p.x * input.width, y: p.y * input.height })),
+        marker,
+        input,
+        true,
+      );
+      expect(estimate).not.toBeNull();
+      return estimateCornerUncertainty(points, destinations, fitHomography(points, destinations)!, input)!;
+    };
+    const spread = diagnostic(0.9);
+    const clustered = diagnostic(0.5);
+    expect(spread).toBeGreaterThan(0);
+    expect(spread).toBeLessThan(2);
+    expect(clustered).toBeGreaterThan(8);
+    expect(clustered).toBeGreaterThan(spread * 8);
+  });
+
+  it("uses a detector noise floor and declines singular uncertainty estimates", () => {
+    const points = Array.from({ length: 25 }, (_, i) => ({ x: (i % 5) / 4, y: Math.floor(i / 5) / 4 }));
+    const h = fitHomography(source, tilted)!;
+    const destinations = points.map((p) => projectPoint(h, p));
+    const floor = estimateCornerUncertainty(points, destinations, h, input)!;
+    expect(floor).toBeGreaterThan(0);
+    expect(estimateCornerUncertainty(points, destinations, h, input, 1)).toBeCloseTo(floor * 2, 8);
+    const line = points.map((p) => ({ x: p.x, y: 0.5 }));
+    expect(
+      estimateCornerUncertainty(
+        line,
+        line.map((p) => projectPoint(h, p)),
+        h,
+        input,
+      ),
+    ).toBeNull();
+    expect(estimateCornerUncertainty(points, destinations.slice(1), h, input)).toBeNull();
+  });
+
+  it.each([15, 30, 60])("does not accelerate toward a repeated biased perspective solve at %i Hz", (fps) => {
+    const filter = createCornerFilter();
+    filter.sample(tilted, 0);
+    const biased = tilted.map((p, i) => ({
+      x: p.x + (i < 2 ? 0.014 : -0.014),
+      y: p.y + (i % 2 ? 0.014 : -0.014),
+    })) as Quad;
+    let previous = tilted;
+    let previousStep = Infinity;
+    for (let frame = 1; frame <= 5; frame++) {
+      const actual = filter.sample(biased, (frame * 1000) / fps)!;
+      const step = error(actual, previous);
+      // An unchanged noisy estimate supplies no evidence of continued tilt.
+      // It may settle gradually, but must not unlock fast tracking on frame 3.
+      expect(step).toBeLessThanOrEqual(previousStep * 1.05);
+      previous = actual;
+      previousStep = step;
+    }
+  });
+
+  it.each([15, 30, 60])("suppresses amplified perspective jitter on a stationary oblique target at %i Hz", (fps) => {
+    const filter = createCornerFilter();
+    filter.sample(tilted, 0);
+    let rawEnergy = 0;
+    let filteredEnergy = 0;
+    for (let frame = 1; frame <= fps * 5; frame++) {
+      // Opposing edge errors are a shape change, not shared camera motion.
+      // Their larger amplitude must not make the filter trust them more.
+      const wobble = (frame % 2 ? 1 : -1) * 0.012;
+      const noisy = tilted.map((p, i) => ({
+        x: p.x + (i < 2 ? wobble : -wobble),
+        y: p.y + (i % 2 ? wobble : -wobble),
+      })) as Quad;
+      const actual = filter.sample(noisy, (frame * 1000) / fps)!;
+      expect(actual).not.toBeNull();
+      if (frame > fps) {
+        rawEnergy += error(noisy, tilted) ** 2;
+        filteredEnergy += error(actual, tilted) ** 2;
+      }
+    }
+    expect(Math.sqrt(filteredEnergy / rawEnergy)).toBeLessThan(0.6);
+  });
+
+  it.each([15, 30, 60])("damps correlated four-frame solve errors without delayed snaps at %i Hz", (fps) => {
+    const filter = createCornerFilter();
+    filter.sample(tilted, 0);
+    let rawEnergy = 0;
+    let filteredEnergy = 0;
+    for (let frame = 1; frame <= fps * 6; frame++) {
+      // Patch matches can retain a biased solution across several distinct
+      // camera frames, unlike the ideal alternating-noise case.
+      const wobble = (Math.floor((frame - 1) / 4) % 2 ? 1 : -1) * 0.014;
+      const noisy = tilted.map((p, i) => ({
+        x: p.x + (i < 2 ? wobble : -wobble),
+        y: p.y + (i % 2 ? wobble : -wobble),
+      })) as Quad;
+      const actual = filter.sample(noisy, (frame * 1000) / fps)!;
+      expect(actual).not.toBeNull();
+      if (frame > fps) {
+        rawEnergy += error(noisy, tilted) ** 2;
+        filteredEnergy += error(actual, tilted) ** 2;
+      }
+    }
+    expect(Math.sqrt(filteredEnergy / rawEnergy)).toBeLessThan(fps === 15 ? 0.75 : fps === 30 ? 0.62 : 0.52);
+  });
+
+  it.each([15, 30, 60])("follows sustained perspective changes after brief confirmation at %i Hz", (fps) => {
+    const filter = createCornerFilter();
+    filter.sample(tilted, 0);
+    for (let frame = 1; frame <= fps; frame++) {
+      const progress = frame / fps;
+      const expected = tilted.map((p, i) => ({
+        x: p.x + (i < 2 ? 0.04 : -0.04) * progress,
+        y: p.y + (i % 2 ? 0.02 : -0.02) * progress,
+      })) as Quad;
+      const actual = filter.sample(expected, (frame * 1000) / fps)!;
+      expect(actual).not.toBeNull();
+      if (frame > 3) expect(error(actual, expected)).toBeLessThan(3);
+    }
+  });
+
+  it("damps irregular oblique-view corner noise at uneven observation intervals", () => {
+    const filter = createCornerFilter();
+    filter.sample(tilted, 0);
+    let seed = 37;
+    const random = () => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 2 ** 32 - 0.5;
+    };
+    let time = 0;
+    let rawEnergy = 0;
+    let filteredEnergy = 0;
+    for (let frame = 1; frame <= 240; frame++) {
+      time += [33, 40, 50, 25][frame % 4];
+      const noisy = tilted.map((p) => ({ x: p.x + random() * 0.024, y: p.y + random() * 0.024 })) as Quad;
+      const actual = filter.sample(noisy, time)!;
+      expect(actual).not.toBeNull();
+      if (frame > 30) {
+        rawEnergy += error(noisy, tilted) ** 2;
+        filteredEnergy += error(actual, tilted) ** 2;
+      }
+    }
+    expect(Math.sqrt(filteredEnergy / rawEnergy)).toBeLessThan(0.85);
+  });
+
+  it("accepts partial translation but rejects a flattened window", () => {
+    const translated = tilted.map((p) => ({ x: p.x + 0.03, y: p.y - 0.02 })) as Quad;
+    const stable = stabilizePartialPose(tilted, translated, input);
+    expect(stable).not.toBeNull();
+    expect(error(stable!, translated)).toBeLessThan(0.001);
+    const flattened = tilted.map((p) => ({ x: p.x, y: 0.5 + (p.y - 0.5) * 0.6 })) as Quad;
+    expect(stabilizePartialPose(tilted, flattened, input)).toBeNull();
+  });
+  it.each(["left", "right", "top", "bottom"] as const)("solves from spread features on the visible %s half", (side) => {
+    const x0 = side === "right" ? -0.95 : 0.1;
+    const x1 = side === "left" ? 1.95 : 0.9;
+    const y0 = side === "bottom" ? -0.95 : 0.1;
+    const y1 = side === "top" ? 1.95 : 0.9;
+    const expected: Quad = [
+      { x: x0, y: y0 },
+      { x: x1, y: y0 },
+      { x: x1, y: y1 },
+      { x: x0, y: y1 },
+    ];
+    const all = measurements(expected);
+    const visible = all.world.flatMap((point, i) => {
+      const p = all.screen[i];
+      return p.x > 0 && p.x < input.width && p.y > 0 && p.y < input.height ? [{ point, p }] : [];
+    });
+    const world = visible.map(({ point }) => point);
+    const screen = visible.map(({ p }) => p);
+    expect(estimatePlanarQuad(world, screen, marker, input)).toBeNull();
+    const estimate = estimatePlanarObservation(world, screen, marker, input, true);
+    expect(estimate?.partial).toBe(true);
+    expect(error(estimate!.corners, expected)).toBeLessThan(6);
+    expect(partialPoseFollows(expected, estimate!.corners)).toBe(true);
+    expect(partialPoseFollows(expected, tilted)).toBe(false);
+  });
   it("recovers all corners under perspective from noisy feature measurements and 25% outliers", () => {
     const { world, screen } = measurements();
     for (let i = 0; i < 12; i++) screen[i] = { x: 650 - i * 10, y: 150 + i * 3 };

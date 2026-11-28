@@ -28,7 +28,11 @@ vi.mock("./postcardBuyerApi", async (original) => ({
   },
   uploadSignedBlob: mocks.put,
 }));
-vi.mock("./postcardBuyerMedia", () => ({ inspectBuyerVideo: mocks.inspect }));
+vi.mock("./postcardBuyerMedia", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./postcardBuyerMedia")>()),
+  inspectBuyerVideo: mocks.inspect,
+  compressBuyerVideo: async (file: File) => file,
+}));
 const publicToken = "1234567890abcdef1234567890abcdef";
 const editToken = "a".repeat(64);
 const available: BuyerSnapshot = {
@@ -154,7 +158,7 @@ describe("public postcard buyer journey", () => {
     await screen.findByRole("heading", { name: "Готово к сохранению" });
     expect(mocks.publish).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Сохранить открытку" }));
-    expect(await screen.findByRole("heading", { name: "Ваш подарок готов" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Просмотр подарка" })).toBeVisible();
     expect(mocks.publish).toHaveBeenCalledWith(publicToken, editToken, expect.any(AbortSignal));
   });
   it("does not publish a different frame selection before uploading that version", async () => {
@@ -230,8 +234,7 @@ describe("public postcard buyer journey", () => {
     fireEvent.click(screen.getByRole("button", { name: "Обновить состояние" }));
     await screen.findByRole("heading", { name: "Готово к сохранению" });
     fireEvent.click(screen.getByRole("button", { name: "Сохранить открытку" }));
-    await screen.findByRole("heading", { name: "Ваш подарок готов" });
-    expect(screen.getByRole("link", { name: "Посмотреть подарок" })).toHaveAttribute("href", `/ar/${"c".repeat(36)}`);
+    await screen.findByRole("heading", { name: "Просмотр подарка" });
   });
   it("reuses the request ID on interrupted upload and does not create a second registration", async () => {
     localStorage.setItem(`khanzama-postcard-edit-v1:${publicToken}`, editToken);
@@ -268,19 +271,13 @@ describe("public postcard buyer journey", () => {
     expect(mocks.upload).toHaveBeenCalledTimes(1);
     expect(mocks.completeUpload).toHaveBeenCalledTimes(2);
   });
-  it("requires confirmation before replacing a published gift", async () => {
+  it("opens only the viewer even when the creator still has a saved editing key", async () => {
     localStorage.setItem(`khanzama-postcard-edit-v1:${publicToken}`, editToken);
     mocks.lookup.mockResolvedValue(withState("published"));
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     open();
-    fireEvent.change(await screen.findByLabelText("Выбрать видео для открытки"), {
-      target: { files: [new File(["test"], "gift.mp4", { type: "video/mp4" })] },
-    });
-    await screen.findByText("gift.mp4");
-    fireEvent.click(screen.getByRole("button", { name: "Заменить видео" }));
-    expect(confirm).toHaveBeenCalled();
+    await screen.findByRole("heading", { name: "Просмотр подарка" });
+    expect(screen.queryByLabelText("Выбрать видео для открытки")).not.toBeInTheDocument();
     expect(mocks.upload).not.toHaveBeenCalled();
-    confirm.mockRestore();
   });
   it("cancels browser Back without losing the selected File, frame choice or history entry", async () => {
     localStorage.setItem(`khanzama-postcard-edit-v1:${publicToken}`, editToken);

@@ -1,0 +1,45 @@
+.ar-diagnostic-panel {
+  position: fixed;
+  z-index: 50;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: 12px;
+  right: 12px;
+  margin: 0 auto;
+  max-width: 480px;
+  padding: 14px;
+  border: 1px solid #c7b8ff;
+  border-radius: 18px;
+  color: #191822;
+  background: #fff;
+  box-shadow: 0 5px 24px #0003;
+  max-height: 45dvh;
+  overflow-y: auto;
+}
+.ar-diagnostic-panel p {
+  font-size: 14px;
+  line-height: 1.45;
+  margin: 8px 0;
+}
+.ar-diagnostic-panel button,
+.ar-diagnostic-panel a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid #6543ce;
+  background: #5431bd;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  text-decoration: none;
+}
+.ar-diagnostic-panel button:disabled {
+  opacity: 0.5;
+}
+.ar-diagnostic-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

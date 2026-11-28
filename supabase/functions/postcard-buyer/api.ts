@@ -57,7 +57,8 @@ export function buyerRpc(input: BuyerRequest, editHash: string | null) {
 export function buyerErrorStatus(code: string) {
   if (code === "invalid_card") return 404;
   if (code === "rate_limited") return 429;
-  if (["activation_unavailable", "storage_limit_reached", "too_many_uploads"].includes(code)) return 409;
+  if (["activation_unavailable", "storage_limit_reached", "too_many_uploads", "postcard_locked"].includes(code))
+    return 409;
   if (
     ["invalid_upload", "request_conflict", "upload_expired", "upload_superseded", "media_limit_reached"].includes(code)
   )

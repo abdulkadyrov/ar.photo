@@ -13,6 +13,9 @@ export function createAlbumVideoPlayback(options: {
   visible(index: number): boolean;
   onReady(index: number): void;
   onState(state: AlbumVideoState): void;
+  lossPauseDelayMs?: number;
+  onAutoplayBlocked?(): void;
+  mutedAutoplayFallback?: boolean;
 }) {
   const { video, targets } = options;
   const hot = new Map<number, { url: string; bytes: number }>();
@@ -22,6 +25,7 @@ export function createAlbumVideoPlayback(options: {
     generation = 0,
     disposed = false;
   let controller: AbortController | undefined;
+  let lossTimer: ReturnType<typeof setTimeout> | undefined;
   let state: AlbumVideoState = "idle";
   const change = (next: AlbumVideoState) => {
     if (state === next) return;
@@ -35,7 +39,23 @@ export function createAlbumVideoPlayback(options: {
   const announce = (index: number) => {
     change("ready");
     options.onReady(index);
-    if (options.visible(index) && targets[index].behavior.autoplay) void video.play().catch(() => undefined);
+    if (options.visible(index) && targets[index].behavior.autoplay && video.paused)
+      void video.play().catch((error: unknown) => {
+        if (
+          !(error instanceof DOMException) ||
+          error.name !== "NotAllowedError" ||
+          disposed ||
+          selected !== index ||
+          !options.visible(index)
+        )
+          return;
+        if (options.mutedAutoplayFallback && !video.muted) {
+          video.muted = true;
+          video.defaultMuted = true;
+          void video.play().catch(() => undefined);
+        }
+        options.onAutoplayBlocked?.();
+      });
   };
   const setSource = async (index: number, entry: { url: string; bytes: number }, signal: AbortSignal) => {
     hot.delete(index);
@@ -50,6 +70,7 @@ export function createAlbumVideoPlayback(options: {
       }
     }
     video.loop = targets[index].behavior.loop;
+    video.preload = "auto";
     const ready = waitForVideoData(video, signal);
     video.src = entry.url;
     video.load();
@@ -60,6 +81,7 @@ export function createAlbumVideoPlayback(options: {
   };
   const select = async (index: number) => {
     if (disposed || !targets[index]) return;
+    clearTimeout(lossTimer);
     if (selected === index && state === "loading") return;
     if (selected === index && state === "ready") {
       announce(index);
@@ -108,6 +130,13 @@ export function createAlbumVideoPlayback(options: {
     lost(index: number) {
       if (selected !== index) return;
       const behavior = targets[index].behavior.markerLost;
+      clearTimeout(lossTimer);
+      if (behavior === "pause_hide" && options.lossPauseDelayMs && state === "ready" && !video.paused) {
+        lossTimer = setTimeout(() => {
+          if (selected === index && !options.visible(index)) video.pause();
+        }, options.lossPauseDelayMs);
+        return;
+      }
       if (behavior !== "continue_audio_hide") video.pause();
       if (behavior === "stop_reset") {
         positions.set(index, 0);
@@ -119,6 +148,7 @@ export function createAlbumVideoPlayback(options: {
     },
     dispose() {
       disposed = true;
+      clearTimeout(lossTimer);
       generation++;
       controller?.abort();
       video.removeEventListener("error", failed);

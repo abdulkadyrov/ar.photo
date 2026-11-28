@@ -107,6 +107,7 @@ export async function optimizeVideoFile(
   metadata: VideoOptimizationInput,
   onProgress?: (progress: number) => void,
   forceTranscode = false,
+  profile?: { maxDimension: number; maxBytes: number; bitrate: number; signal: AbortSignal },
 ): Promise<VideoOptimizationResult> {
   if (!forceTranscode && !shouldOptimizeVideo(file, metadata)) return { file, strategy: "source-kept" };
 
@@ -116,7 +117,11 @@ export async function optimizeVideoFile(
     const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(file) });
     const target = new BufferTarget();
     const output = new Output({ format: new Mp4OutputFormat({ fastStart: "in-memory" }), target });
-    const resize = containedVideoSize(metadata.width, metadata.height, clientVideoMaxDimension);
+    const resize = containedVideoSize(
+      metadata.width,
+      metadata.height,
+      profile?.maxDimension ?? clientVideoMaxDimension,
+    );
     const conversion = await Conversion.init({
       input,
       output,
@@ -126,7 +131,8 @@ export async function optimizeVideoFile(
         width: resize.width,
         height: resize.height,
         fit: "contain",
-        bitrate: targetVideoBitrate(resize),
+        bitrate: profile?.bitrate ?? targetVideoBitrate(resize),
+        frameRate: profile ? 24 : undefined,
         keyFrameInterval: 2,
         allowRotationMetadata: false,
         forceTranscode: true,
@@ -149,11 +155,16 @@ export async function optimizeVideoFile(
     }
 
     conversion.onProgress = (progress) => onProgress?.(Math.max(0, Math.min(1, progress)));
+    const cancel = () => void conversion.cancel().catch(() => {});
     try {
+      profile?.signal.throwIfAborted();
+      profile?.signal.addEventListener("abort", cancel, { once: true });
       await conversion.execute();
     } finally {
+      profile?.signal.removeEventListener("abort", cancel);
       input.dispose();
     }
+    profile?.signal.throwIfAborted();
     if (!target.buffer) throw new VideoOptimizationUnavailableError("Браузер не создал оптимизированный MP4");
 
     const baseName = file.name.replace(/\.[^.]+$/, "") || "video";
@@ -161,6 +172,9 @@ export async function optimizeVideoFile(
       type: "video/mp4",
       lastModified: Date.now(),
     });
+    if (profile && optimized.size > profile.maxBytes) {
+      throw new VideoOptimizationUnavailableError("Не удалось сжать видео до допустимого размера");
+    }
     if (optimized.size > clientVideoHardLimitBytes) {
       if (!forceTranscode && file.size <= clientVideoHardLimitBytes) return { file, strategy: "source-kept" };
       throw new VideoOptimizationUnavailableError("Не удалось уменьшить видео до лимита 50 МБ");

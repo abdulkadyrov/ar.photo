@@ -57,6 +57,7 @@ Deno.serve(async (request) => {
         p_edit_hash: editHash,
         p_upload_id: match[2],
       });
+      if (target.data?.error === "postcard_locked") return json({ code: "postcard_locked" }, 409);
       if (target.error || !target.data || target.data.error) return json({ code: "invalid_upload" }, 404);
       const data = target.data as {
         bucket: string;
@@ -116,6 +117,8 @@ Deno.serve(async (request) => {
     const parsed = buyerRequestSchema.safeParse(body);
     if (!parsed.success) return json({ code: "invalid_request" }, 400);
     const input = parsed.data;
+    if (input.action === "upload" && input.video.sizeBytes > 15 * 1024 * 1024)
+      return json({ code: "media_limit_reached" }, 422);
     const ip =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "missing";
     const ipHash = await hashBuyerSecret(salt, `ip|${ip}|${input.action === "claim" ? "claim" : "request"}`);
@@ -163,6 +166,8 @@ Deno.serve(async (request) => {
       });
     }
     const envelope = stripPrivateFields(data);
+    if ((envelope.card as { state?: string } | undefined)?.state === "published")
+      return json({ ...envelope, owned: false, jobs: [], previewImageUrl: null, videoPreviewUrl: null });
     for (const [privateField, publicField] of [
       ["_previewAssetId", "previewImageUrl"],
       ["_videoAssetId", "videoPreviewUrl"],

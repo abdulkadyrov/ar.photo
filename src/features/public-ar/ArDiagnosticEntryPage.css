@@ -1,0 +1,89 @@
+.ar-diagnostic-entry {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 28px 20px 48px;
+  line-height: 1.55;
+  color: #202126;
+  overflow-wrap: anywhere;
+}
+.ar-diagnostic-brand {
+  font-weight: 850;
+  font-size: 22px;
+  text-decoration: none;
+  color: #4423a6;
+}
+.ar-diagnostic-entry h1 {
+  font-size: clamp(26px, 6vw, 36px);
+  line-height: 1.15;
+  margin: 24px 0 16px;
+}
+.ar-diagnostic-entry ol {
+  padding-left: 24px;
+}
+.ar-diagnostic-entry li {
+  margin: 12px 0;
+}
+.ar-diagnostic-privacy {
+  background: #efecf8;
+  border-radius: 16px;
+  padding: 16px;
+  font-size: 14px;
+}
+.ar-diagnostic-entry button,
+.ar-diagnostic-entry input {
+  font: inherit;
+  border: 1px solid #d4cedf;
+  border-radius: 12px;
+  padding: 12px 16px;
+  min-height: 48px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.ar-diagnostic-entry button {
+  cursor: pointer;
+  background: #fff;
+  font-weight: 650;
+  color: #282330;
+}
+.ar-diagnostic-entry button.ar-diagnostic-primary {
+  background: #6240dd;
+  color: #fff;
+  border-color: #6240dd;
+}
+.ar-diagnostic-entry button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.ar-diagnostic-entry :focus-visible {
+  outline: 3px solid #a38ce8;
+  outline-offset: 3px;
+}
+.ar-diagnostic-entry details {
+  margin-top: 24px;
+}
+.ar-diagnostic-entry summary {
+  cursor: pointer;
+  padding: 12px 0;
+}
+.ar-diagnostic-entry form {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+.ar-diagnostic-camera {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  object-fit: cover;
+  border-radius: 16px;
+  background: #15131a;
+}
+.ar-diagnostic-camera[hidden] {
+  display: none;
+}
+.ar-diagnostic-message {
+  padding: 12px;
+  border-radius: 12px;
+  background: #fff2e0;
+  color: #783c0d;
+}

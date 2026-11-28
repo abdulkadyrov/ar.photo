@@ -2,14 +2,18 @@ import { webcrypto } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { Blob as NodeBlob, File as NodeFile } from "node:buffer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { inspectBuyerVideo, videoMimeType } from "./postcardBuyerMedia";
+import { compressBuyerVideo, inspectBuyerVideo, postcardVideoMaxBytes, videoMimeType } from "./postcardBuyerMedia";
 
-const source = vi.hoisted(() => ({ inspect: vi.fn() }));
-vi.mock("../../media/videoOptimization", () => ({ inspectVideoSource: source.inspect }));
+const source = vi.hoisted(() => ({ inspect: vi.fn(), optimize: vi.fn() }));
+vi.mock("../../media/videoOptimization", () => ({
+  inspectVideoSource: source.inspect,
+  optimizeVideoFile: source.optimize,
+}));
 
 const limits = { maxVideoBytes: 1024, maxVideoSeconds: 120 };
 beforeEach(() => {
   source.inspect.mockReset();
+  source.optimize.mockReset();
   URL.createObjectURL = vi.fn(() => "blob:metadata-test");
   URL.revokeObjectURL = vi.fn();
   vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => undefined);
@@ -19,6 +23,29 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("buyer video validation", () => {
+  it("compresses a large source and rejects it if browser encoding fails", async () => {
+    const file = new File([new Uint8Array(postcardVideoMaxBytes + 1)], "camera.mp4", { type: "video/mp4" });
+    const metadata = {
+      name: file.name,
+      mimeType: "video/mp4" as const,
+      sizeBytes: file.size,
+      width: 1920,
+      height: 1080,
+      durationSeconds: 60,
+      sha256: "0".repeat(64),
+    };
+    const signal = new AbortController().signal;
+    const result = new File(["compressed"], "camera.optimized.mp4", { type: "video/mp4" });
+    source.optimize.mockResolvedValueOnce({ file: result }).mockRejectedValueOnce(new Error("encoder unavailable"));
+    await expect(compressBuyerVideo(file, metadata, postcardVideoMaxBytes, signal, vi.fn())).resolves.toBe(result);
+    expect(source.optimize).toHaveBeenCalledWith(file, expect.anything(), expect.any(Function), true, {
+      maxDimension: 640,
+      maxBytes: postcardVideoMaxBytes,
+      bitrate: 650_000,
+      signal,
+    });
+    await expect(compressBuyerVideo(file, metadata, postcardVideoMaxBytes, signal, vi.fn())).rejects.toThrow("15 МБ");
+  });
   it("rejects empty, oversized and unsupported media before decoding", async () => {
     await expect(inspectBuyerVideo(new File([], "empty.mp4", { type: "video/mp4" }), limits)).rejects.toThrow("пуст");
     await expect(

@@ -1,3 +1,4 @@
+import { createArDiagnostics, type ArDiagnosticsEngine, type ArDiagnosticState } from "./arDiagnostics";
 import type * as ThreeModule from "three";
 import {
   publicArTargets,
@@ -33,6 +34,28 @@ export const publicArCameraConstraints = Object.freeze({
 export const PUBLIC_AR_START_TIMEOUT_MS = 45_000;
 
 export type MarkerDimensions = { width: number; height: number };
+
+export function roundedPostcardGeometry(three: typeof ThreeModule) {
+  const shape = new three.Shape();
+  const x = 0.5;
+  const y = 0.5;
+  const rx = 0.07;
+  const ry = 0.1;
+  shape.moveTo(-x + rx, -y);
+  shape.lineTo(x - rx, -y);
+  shape.quadraticCurveTo(x, -y, x, -y + ry);
+  shape.lineTo(x, y - ry);
+  shape.quadraticCurveTo(x, y, x - rx, y);
+  shape.lineTo(-x + rx, y);
+  shape.quadraticCurveTo(-x, y, -x, y - ry);
+  shape.lineTo(-x, -y + ry);
+  shape.quadraticCurveTo(-x, -y, -x + rx, -y);
+  const geometry = new three.ShapeGeometry(shape, 6);
+  const uv = geometry.getAttribute("uv");
+  const position = geometry.getAttribute("position");
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, position.getX(i) + x, position.getY(i) + y);
+  return geometry;
+}
 
 type ColorManagedRenderer = { outputColorSpace: string };
 type ColorManagedTexture = { colorSpace: string };
@@ -141,6 +164,7 @@ export function coverTextureTransform(videoAspectRatio: number, markerAspectRati
 
 export type PublicArSession = {
   readonly recordingSupported: boolean;
+  readonly diagnostics?: ArDiagnosticsEngine | null;
   setMuted(muted: boolean): void;
   togglePlayback(): Promise<boolean>;
   startRecording(): void;
@@ -163,6 +187,10 @@ export function boundedCameraConstraints(constraints: MediaStreamConstraints = {
 
 export async function startPublicMindAr(options: {
   container: HTMLDivElement;
+  diagnostics?: boolean;
+  /** Preserve reference-only tracking for controlled comparisons. */
+  opticalFlow?: boolean;
+  onDiagnosticState?(state: ArDiagnosticState): void;
   manifest: PublicArManifest;
   muted: boolean;
   playbackVideo?: HTMLVideoElement;
@@ -172,10 +200,12 @@ export async function startPublicMindAr(options: {
   trackingAssets?: Blob[];
   loadVideo?(index: number, signal: AbortSignal): Promise<Blob>;
   onMediaState?(state: AlbumVideoState): void;
+  onAutoplayBlocked?(): void;
   onTrackingState(state: PublicArTrackingState): void;
   onPlaybackEvent(event: PublicArAnalyticsEvent, valueSeconds?: number | null, errorCode?: string | null): void;
 }): Promise<PublicArSession> {
   const { container, manifest, onTrackingState, onPlaybackEvent } = options;
+  const postcard = manifest.version === 1 && Boolean(manifest.videoViewport);
   options.signal?.throwIfAborted();
   const targets = publicArTargets(manifest);
   const videos =
@@ -224,19 +254,39 @@ export async function startPublicMindAr(options: {
   const abort = () => lifetime.abort(options.signal?.reason);
   options.signal?.addEventListener("abort", abort, { once: true });
   if (options.signal?.aborted) abort();
-  const readObservation = installPlanarObservations(mindar, lifetime.signal, isIosWebKit(), (error) =>
-    lifetime.abort(error),
+  const readObservation = installPlanarObservations(
+    mindar,
+    lifetime.signal,
+    isIosWebKit(),
+    (error) => lifetime.abort(error),
+    postcard,
+    options.opticalFlow ?? postcard,
   );
   mindar._startVideo = async () => {
     const video = document.createElement("video");
     mindar.video = video;
     container.appendChild(video);
-    await prepareArCamera({
+    const cameraOptions = {
       video,
       signal: lifetime.signal,
       stream: options.cameraStream,
       constraints: boundedCameraConstraints({ audio: false, video: { facingMode: { ideal: "environment" } } }),
-    });
+    };
+    try {
+      await prepareArCamera(cameraOptions);
+    } catch (error) {
+      if (
+        !postcard ||
+        options.cameraStream ||
+        lifetime.signal.aborted ||
+        !(error instanceof DOMException) ||
+        !["NotReadableError", "TrackStartError"].includes(error.name)
+      )
+        throw error;
+      // The system QR camera can still be releasing the device as Safari opens.
+      await abortable(new Promise<void>((resolve) => setTimeout(resolve, 500)), lifetime.signal);
+      await prepareArCamera(cameraOptions);
+    }
   };
   const { renderer, scene, camera } = mindar;
   // Wait for valid camera dimensions and a committed, visible React container.
@@ -257,14 +307,17 @@ export async function startPublicMindAr(options: {
   observer.observe(container);
   window.addEventListener("resize", resize);
   window.visualViewport?.addEventListener("resize", resize);
-  renderer.setPixelRatio?.(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio?.(Math.min(window.devicePixelRatio || 1, postcard && isIosWebKit() ? 1 : 2));
   renderer.setClearColor(0x000000, 0);
   let stopped = false;
   let activeTargetIndex = 0;
   let targetVisible = false;
   const texture = new Three.VideoTexture(video);
   configureSrgbVideoOutput(renderer, texture, Three.SRGBColorSpace);
-  const geometry = new Three.PlaneGeometry(1, 1);
+  const geometry =
+    manifest.version === 1 && manifest.postcardFrameTemplate
+      ? roundedPostcardGeometry(Three)
+      : new Three.PlaneGeometry(1, 1);
   const material = new Three.MeshBasicMaterial({
     map: texture,
     transparent: false,
@@ -332,6 +385,7 @@ export async function startPublicMindAr(options: {
       },
       fitVideoToMarker,
       updatePose: stabilizedAnchor.update,
+      diagnosticGroup: stabilizedAnchor.group,
       dispose() {
         stabilizedAnchor.dispose();
       },
@@ -342,6 +396,9 @@ export async function startPublicMindAr(options: {
     targets,
     load: options.loadVideo ?? ((index, signal) => loadPublicArVideo(targets[index].assets.videoUrl, signal)),
     visible: (index) => targetVisible && activeTargetIndex === index,
+    lossPauseDelayMs: postcard ? 650 : undefined,
+    mutedAutoplayFallback: postcard,
+    onAutoplayBlocked: options.onAutoplayBlocked,
     onReady(index) {
       if (index !== activeTargetIndex || !targetVisible) return;
       runtimes[index].fitVideoToMarker();
@@ -384,6 +441,8 @@ export async function startPublicMindAr(options: {
   document.addEventListener("visibilitychange", visibility);
 
   let recordingEngine: ArRecordingEngine | null = null;
+  let diagnostics: ArDiagnosticsEngine | null = null;
+  let lastDiagnosticFrame = -Infinity;
   try {
     await startMindArWithVisibleCamera(mindar, PUBLIC_AR_START_TIMEOUT_MS, lifetime.signal);
     lifetime.signal.throwIfAborted();
@@ -407,10 +466,44 @@ export async function startPublicMindAr(options: {
         playbackVideo: () => runtimes[activeTargetIndex].video,
       });
     }
+    if (options.diagnostics && mindar.video) {
+      diagnostics = createArDiagnostics({
+        cameraVideo: mindar.video,
+        playbackVideo: video,
+        onState: options.onDiagnosticState,
+        trackingAssets: options.trackingAssets,
+        metadata: {
+          targets: targets.map((t) => ({
+            width: t.marker.width,
+            height: t.marker.height,
+            videoViewport: t.videoViewport,
+          })),
+        },
+      });
+    }
     renderer.setAnimationLoop(() => {
       runtimes.forEach((runtime) => runtime.updatePose());
       renderer.render(scene, camera);
       recordingEngine?.drawFrame();
+      const now = performance.now();
+      if (diagnostics?.active && now - lastDiagnosticFrame >= 70) {
+        lastDiagnosticFrame = now;
+        const observation = readObservation(activeTargetIndex);
+        const group = runtimes[activeTargetIndex].diagnosticGroup;
+        diagnostics.addSample({
+          corners: observation?.corners,
+          frameTime: observation?.frameTime,
+          processingMs: observation ? observation.time - (observation.frameTime ?? observation.time) : undefined,
+          cameraTime: mindar.video?.currentTime,
+          input: observation?.input,
+          partial: observation?.partial,
+          found: group.visible,
+          targetIndex: activeTargetIndex,
+          renderedMatrix: Array.from(group.matrix.elements),
+          projectionMatrix: Array.from((camera as ThreeModule.Camera).projectionMatrix.elements),
+          viewport: { width: container.clientWidth, height: container.clientHeight },
+        });
+      }
     });
     onTrackingState("searching");
   } catch (error) {
@@ -430,6 +523,9 @@ export async function startPublicMindAr(options: {
   }
 
   return {
+    get diagnostics() {
+      return diagnostics;
+    },
     get recordingSupported() {
       return recordingEngine?.supported ?? false;
     },
@@ -474,6 +570,7 @@ export async function startPublicMindAr(options: {
       window.visualViewport?.removeEventListener("resize", resize);
       document.removeEventListener("visibilitychange", visibility);
       renderer.setAnimationLoop(null);
+      diagnostics?.dispose();
       recordingEngine?.dispose();
       stopMindAr(mindar);
       runtimes.forEach((runtime) => runtime.dispose());

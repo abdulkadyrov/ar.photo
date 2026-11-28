@@ -56,6 +56,8 @@ describe("public AR manifest client", () => {
     const manifest = parsePublicArManifest({ ...legacy, videoViewport });
     expect(publicArTargets(manifest)[0].videoViewport).toEqual(videoViewport);
     expect(publicArTargets(manifest)[0].marker).toEqual(legacy.marker);
+    const milka = parsePublicArManifest({ ...legacy, videoViewport, postcardFrameTemplate: "milka-gift" });
+    expect(publicArTargets(milka)[0].videoViewport).toEqual({ x: 0.053, y: 0.242, width: 0.894, height: 0.423 });
   });
 
   it("accepts bounded windows per target and rejects unsafe window metadata", async () => {

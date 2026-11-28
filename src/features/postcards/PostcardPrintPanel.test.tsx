@@ -1,6 +1,14 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import PostcardPrintPanel from "./PostcardPrintPanel";
+import PrintPanel from "./PostcardPrintPanel";
+import { MemoryRouter } from "react-router-dom";
+function PostcardPrintPanel(props: React.ComponentProps<typeof PrintPanel>) {
+  return (
+    <MemoryRouter>
+      <PrintPanel {...props} />
+    </MemoryRouter>
+  );
+}
 import type { PostcardBatch, PostcardCard } from "./postcardModel";
 
 const mocks = vi.hoisted(() => ({ rpc: vi.fn(), asset: vi.fn(), zip: vi.fn(), signed: vi.fn() }));

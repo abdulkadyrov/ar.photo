@@ -1,5 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  // A service-worker update can arrive after navigation and cover the mobile
+  // sign-in button. Dismiss it through its real control before continuing.
+  const postponeUpdate = page.getByRole("button", { name: "Отложить обновление", exact: true });
+  await page.addLocatorHandler(postponeUpdate, async () => {
+    await postponeUpdate.click();
+  });
+});
+
 async function signInToDemo(page: Page) {
   await page.getByPlaceholder("Не менее 8 символов").fill("demo-password");
   await page.getByRole("button", { name: "Войти" }).click();

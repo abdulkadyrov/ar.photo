@@ -143,15 +143,9 @@ for (const width of [319, 390, 430, 1440]) {
     await page.evaluate(() => scrollTo(0, 0));
     await page.screenshot({ path: `artifacts/buyer-easy-20261127/buyer-${width}-ready.png`, fullPage: true });
     await page.getByRole("button", { name: "Сохранить открытку" }).click();
-    await expect(page.getByRole("heading", { name: "Ваш подарок готов" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Посмотреть подарок" })).toHaveAttribute(
-      "href",
-      `/ar.photo/ar/${slug}`,
-    );
-    await page.getByText("Сохранить доступ к видео", { exact: true }).click();
-    const backup = page.waitForEvent("download");
-    await page.getByRole("button", { name: /Скачать.*доступ|Скачать.*ссылк|Скачать файл/ }).click();
-    expect((await backup).suggestedFilename()).toContain("доступ");
+    await expect(page).toHaveURL(new RegExp(`/ar/${slug}$`));
+    await page.goto(`./card/${publicToken}`);
+    await expect(page).toHaveURL(new RegExp(`/ar/${slug}$`));
   });
 }
 

@@ -1,4 +1,5 @@
 // Development-only browser fixture. This entry is not included in the production build.
+import { BrowserRouter } from "react-router-dom";
 import { createRoot } from "react-dom/client";
 import PostcardPrintPanel from "../../../src/features/postcards/PostcardPrintPanel";
 import "../../../src/styles.css";
@@ -27,13 +28,16 @@ const cards = Array.from({ length: 10 }, (_, index) => ({
 }));
 createRoot(document.getElementById("root")!).render(
   <main style={{ maxWidth: 900, margin: "24px auto", padding: "0 14px" }}>
-    <PostcardPrintPanel
-      accountId="account"
-      batch={batch}
-      cards={cards}
-      canManage
-      demo={false}
-      onUpdated={async () => undefined}
-    />
+    <BrowserRouter>
+      <div style={{ height: 700 }} aria-hidden="true" />
+      <PostcardPrintPanel
+        accountId="account"
+        batch={batch}
+        cards={cards}
+        canManage
+        demo={false}
+        onUpdated={async () => undefined}
+      />
+    </BrowserRouter>
   </main>,
 );

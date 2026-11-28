@@ -114,6 +114,25 @@ declare module "three" {
     dispose(): void;
   }
 
+  export class Shape {
+    moveTo(x: number, y: number): this;
+    lineTo(x: number, y: number): this;
+    quadraticCurveTo(cx: number, cy: number, x: number, y: number): this;
+  }
+
+  export class ShapeGeometry {
+    constructor(shape: Shape, curveSegments?: number);
+    getAttribute(name: string): {
+      count: number;
+      getX(index: number): number;
+      getY(index: number): number;
+      setXY(index: number, x: number, y: number): void;
+    };
+    boundingBox: { min: { toArray(): number[] }; max: { toArray(): number[] } } | null;
+    computeBoundingBox(): void;
+    dispose(): void;
+  }
+
   export class MeshBasicMaterial {
     constructor(options: {
       map: unknown;

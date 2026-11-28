@@ -1,9 +1,14 @@
+import { createHybridPlanarTracker } from "./hybridPlanarTracking";
+import type { GrayFrame } from "./opticalFlow";
+import { createVideoFrameClock } from "./videoFrameClock";
 import type * as Three from "three";
 import { installAlbumCandidateSearch, type FeaturePoint } from "./albumCandidateSearch";
 import {
   createCornerFilter,
   cornerProjectionMatrix,
-  estimatePlanarQuad,
+  estimatePlanarObservation,
+  partialPoseFollows,
+  stabilizePartialPose,
   PLANAR_HOLD_MS,
   type Point2,
   type Quad,
@@ -24,6 +29,8 @@ type Controller = {
 };
 export type PlanarObservation = {
   corners: Quad;
+  partial?: boolean;
+  continuousFlow?: boolean;
   // Availability controls the existing loss grace period; capture controls
   // filter cadence and duplicate detection. They are different clocks.
   time: number;
@@ -37,6 +44,8 @@ export function installPlanarObservations(
   signal: AbortSignal,
   skipWarmup: boolean,
   onError?: (error: unknown) => void,
+  allowPartial = false,
+  hybridFlow = false,
 ) {
   let controller: Controller | undefined;
   const observations = new Map<number, PlanarObservation>();
@@ -57,19 +66,55 @@ export function installPlanarObservations(
           const tracker = next.tracker;
           if (!tracker) throw new Error("MindAR observation contract unavailable");
           const capturedAt = new WeakMap<object, number>();
+          const capturedFrames = new WeakMap<object, GrayFrame>();
+          const hybrids = new Map<number, ReturnType<typeof createHybridPlanarTracker>>();
+          const captureCanvas = hybridFlow ? document.createElement("canvas") : null;
+          const captureContext = captureCanvas?.getContext("2d", { willReadFrequently: true });
+          let grayTime = -Infinity,
+            gray: GrayFrame | undefined;
+          signal.addEventListener(
+            "abort",
+            () => {
+              hybrids.clear();
+              gray = undefined;
+              if (captureCanvas) captureCanvas.width = captureCanvas.height = 0;
+            },
+            { once: true },
+          );
           if (next.inputLoader) {
             const load = next.inputLoader.loadInput.bind(next.inputLoader);
-            let mediaTime = -Infinity;
-            let frameTime = -Infinity;
+            let frameClock: ReturnType<typeof createVideoFrameClock> | undefined;
+            let clockVideo: HTMLVideoElement | undefined;
             next.inputLoader.loadInput = (video) => {
-              // The worker can finish long after this camera frame was read.
-              // Timestamp capture, not completion; repeated camera frames must
-              // neither strengthen smoothing nor extend stale geometry's life.
-              if (video.currentTime !== mediaTime) {
-                mediaTime = video.currentTime;
-                frameTime = performance.now();
+              if (clockVideo !== video) {
+                frameClock?.dispose();
+                clockVideo = video;
+                frameClock = createVideoFrameClock(video, signal);
+              }
+              const frameTime = frameClock!.read();
+              const sourceWidth = video.videoWidth || (video instanceof HTMLCanvasElement ? video.width : 0);
+              const sourceHeight = video.videoHeight || (video instanceof HTMLCanvasElement ? video.height : 0);
+              if (captureCanvas && captureContext && frameTime !== grayTime && sourceWidth && sourceHeight) {
+                const scale = Math.min(
+                  360 / Math.min(sourceWidth, sourceHeight),
+                  640 / Math.max(sourceWidth, sourceHeight),
+                );
+                const width = Math.round(sourceWidth * scale),
+                  height = Math.round(sourceHeight * scale);
+                if (captureCanvas.width !== width || captureCanvas.height !== height) {
+                  captureCanvas.width = width;
+                  captureCanvas.height = height;
+                }
+                captureContext.drawImage(video, 0, 0, width, height);
+                const rgba = captureContext.getImageData(0, 0, width, height).data;
+                const data = new Float32Array(width * height);
+                for (let i = 0; i < data.length; i++)
+                  data[i] = 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2];
+                gray = { width, height, data };
+                grayTime = frameTime;
               }
               const tensor = load(video);
+              if (gray) capturedFrames.set(tensor, gray);
               capturedAt.set(tensor, frameTime);
               return tensor;
             };
@@ -81,28 +126,42 @@ export function installPlanarObservations(
             observations.delete(index);
             if (dimensions && !signal.aborted) {
               const inputSize = { width: next.inputWidth, height: next.inputHeight };
-              const corners = estimatePlanarQuad(
+              const estimate = estimatePlanarObservation(
                 sample.worldCoords,
                 sample.screenCoords,
                 { width: dimensions[0], height: dimensions[1] },
                 inputSize,
+                allowPartial,
               );
+              const rotated = isRotatedInput(runtime.video, inputSize);
+              const reference = estimate
+                ? rotated
+                  ? (estimate.corners.map((p) => ({ x: p.y, y: 1 - p.x })) as Quad)
+                  : estimate.corners
+                : null;
+              const object = input !== null && typeof input === "object" ? input : null;
+              const frameTime = object ? (capturedAt.get(object) ?? performance.now()) : performance.now();
+              const frame = object ? capturedFrames.get(object) : undefined;
+              let corners = reference;
+              let continuousFlow = false;
+              if (hybridFlow && frame) {
+                let hybrid = hybrids.get(index);
+                if (!hybrid) {
+                  hybrid = createHybridPlanarTracker();
+                  hybrids.set(index, hybrid);
+                }
+                const result = hybrid.sample(frame, frameTime, reference);
+                corners = result?.corners ?? null;
+                continuousFlow = result?.source === "flow" && result.flowPoints >= 16;
+              }
               if (corners)
                 observations.set(index, {
-                  // InputLoader rotates +90 degrees when the element dimensions
-                  // are swapped (also true for square inputs). Undo that before
-                  // mapping observations onto the displayed camera image.
-                  corners: isRotatedInput(runtime.video, inputSize)
-                    ? (corners.map((p) => ({ x: p.y, y: 1 - p.x })) as Quad)
-                    : corners,
+                  corners,
+                  continuousFlow,
+                  partial: estimate?.partial,
                   time: performance.now(),
-                  frameTime:
-                    input !== null && typeof input === "object"
-                      ? (capturedAt.get(input) ?? performance.now())
-                      : performance.now(),
-                  input: isRotatedInput(runtime.video, inputSize)
-                    ? { width: inputSize.height, height: inputSize.width }
-                    : inputSize,
+                  frameTime,
+                  input: rotated ? { width: inputSize.height, height: inputSize.width } : inputSize,
                   aspect: dimensions[0] / dimensions[1],
                 });
             }
@@ -144,6 +203,10 @@ export function createPlanarAnchor(options: {
   let lastSample = -Infinity;
   let acceptedAt = -Infinity;
   let current: PlanarObservation | null = null;
+  let lastObserved: Quad | null = null;
+  let projected: PlanarObservation | null = null;
+  let projectedWidth = 0;
+  let projectedHeight = 0;
   const setVisible = (visible: boolean) => {
     if (group.visible === visible) return;
     group.visible = visible;
@@ -155,18 +218,23 @@ export function createPlanarAnchor(options: {
     const width = options.container.clientWidth,
       height = options.container.clientHeight;
     if (!width || !height) return;
+    if (current === projected && width === projectedWidth && height === projectedHeight) return;
     const clip = cornerProjectionMatrix(options.three, current.corners, current.aspect, current.input, {
       width,
       height,
     });
     if (!clip) return;
     group.matrix.multiplyMatrices(options.camera.projectionMatrixInverse, clip);
+    projected = current;
+    projectedWidth = width;
+    projectedHeight = height;
   };
   const consumeObservation = () => {
     if (!options.anchor.visible) {
       cornerFilter.reset();
       acceptedAt = -Infinity;
       current = null;
+      lastObserved = null;
       setVisible(false);
       return;
     }
@@ -175,9 +243,24 @@ export function createPlanarAnchor(options: {
     const frameTime = sample.frameTime ?? sample.time;
     if (frameTime <= lastSample) return;
     lastSample = frameTime;
-    const corners = cornerFilter.sample(sample.corners, frameTime);
+    if (
+      sample.partial &&
+      (!group.visible ||
+        !lastObserved ||
+        now() - acceptedAt > PLANAR_HOLD_MS ||
+        !cornerFilter.fresh(frameTime) ||
+        !partialPoseFollows(lastObserved, sample.corners))
+    )
+      return;
+    const measured =
+      sample.partial && lastObserved
+        ? stabilizePartialPose(lastObserved, sample.corners, sample.input)
+        : sample.corners;
+    if (!measured) return;
+    const corners = cornerFilter.sample(measured, frameTime, sample.continuousFlow);
     if (!corners) return;
     acceptedAt = sample.time;
+    lastObserved = measured;
     current = { ...sample, corners };
     updateMatrix();
     setVisible(true);

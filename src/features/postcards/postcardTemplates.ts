@@ -23,6 +23,7 @@ export type PostcardPrintTemplate = Readonly<{
   caption: string;
   searchTerms?: string;
   frame: PostcardFrame;
+  previewFrame?: PostcardFrame & { borderRadius: string };
   ink: string;
 }>;
 
@@ -38,6 +39,7 @@ export const postcardTemplateCatalog: readonly PostcardPrintTemplate[] = [
     caption: "Маленький подарок. Большие чувства.",
     searchTerms: "milka милка шоколад сладкий корзина корзинка подарок сиреневый нежность",
     frame: { x: 0.085, y: 0.255, width: 0.83, height: 0.4 },
+    previewFrame: { x: 0.053, y: 0.242, width: 0.894, height: 0.423, borderRadius: "7% / 10%" },
     ink: "#fff5e9",
   },
   {

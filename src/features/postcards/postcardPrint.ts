@@ -9,7 +9,7 @@ export const POSTCARD_QR = Object.freeze({ x: 948, y: 1512, size: 192, quietZone
 export const POSTCARD_PUBLIC_BASE_URL = "https://khanzama.ru/ar.photo";
 
 export type RenderedPostcard = { publicToken: string; blob: Blob };
-export type PostcardPrintPageSize = "photo" | "a4";
+export type PostcardPrintPageSize = "photo" | "a4" | "a4-four";
 const imagePromises = new Map<string, Promise<HTMLImageElement>>();
 const MAX_EXPORT_BYTES = 120 * 1024 * 1024;
 
@@ -188,11 +188,76 @@ export async function createPostcardZip(templateCode: string, cards: readonly Re
   return zip.generateAsync({ type: "blob", compression: "STORE" });
 }
 
+/** Embed canonical PNG pixels losslessly at their physical print size. */
+export async function createPostcardPdf(
+  templateCode: string,
+  cards: readonly RenderedPostcard[],
+  pageSize: PostcardPrintPageSize = "photo",
+  options: { signal?: AbortSignal; onProgress?: (done: number, total: number) => void } = {},
+): Promise<Blob> {
+  validateRenderedCards(templateCode, cards);
+  if (pageSize !== "photo" && pageSize !== "a4" && pageSize !== "a4-four")
+    throw new Error("Неподдерживаемый формат печати.");
+  const { PDFDocument, PrintScaling } = await import("pdf-lib");
+  const pdf = await PDFDocument.create();
+  pdf.setTitle("KHANZAMA postcards");
+  pdf.catalog.getOrCreateViewerPreferences().setPrintScaling(PrintScaling.None);
+  const mm = 72 / 25.4;
+  const perPage = pageSize === "a4" ? 2 : pageSize === "a4-four" ? 4 : 1;
+  for (const [index, card] of cards.entries()) {
+    options.signal?.throwIfAborted();
+    const image = await pdf.embedPng(await card.blob.arrayBuffer());
+    if (image.width !== POSTCARD_PRINT_WIDTH || image.height !== POSTCARD_PRINT_HEIGHT)
+      throw new Error("Размер печатного изображения должен быть 1200 × 1800 пикселей.");
+    const page =
+      index % perPage === 0
+        ? pdf.addPage(pageSize === "photo" ? [100 * mm, 150 * mm] : [210 * mm, 297 * mm])
+        : pdf.getPage(pdf.getPageCount() - 1);
+    const position = index % perPage;
+    const fourPerA4 = pageSize === "a4-four";
+    page.drawImage(image, {
+      x: pageSize === "photo" ? 0 : (fourPerA4 ? 10 + (position % 2) * 95 : 5 + position * 100) * mm,
+      y: pageSize === "photo" ? 0 : (fourPerA4 ? 6 + (1 - Math.floor(position / 2)) * 142.5 : 142) * mm,
+      width: (fourPerA4 ? 95 : 100) * mm,
+      height: (fourPerA4 ? 142.5 : 150) * mm,
+    });
+    options.onProgress?.(index + 1, cards.length);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  }
+  options.signal?.throwIfAborted();
+  const bytes = await pdf.save();
+  options.signal?.throwIfAborted();
+  return new Blob([Uint8Array.from(bytes)], { type: "application/pdf" });
+}
+
 function escapeHtml(text: string) {
   return text.replace(
     /[&<>"']/g,
     (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!,
   );
+}
+
+/** Same-origin object URLs avoid duplicating full-size PNGs as base64 in the print frame. */
+export function createPostcardPrintFrameHtml(
+  cards: readonly { publicToken: string; url: string }[],
+  pageSize: PostcardPrintPageSize,
+) {
+  if (!cards.length || cards.length > MAX_POSTCARD_EXPORT_COUNT) throw new Error("Выберите открытки для печати.");
+  if (pageSize !== "photo" && pageSize !== "a4" && pageSize !== "a4-four")
+    throw new Error("Неподдерживаемый формат печати.");
+  const pictures = cards.map((card) => {
+    postcardPublicUrl(card.publicToken);
+    if (!card.url.startsWith(`blob:${window.location.origin}/`)) throw new Error("Печатное изображение недоступно.");
+    return `<img src="${escapeHtml(card.url)}" width="1200" height="1800" alt="Открытка">`;
+  });
+  const perPage = pageSize === "a4" ? 2 : pageSize === "a4-four" ? 4 : 1;
+  const sheets: string[] = [];
+  for (let index = 0; index < pictures.length; index += perPage)
+    sheets.push(`<section>${pictures.slice(index, index + perPage).join("")}</section>`);
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>KHANZAMA — печать открыток</title><style>
+@page{size:${pageSize === "photo" ? "100mm 150mm" : "A4 portrait"};margin:${pageSize === "photo" ? "0" : pageSize === "a4-four" ? "6mm 10mm" : "5mm"}}
+*{box-sizing:border-box}html,body{margin:0;padding:0;background:white}section{display:${pageSize === "a4-four" ? "grid" : "flex"};grid-template-columns:${pageSize === "a4-four" ? "repeat(2, 95mm)" : "none"};grid-template-rows:${pageSize === "a4-four" ? "repeat(2, 142.5mm)" : "none"};width:${pageSize === "a4-four" ? "190mm" : `${perPage * 100}mm`};height:${pageSize === "a4-four" ? "285mm" : "150mm"};break-inside:avoid;break-after:page}section:last-child{break-after:auto}img{display:block;width:${pageSize === "a4-four" ? "95mm" : "100mm"};height:${pageSize === "a4-four" ? "142.5mm" : "150mm"};max-width:none;object-fit:fill;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+</style></head><body>${sheets.join("")}</body></html>`;
 }
 
 export async function createPostcardPrintHtml(
@@ -201,8 +266,10 @@ export async function createPostcardPrintHtml(
   pageSize: PostcardPrintPageSize = "photo",
 ): Promise<Blob> {
   validateRenderedCards(templateCode, cards);
-  if (pageSize !== "photo" && pageSize !== "a4") throw new Error("Неподдерживаемый формат печати.");
-  const perSheet = pageSize === "a4" ? 2 : 1;
+  if (pageSize !== "photo" && pageSize !== "a4" && pageSize !== "a4-four")
+    throw new Error("Неподдерживаемый формат печати.");
+  const perSheet = pageSize === "a4" ? 2 : pageSize === "a4-four" ? 4 : 1;
+  const fourPerA4 = pageSize === "a4-four";
   const pictures: string[] = [];
   for (const card of cards)
     pictures.push(
@@ -212,8 +279,8 @@ export async function createPostcardPrintHtml(
   for (let index = 0; index < pictures.length; index += perSheet)
     sheets.push(`<section class="sheet">${pictures.slice(index, index + perSheet).join("")}</section>`);
   const html = `<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Хан Зама — открытки 10 × 15 см</title><style>
-*{box-sizing:border-box}body{margin:0;background:#f5f3f0;color:#24212b;font-family:Arial,sans-serif}.controls{padding:20px;max-width:900px;margin:auto}.controls p{line-height:1.6}button{padding:12px 18px;font:inherit;border:0;border-radius:8px;background:#6943e5;color:white;cursor:pointer}.sheet{display:grid;grid-template-columns:repeat(${perSheet},100mm);width:${perSheet * 100}mm;height:150mm;margin:20px auto;gap:0;background:white;break-inside:avoid;break-after:page}.sheet img{display:block;width:100mm;height:150mm;object-fit:fill;max-width:none}@page{size:${pageSize === "a4" ? "A4 portrait" : "100mm 150mm"};margin:${pageSize === "a4" ? "5mm" : "0"}}@media screen and (max-width:800px){.sheet{width:min(100mm,calc(100vw - 24px));height:auto;grid-template-columns:1fr}.sheet img{width:100%;height:auto}}@media print{body{background:white}.controls{display:none}.sheet{margin:0;print-color-adjust:exact;-webkit-print-color-adjust:exact}.sheet:last-child{break-after:auto}}
-</style><main><div class="controls"><h1>${escapeHtml(getPostcardTemplate(templateCode).name)}</h1><p>${cards.length} открыток по 100 × 150 мм. ${pageSize === "a4" ? "На листе A4 по две открытки." : "Одна открытка на листе фотобумаги 10 × 15 см."} В диалоге печати выберите масштаб 100%, отключите колонтитулы и автоматическое кадрирование. Проверьте пробный отпечаток линейкой перед тиражом.</p><button type="button" onclick="window.print()">Печатать открытки</button></div>${sheets.join("")}</main></html>`;
+*{box-sizing:border-box}body{margin:0;background:#f5f3f0;color:#24212b;font-family:Arial,sans-serif}.controls{padding:20px;max-width:900px;margin:auto}.controls p{line-height:1.6}button{padding:12px 18px;font:inherit;border:0;border-radius:8px;background:#6943e5;color:white;cursor:pointer}.sheet{display:grid;grid-template-columns:repeat(${fourPerA4 ? 2 : perSheet},${fourPerA4 ? 95 : 100}mm);grid-template-rows:${fourPerA4 ? "repeat(2,142.5mm)" : "150mm"};width:${fourPerA4 ? 190 : perSheet * 100}mm;height:${fourPerA4 ? 285 : 150}mm;margin:20px auto;gap:0;background:white;break-inside:avoid;break-after:page}.sheet img{display:block;width:${fourPerA4 ? 95 : 100}mm;height:${fourPerA4 ? 142.5 : 150}mm;object-fit:fill;max-width:none}@page{size:${pageSize === "photo" ? "100mm 150mm" : "A4 portrait"};margin:${pageSize === "photo" ? "0" : fourPerA4 ? "6mm 10mm" : "5mm"}}@media screen and (max-width:800px){.sheet{width:min(100mm,calc(100vw - 24px));height:auto;grid-template-columns:1fr;grid-template-rows:none}.sheet img{width:100%;height:auto}}@media print{body{background:white}.controls{display:none}.sheet{margin:0;print-color-adjust:exact;-webkit-print-color-adjust:exact}.sheet:last-child{break-after:auto}}
+</style><main><div class="controls"><h1>${escapeHtml(getPostcardTemplate(templateCode).name)}</h1><p>${cards.length} открыток. ${pageSize === "a4" ? "На листе A4 по две открытки размером 100 × 150 мм." : pageSize === "a4-four" ? "На листе A4 по четыре открытки размером 95 × 142,5 мм (масштаб 95%)." : "Одна открытка размером 100 × 150 мм на листе фотобумаги."} Отключите колонтитулы и автоматическое кадрирование. Проверьте пробный отпечаток линейкой перед тиражом.</p><button type="button" onclick="window.print()">Печатать открытки</button></div>${sheets.join("")}</main></html>`;
   return new Blob([html], { type: "text/html;charset=utf-8" });
 }
 

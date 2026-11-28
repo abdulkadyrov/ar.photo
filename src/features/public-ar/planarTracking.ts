@@ -59,6 +59,16 @@ function validQuad(quad: Quad) {
 }
 
 export function estimatePlanarQuad(world: Point2[], screen: Point2[], marker: Size, input: Size): Quad | null {
+  return estimatePlanarObservation(world, screen, marker, input)?.corners ?? null;
+}
+
+export function estimatePlanarObservation(
+  world: Point2[],
+  screen: Point2[],
+  marker: Size,
+  input: Size,
+  allowPartial = false,
+) {
   if (world.length < 8 || world.length !== screen.length) return null;
   const source = world.map((p) => ({ x: p.x / marker.width, y: p.y / marker.height }));
   const destination = screen.map((p) => ({ x: p.x / input.width, y: p.y / input.height }));
@@ -101,7 +111,16 @@ export function estimatePlanarQuad(world: Point2[], screen: Point2[], marker: Si
   // A cluster on a face alone cannot reliably locate all four image corners.
   const spanX = Math.max(...points.map((p) => p.x)) - Math.min(...points.map((p) => p.x));
   const spanY = Math.max(...points.map((p) => p.y)) - Math.min(...points.map((p) => p.y));
-  if (spanX < 0.45 || spanY < 0.45) return null;
+  const partial = spanX < 0.45 || spanY < 0.45;
+  if (
+    partial &&
+    (!allowPartial ||
+      best.length < 10 ||
+      best.length < source.length * 0.75 ||
+      Math.min(spanX, spanY) < 0.28 ||
+      Math.max(spanX, spanY) < 0.5)
+  )
+    return null;
   const meanX = points.reduce((sum, p) => sum + p.x, 0) / points.length;
   const meanY = points.reduce((sum, p) => sum + p.y, 0) / points.length;
   const xx = points.reduce((sum, p) => sum + (p.x - meanX) ** 2, 0) / points.length;
@@ -114,7 +133,127 @@ export function estimatePlanarQuad(world: Point2[], screen: Point2[], marker: Si
   );
   if (!h || UNIT_CORNERS.some((p) => h[6] * p.x + h[7] * p.y + 1 <= 0.05)) return null;
   const quad = UNIT_CORNERS.map((p) => projectPoint(h, p)) as Quad;
-  return validQuad(quad) ? quad : null;
+  if (!validQuad(quad)) return null;
+  if (partial) {
+    if (
+      best.some((index) => {
+        const { x, y } = destination[index];
+        return x < 0 || x > 1 || y < 0 || y > 1;
+      })
+    )
+      return null;
+    const error = best.reduce((sum, index) => {
+      const p = projectPoint(h, source[index]);
+      return (
+        sum + ((p.x - destination[index].x) * input.width) ** 2 + ((p.y - destination[index].y) * input.height) ** 2
+      );
+    }, 0);
+    if (Math.sqrt(error / best.length) > 1.6) return null;
+  }
+  return { corners: quad, partial };
+}
+
+/**
+ * Diagnostic only: largest linearized corner standard deviation in camera
+ * pixels. Source and destination are normalized marker/camera coordinates.
+ * This is not a calibrated confidence bound: correlated matching errors can
+ * exceed it. Callers must supply the final inliers, not the RANSAC outliers.
+ */
+export function estimateCornerUncertainty(
+  source: Point2[],
+  destination: Point2[],
+  h: number[],
+  input: Size,
+  noiseFloorPixels = 0.5,
+): number | null {
+  if (
+    source.length < 5 ||
+    source.length !== destination.length ||
+    h.length !== 9 ||
+    h[8] !== 1 ||
+    !h.every(Number.isFinite) ||
+    [...source, ...destination].some((p) => !Number.isFinite(p.x + p.y)) ||
+    !Number.isFinite(input.width + input.height + noiseFloorPixels) ||
+    input.width <= 0 ||
+    input.height <= 0 ||
+    noiseFloorPixels < 0
+  )
+    return null;
+  const jacobian = ({ x, y }: Point2) => {
+    const w = h[6] * x + h[7] * y + 1;
+    if (!Number.isFinite(w) || w <= 0.05) return null;
+    const { x: u, y: v } = projectPoint(h, { x, y });
+    return [
+      [x, y, 1, 0, 0, 0, -u * x, -u * y].map((value) => (value * input.width) / w),
+      [0, 0, 0, x, y, 1, -v * x, -v * y].map((value) => (value * input.height) / w),
+    ];
+  };
+  const normal = Array.from({ length: 8 }, (_, row) =>
+    Array.from({ length: 16 }, (_, col) => (col === row + 8 ? 1 : 0)),
+  );
+  let squaredError = 0;
+  for (let index = 0; index < source.length; index++) {
+    const rows = jacobian(source[index]);
+    if (!rows) return null;
+    for (const row of rows) for (let a = 0; a < 8; a++) for (let b = 0; b < 8; b++) normal[a][b] += row[a] * row[b];
+    const p = projectPoint(h, source[index]);
+    squaredError +=
+      ((p.x - destination[index].x) * input.width) ** 2 + ((p.y - destination[index].y) * input.height) ** 2;
+  }
+  // Invert the information matrix; no estimate is safer than pretending that
+  // collinear or numerically singular support locates all four image corners.
+  const tolerance = Math.max(...normal.map((row, index) => Math.abs(row[index]))) * 1e-12;
+  for (let col = 0; col < 8; col++) {
+    let pivot = col;
+    for (let row = col + 1; row < 8; row++) if (Math.abs(normal[row][col]) > Math.abs(normal[pivot][col])) pivot = row;
+    if (Math.abs(normal[pivot][col]) <= tolerance) return null;
+    [normal[col], normal[pivot]] = [normal[pivot], normal[col]];
+    const divisor = normal[col][col];
+    for (let k = 0; k < 16; k++) normal[col][k] /= divisor;
+    for (let row = 0; row < 8; row++) {
+      if (row === col) continue;
+      const factor = normal[row][col];
+      for (let k = 0; k < 16; k++) normal[row][k] -= factor * normal[col][k];
+    }
+  }
+  // Keep a configurable detector-noise floor even for an exact synthetic fit.
+  const variance = Math.max(noiseFloorPixels ** 2, squaredError / (source.length * 2 - 8));
+  let worst = 0;
+  for (const corner of UNIT_CORNERS) {
+    const rows = jacobian(corner);
+    if (!rows) return null;
+    const predictionVariance = rows.reduce(
+      (sum, row) =>
+        sum +
+        row.reduce(
+          (value, component, a) => value + component * row.reduce((dot, other, b) => dot + normal[a][b + 8] * other, 0),
+          0,
+        ),
+      0,
+    );
+    if (!Number.isFinite(predictionVariance) || predictionVariance < -1e-8) return null;
+    worst = Math.max(worst, Math.sqrt(variance * Math.max(0, predictionVariance)));
+  }
+  return Number.isFinite(worst) ? worst : null;
+}
+
+export function partialPoseFollows(previous: Quad, next: Quad) {
+  const size = Math.hypot(previous[0].x - previous[2].x, previous[0].y - previous[2].y);
+  return next.every(
+    (point, index) => Math.hypot(point.x - previous[index].x, point.y - previous[index].y) <= size * 0.16,
+  );
+}
+
+/** Partial observations can move a trusted plane, but cannot reshape it. */
+export function stabilizePartialPose(previous: Quad, next: Quad, input: Size): Quad | null {
+  const pixels = (quad: Quad) => quad.map((p) => ({ x: p.x * input.width, y: p.y * input.height })) as Quad;
+  const before = pixels(previous);
+  const measured = pixels(next);
+  const coherent = fitCornerSimilarity(before, measured);
+  const diagonal = Math.hypot(before[0].x - before[2].x, before[0].y - before[2].y);
+  if (!diagonal || coherent.some((p, i) => Math.hypot(p.x - measured[i].x, p.y - measured[i].y) > diagonal * 0.035))
+    return null;
+  return coherent.map((p) => ({ x: p.x / input.width, y: p.y / input.height })) as Quad;
 }
 
 export function createCornerFilter() {
@@ -125,6 +264,7 @@ export function createCornerFilter() {
   let consistentShape = 0;
   let previousInput: Quad | null = null;
   let velocity: Quad | null = null;
+  let observedVelocity: Quad | null = null;
   const distance = (a: Quad, b: Quad) => Math.max(...a.map((p, i) => Math.hypot(p.x - b[i].x, p.y - b[i].y)));
   return {
     reset() {
@@ -134,38 +274,60 @@ export function createCornerFilter() {
       consistentShape = 0;
       previousInput = null;
       velocity = null;
+      observedVelocity = null;
       acceptedAt = -Infinity;
     },
     fresh(now: number) {
       return now - acceptedAt <= PLANAR_HOLD_MS;
     },
-    sample(next: Quad, now: number): Quad | null {
+    sample(next: Quad, now: number, continuousFlow = false): Quad | null {
       if (!validQuad(next) || !Number.isFinite(now) || now <= acceptedAt) return null;
       if (!corners || now - acceptedAt > PLANAR_HOLD_MS) {
         corners = next.map((p) => ({ ...p })) as Quad;
         previousResidual = null;
         consistentShape = 0;
         velocity = null;
+        observedVelocity = null;
       } else {
+        const dt = (now - acceptedAt) / 1000;
         const size = Math.max(0.02, Math.hypot(corners[0].x - corners[2].x, corners[0].y - corners[2].y));
-        const delta = distance(corners, next) / size;
-        const displacements = corners
+        // Gate measurement discontinuities, not lag accumulated by smoothing.
+        const lastMeasurement = previousInput ?? corners;
+        const delta = distance(lastMeasurement, next) / size;
+        const displacements = lastMeasurement
           .map((p, i) => Math.hypot(p.x - next[i].x, p.y - next[i].y) / size)
           .sort((a, b) => a - b);
         const oneCornerSlipped = displacements[3] > 0.04 && displacements[3] > 3 * Math.max(displacements[1], 0.005);
-        if ((delta > 0.18 || oneCornerSlipped) && (!candidate || distance(candidate, next) / size > 0.03)) {
+        // A slow camera/worker interval can contain real motion beyond the
+        // normal per-frame gate. Allow only a bounded continuation close to
+        // the preceding measured velocity; never extrapolate the drawn pose.
+        const predicted = observedVelocity
+          ? (lastMeasurement.map((p, i) => ({
+              x: p.x + observedVelocity![i].x * dt,
+              y: p.y + observedVelocity![i].y * dt,
+            })) as Quad)
+          : null;
+        const continuousMotion = dt > 0.05 && delta < 0.35 && predicted && distance(predicted, next) / size < 0.1;
+        if (
+          // Bidirectionally checked, spatially distributed flow supplies an
+          // independent continuity check; keep the hard jump bound even then.
+          !(continuousFlow && delta < 0.35) &&
+          ((delta > 0.18 && !continuousMotion) || oneCornerSlipped) &&
+          (!candidate || distance(candidate, next) / size > 0.03)
+        ) {
           candidate = next;
           // A rejected solve must not become apparent camera velocity.
           previousInput = null;
           velocity = null;
+          observedVelocity = null;
+          previousResidual = null;
+          consistentShape = 0;
           return null;
         }
         // Approach/retreat is mostly one coherent scale + translation. Let
         // that motion follow quickly without also opening the noise gate for
         // independent corner wobble (especially magnified near the photograph).
         const coherent = fitCornerSimilarity(corners, next);
-        const deformation = distance(coherent, next) / size;
-        const dt = (now - acceptedAt) / 1000;
         // Adapt to sustained velocity rather than distance from the filtered
         // output. Distance feedback opens/closes the noise gate as lag builds
         // up, producing stick-slip during a slow pan. Low-pass the signed
@@ -187,7 +349,11 @@ export function createCornerFilter() {
           const smooth = t * t * (3 - 2 * t);
           return 1 - Math.exp(-2 * Math.PI * (quiet + (moving - quiet) * smooth) * dt);
         };
-        const residual = next.map((p, i) => ({ x: p.x - coherent[i].x, y: p.y - coherent[i].y })) as Quad;
+        // Measure continued shape change between raw observations, not the
+        // distance still left to the smoothed output. Repeated biased solves
+        // otherwise look like continued tilt and cause a delayed snap.
+        const residual = next.map((p, i) => ({ x: p.x - inputMotion[i].x, y: p.y - inputMotion[i].y })) as Quad;
+        const deformation = distance(inputMotion, next) / size;
         const energy = (q: Quad) => q.reduce((sum, p) => sum + p.x * p.x + p.y * p.y, 0);
         const correlation = previousResidual
           ? residual.reduce((sum, p, i) => sum + p.x * previousResidual![i].x + p.y * previousResidual![i].y, 0) /
@@ -198,12 +364,20 @@ export function createCornerFilter() {
         const motionAlpha = coefficient(speed, 2, 35, 0.05, 0.14);
         // A sustained perspective change is motion, not noise. Alternating
         // corner errors do not pass this directional consistency check.
-        const shapeAlpha =
-          consistentShape >= 2 ? 1 - Math.exp(-2 * Math.PI * 35 * dt) : coefficient(deformation, 1.5, 35, 0.004, 0.025);
+        // Oblique views amplify homography uncertainty. Its amplitude alone
+        // must never open the shape gate: a stationary tilted target can have
+        // larger alternating corner errors than a moving front-facing one.
+        const shapeAlpha = 1 - Math.exp(-2 * Math.PI * (consistentShape >= 2 ? 35 : 1.5) * dt);
         corners = corners.map((p, i) => ({
           x: p.x + motionAlpha * (coherent[i].x - p.x) + shapeAlpha * (next[i].x - coherent[i].x),
           y: p.y + motionAlpha * (coherent[i].y - p.y) + shapeAlpha * (next[i].y - coherent[i].y),
         })) as Quad;
+        observedVelocity = previousInput
+          ? (next.map((p, i) => ({
+              x: (p.x - previousInput![i].x) / dt,
+              y: (p.y - previousInput![i].y) / dt,
+            })) as Quad)
+          : null;
       }
       candidate = null;
       previousInput = next.map((p) => ({ ...p })) as Quad;
